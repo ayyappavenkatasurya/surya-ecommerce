@@ -1,0 +1,24 @@
+<%- include('../partials/header', { title: 'Login' }) %>
+
+<div class="auth-container">
+    <h1>Login</h1>
+
+    <%# --- Spinner Class Added --- %>
+    <form action="/auth/login" method="POST" class="auth-form form-submit-spinner">
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required autocomplete="email">
+        </div>
+        <div class="form-group">
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+    <div class="auth-links">
+        <p><a href="/auth/forgot-password">Forgot Password?</a></p>
+        <p>Don't have an account? <a href="/auth/register">Register here</a></p>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

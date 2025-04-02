@@ -1,0 +1,26 @@
+<%- include('../partials/header', { title: 'Delivery Dashboard' }) %>
+
+<div class="delivery-dashboard-container">
+    <h1>My Delivery Dashboard</h1>
+    <p>Welcome, <%= currentUser.name %> (<%= assignedAdminEmail %>)!</p>
+
+    <div class="delivery-stats-grid">
+         <div class="stat-card">
+            <h2><%= totalAssigned %></h2>
+            <p>Total Assigned Orders</p>
+            <a href="/delivery/orders/total" class="btn btn-primary">View All</a>
+         </div>
+        <div class="stat-card">
+            <h2><%= pendingCount %></h2>
+            <p>Pending Deliveries</p>
+            <a href="/delivery/orders/pending" class="btn btn-warning">View Pending</a>
+         </div>
+        <div class="stat-card">
+            <h2><%= deliveredCount %></h2>
+            <p>Completed Deliveries</p>
+            <a href="/delivery/orders/delivered" class="btn btn-success">View Delivered</a>
+        </div>
+     </div>
+</div>
+
+ <%- include('../partials/footer') %>

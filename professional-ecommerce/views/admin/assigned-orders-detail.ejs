@@ -1,0 +1,44 @@
+ <%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container">
+    <h1><%= title %></h1>
+    <p><a href="/admin/manage-assigned-orders">&laquo; Back to Delivery Admin Overview</a></p>
+
+    <% if (orders.length > 0) { %>
+        <table class="data-table">
+            <thead>
+                 <tr>
+                    <th>Order ID</th>
+                    <th>Placed Date</th>
+                     <th>Customer Email</th>
+                     <th>Address</th>
+                     <th>Items</th>
+                    <th>Total</th>
+                     <th>Status</th>
+                     <th>Delivered Date</th>
+                 </tr>
+             </thead>
+            <tbody>
+                <% orders.forEach(order => { %>
+                    <tr>
+                         <td><%= order._id %></td>
+                         <td><%= order.formattedOrderDate %></td>
+                        <td><%= order.userEmail %></td>
+                        <td>
+                             <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
+                             <br>Ph: <%= order.shippingAddress.phone %>
+                         </td>
+                         <td><%= order.products.map(p => `${p.name} (x${p.quantity})`).join(', ').substring(0, 50) %>...</td>
+                         <td>$<%= order.totalAmount.toFixed(2) %></td>
+                         <td><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
+                         <td><%= order.formattedReceivedDate %></td>
+                    </tr>
+                <% }) %>
+             </tbody>
+        </table>
+     <% } else { %>
+         <p>No orders found matching this criteria for <%= deliveryAdminEmail %>.</p>
+     <% } %>
+</div>
+
+<%- include('../partials/footer') %>

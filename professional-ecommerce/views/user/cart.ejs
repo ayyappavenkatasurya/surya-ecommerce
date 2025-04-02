@@ -1,0 +1,53 @@
+<%- include('../partials/header', { title: 'Shopping Cart' }) %>
+
+<div class="cart-container">
+    <h1>Your Shopping Cart</h1>
+
+    <% if (cart.length > 0) { %>
+        <div class="cart-items">
+            <% cart.forEach(item => { %>
+                <div class="cart-item" data-product-id="<%= item.productId %>">
+                    <div class="cart-item-image">
+                        <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
+                    </div>
+                    <div class="cart-item-details">
+                        <h3 class="cart-item-name"><%= item.name %></h3>
+                        <p class="cart-item-price">$<%= item.price.toFixed(2) %></p>
+                         <p class="cart-item-stock">Stock: <%= item.stock %></p>
+                    </div>
+                    <div class="cart-item-quantity">
+                        <label for="quantity-<%= item.productId %>">Qty:</label>
+                        <input type="number"
+                               id="quantity-<%= item.productId %>"
+                               class="quantity-input"
+                               name="quantity"
+                               value="<%= item.quantity %>"
+                               min="0"
+                               max="<%= item.stock %>"
+                               data-product-id="<%= item.productId %>"
+                               data-item-price="<%= item.price %>">
+                        <button class="btn btn-secondary btn-sm btn-update-qty" data-product-id="<%= item.productId %>">Update</button>
+                     </div>
+                     <div class="cart-item-subtotal">
+                         Subtotal: $<span class="item-subtotal-value"><%= item.subtotal.toFixed(2) %></span>
+                    </div>
+                    <div class="cart-item-remove">
+                        <form action="/user/cart/remove/<%= item.productId %>" method="POST">
+                            <button type="submit" class="btn btn-danger btn-sm">&times; Remove</button>
+                         </form>
+                     </div>
+                </div>
+            <% }) %>
+        </div>
+
+         <div class="cart-summary">
+             <h2>Cart Total: $<span id="cart-total-value"><%= cartTotal.toFixed(2) %></span></h2>
+             <a href="/user/checkout" class="btn btn-success btn-checkout">Proceed to Checkout</a>
+        </div>
+
+    <% } else { %>
+        <p>Your cart is empty. <a href="/">Continue Shopping</a></p>
+    <% } %>
+</div>
+
+ <%- include('../partials/footer') %>

@@ -1,0 +1,36 @@
+<%- include('../partials/header', { title: 'Admin Dashboard' }) %>
+
+<div class="admin-dashboard-container">
+    <h1>Admin Dashboard</h1>
+    <p>Welcome, <%= currentUser.name %>!</p>
+
+    <div class="admin-actions-grid">
+         <a href="/admin/upload-product" class="admin-action-card">
+            <i class="fas fa-upload"></i>
+            <h3>Upload Products</h3>
+            <p>Add new products to the store.</p>
+        </a>
+         <a href="/admin/manage-products" class="admin-action-card">
+            <i class="fas fa-edit"></i>
+            <h3>Manage Products</h3>
+            <p>Edit or remove existing products.</p>
+         </a>
+        <a href="/admin/manage-orders" class="admin-action-card">
+             <i class="fas fa-clipboard-list"></i>
+             <h3>Manage Orders</h3>
+             <p>View, verify, and assign orders.</p>
+        </a>
+        <a href="/admin/manage-users" class="admin-action-card">
+             <i class="fas fa-users-cog"></i>
+             <h3>Manage Users</h3>
+             <p>Update roles or remove users.</p>
+        </a>
+         <a href="/admin/manage-assigned-orders" class="admin-action-card">
+            <i class="fas fa-shipping-fast"></i>
+            <h3>Manage Assigned Orders</h3>
+             <p>Track delivery admin progress.</p>
+         </a>
+        </div>
+    </div>
+
+ <%- include('../partials/footer') %>

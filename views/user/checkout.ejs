@@ -1,0 +1,113 @@
+<%# views/user/checkout.ejs %>
+<%- include('../partials/header', { title: 'Checkout' }) %>
+
+<div class="checkout-container">
+    <h1>Checkout</h1>
+
+    <div class="checkout-grid">
+        <div class="checkout-address">
+            <h2>Shipping Address</h2>
+            <% if (userAddress && userAddress.name) { %>
+                <div class="saved-address">
+                    <p><strong><%= userAddress.name %></strong></p>
+                    <p><%= userAddress.phone %></p>
+                    <p><%= userAddress.landmarkNearby ? userAddress.landmarkNearby + ', ' : '' %><%= userAddress.cityVillage %></p>
+                    <p>Pincode: <%= userAddress.pincode %></p>
+                    <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+                </div>
+             <% } %>
+
+            <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (userAddress && userAddress.name) ? 'hidden' : '' %> form-submit-spinner">
+                <h3><%= (userAddress && userAddress.name) ? 'Edit Address' : 'Add Address' %></h3>
+                <div class="form-group">
+                    <label for="name">Full Name:</label>
+                    <input type="text" id="name" name="name" value="<%= userAddress?.name || '' %>" required autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number:</label>
+                    <input type="tel" <%# Correct semantic type %>
+                           id="phone"
+                           name="phone"
+                           value="<%= userAddress?.phone || '' %>"
+                           required
+                           pattern="\d{10,15}" <%# Expect 10-15 digits %>
+                           minlength="10"  <%# Minimum 10 digits %>
+                           maxlength="15" <%# Maximum 15 digits %>
+                           title="Enter 10 to 15 digit phone number (numbers only)" <%# Clear hint %>
+                           autocomplete="tel"> <%# Standard autocomplete %>
+                </div>
+                 <div class="form-group">
+                    <label for="pincode">Pincode:</label>
+                     <input type="text" <%# Use text type, pattern handles format %>
+                            id="pincode"
+                            name="pincode"
+                            value="<%= userAddress?.pincode || '' %>"
+                            required
+                            pattern="\d{6}" <%# Assuming 6 digit Indian pincode %>
+                            maxlength="6"
+                            inputmode="numeric"
+                            title="Enter 6-digit Pincode"
+                            autocomplete="postal-code">
+                </div>
+                 <div class="form-group">
+                    <label for="cityVillage">City / Village:</label>
+                     <input type="text" id="cityVillage" name="cityVillage" value="<%= userAddress?.cityVillage || '' %>" required autocomplete="address-level2">
+                </div>
+                <div class="form-group">
+                    <label for="landmarkNearby">Landmark / Nearby (Optional):</label>
+                     <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= userAddress?.landmarkNearby || '' %>">
+                </div>
+                <button type="submit" class="btn btn-primary">Save Address</button>
+                <% if (userAddress && userAddress.name) { %>
+                    <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel Edit</button>
+                <% } %>
+             </form>
+        </div>
+
+         <div class="checkout-summary">
+             <h2>Order Summary</h2>
+             <div class="checkout-items">
+                 <% items.forEach(item => { %>
+                    <div class="checkout-item">
+                         <a href="/products/<%= item.productId %>" class="checkout-item-image">
+                            <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
+                        </a>
+                        <div class="checkout-item-info">
+                             <%= item.name %> (Qty: <%= item.quantity %>)
+                        </div>
+                        <div class="checkout-item-price">₹<%= item.itemTotal.toFixed(2) %></div>
+                     </div>
+                <% }) %>
+            </div>
+            <hr>
+            <div class="checkout-totals">
+                <p>Subtotal: <span>₹<%= subTotal.toFixed(2) %></span></p>
+                 <p>Shipping: <span>FREE</span></p>
+                <hr>
+                 <p><strong>Total: <span>₹<%= totalAmount.toFixed(2) %></span></strong></p>
+            </div>
+
+            <div class="checkout-payment">
+                <h3>Payment Method</h3>
+                 <div class="payment-option selected">
+                     <input type="radio" id="cod" name="paymentMethodValue" value="COD" checked disabled>
+                     <label for="cod"><i class="fas fa-money-bill-wave"></i> Cash on Delivery (COD)</label>
+                 </div>
+            </div>
+
+            <form action="/orders/place" method="POST" class="place-order-form form-submit-spinner">
+                 <input type="hidden" name="paymentMethod" value="COD">
+                 <button type="submit" class="btn btn-success btn-block btn-place-order" <%= (!userAddress || !userAddress.name) ? 'disabled' : '' %>>
+                    Place Order
+                 </button>
+                 <% if (!userAddress || !userAddress.name) { %>
+                    <p class="text-danger small">Please add/save your shipping address first.</p>
+                 <% } %>
+             </form>
+         </div>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
+
+<%# Checkout specific JS logic was moved to public/js/main.js %>

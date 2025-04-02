@@ -1,0 +1,66 @@
+<%# views/admin/assigned-orders-detail.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container">
+    <h1><%= title %></h1>
+    <p><a href="/admin/manage-assigned-orders">« Back to Delivery Admin Overview</a></p>
+
+    <% if (orders.length > 0) { %>
+        <table class="data-table">
+            <thead>
+                 <tr>
+                    <th>Image</th>
+                    <th>Order ID</th>
+                    <th>Placed Date</th>
+                     <th>Customer Email</th>
+                     <th>Address</th>
+                     <th>Items</th>
+                    <th>Total</th>
+                     <th>Status</th>
+                     <th>Delivered Date</th>
+                 </tr>
+             </thead>
+            <tbody>
+                <% orders.forEach(order => { %>
+                    <tr>
+                        <td>
+                            <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
+                                <a href="/products/<%= order.products[0].productId %>">
+                                    <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
+                                </a>
+                            <% } else { %>
+                                <span class="text-muted">N/A</span>
+                            <% } %>
+                        </td>
+                         <td><%= order._id %></td>
+                         <td><%= order.formattedOrderDate %></td>
+                        <td><%= order.userEmail %></td>
+                        <td>
+                             <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
+                             <br>Ph: <%= order.shippingAddress.phone %>
+                         </td>
+                         <td>
+                            <% if (order.products && order.products.length > 0) { %>
+                                <%= order.products[0].name %> (x<%= order.products[0].quantity %>)
+                                <% if (order.products.length > 1) { %>
+                                    <br><small>+ <%= order.products.length - 1 %> more item(s)</small>
+                                <% } %>
+                            <% } else { %>
+                                No items found
+                            <% } %>
+                         </td>
+                         <%# --- CURRENCY UPDATE --- %>
+                         <td>₹<%= order.totalAmount.toFixed(2) %></td>
+                         <%# --- END CURRENCY UPDATE --- %>
+                         <td><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
+                         <td><%= order.formattedReceivedDate %></td>
+                    </tr>
+                <% }) %>
+             </tbody>
+        </table>
+     <% } else { %>
+         <p>No orders found matching this criteria for <%= deliveryAdminEmail %>.</p>
+     <% } %>
+</div>
+
+<%- include('../partials/footer') %>

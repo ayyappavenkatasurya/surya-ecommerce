@@ -1,0 +1,127 @@
+<%- include('../partials/header', { title: 'Checkout' }) %>
+
+<div class="checkout-container">
+    <h1>Checkout</h1>
+
+    <div class="checkout-grid">
+        <div class="checkout-address">
+            <h2>Shipping Address</h2>
+            <% if (userAddress && userAddress.name) { %>
+                <div class="saved-address">
+                    <p><strong><%= userAddress.name %></strong></p>
+                    <p><%= userAddress.phone %></p>
+                    <p><%= userAddress.landmarkNearby ? userAddress.landmarkNearby + ', ' : '' %><%= userAddress.cityVillage %></p>
+                    <p>Pincode: <%= userAddress.pincode %></p>
+                    <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+                </div>
+             <% } %>
+
+            <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (userAddress && userAddress.name) ? 'hidden' : '' %>">
+                <h3><%= (userAddress && userAddress.name) ? 'Edit Address' : 'Add Address' %></h3>
+                <div class="form-group">
+                    <label for="name">Full Name:</label>
+                    <input type="text" id="name" name="name" value="<%= userAddress?.name || '' %>" required>
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number:</label>
+                    <input type="tel" id="phone" name="phone" value="<%= userAddress?.phone || '' %>" required>
+                </div>
+                 <div class="form-group">
+                    <label for="pincode">Pincode:</label>
+                     <input type="text" id="pincode" name="pincode" value="<%= userAddress?.pincode || '' %>" required>
+                </div>
+                 <div class="form-group">
+                    <label for="cityVillage">City / Village:</label>
+                     <input type="text" id="cityVillage" name="cityVillage" value="<%= userAddress?.cityVillage || '' %>" required>
+                </div>
+                <div class="form-group">
+                    <label for="landmarkNearby">Landmark / Nearby (Optional):</label>
+                     <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= userAddress?.landmarkNearby || '' %>">
+                </div>
+                <button type="submit" class="btn btn-primary">Save Address</button>
+                <% if (userAddress && userAddress.name) { %>
+                    <button type="button" id="cancel-edit-btn" class="btn btn-secondary">Cancel Edit</button>
+                <% } %>
+             </form>
+        </div>
+
+         <div class="checkout-summary">
+             <h2>Order Summary</h2>
+             <div class="checkout-items">
+                 <% items.forEach(item => { %>
+                    <div class="checkout-item">
+                         <img src="<%= item.imageUrl %>" alt="<%= item.name %>" class="checkout-item-image">
+                        <div class="checkout-item-info">
+                             <%= item.name %> (Qty: <%= item.quantity %>)
+                        </div>
+                        <div class="checkout-item-price">$<%= item.itemTotal.toFixed(2) %></div>
+                     </div>
+                <% }) %>
+            </div>
+            <hr>
+            <div class="checkout-totals">
+                <p>Subtotal: <span>$<%= subTotal.toFixed(2) %></span></p>
+                 <p>Shipping: <span>FREE</span></p>
+                <hr>
+                 <p><strong>Total: <span>$<%= totalAmount.toFixed(2) %></span></strong></p>
+            </div>
+
+            <div class="checkout-payment">
+                <h3>Payment Method</h3>
+                 <div class="payment-option selected">
+                     <input type="radio" id="cod" name="paymentMethod" value="COD" checked disabled>
+                     <label for="cod"><i class="fas fa-money-bill-wave"></i> Cash on Delivery (COD)</label>
+                 </div>
+            </div>
+
+            <form action="/orders/place" method="POST" class="place-order-form">
+                 <input type="hidden" name="paymentMethod" value="COD">
+                 <button type="submit" class="btn btn-success btn-block btn-place-order" <%= (!userAddress || !userAddress.name) ? 'disabled' : '' %>>
+                    Place Order
+                 </button>
+                 <% if (!userAddress || !userAddress.name) { %>
+                    <p class="text-danger small">Please save your shipping address first.</p>
+                 <% } %>
+             </form>
+         </div>
+    </div>
+</div>
+
+
+ <%- include('../partials/footer') %>
+
+ <script>
+    const editBtn = document.getElementById('edit-address-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const addressForm = document.getElementById('address-form');
+    const savedAddressDiv = document.querySelector('.saved-address');
+    const placeOrderBtn = document.querySelector('.btn-place-order');
+    const formTitle = addressForm.querySelector('h3');
+
+    if(editBtn) {
+         editBtn.addEventListener('click', () => {
+             addressForm.classList.remove('hidden');
+             if (savedAddressDiv) savedAddressDiv.classList.add('hidden');
+             if(placeOrderBtn) placeOrderBtn.disabled = true;
+             if(formTitle) formTitle.textContent = 'Edit Address';
+         });
+    }
+     if(cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            addressForm.classList.add('hidden');
+            if (savedAddressDiv) savedAddressDiv.classList.remove('hidden');
+            if(placeOrderBtn) placeOrderBtn.disabled = false;
+             // Optionally clear form fields on cancel or repopulate with original if needed
+        });
+     }
+     // If initially no address, ensure place order button is disabled
+     if (placeOrderBtn && (!savedAddressDiv || savedAddressDiv.classList.contains('hidden')) && addressForm.classList.contains('hidden')) {
+        addressForm.classList.remove('hidden'); // Show form if no address saved
+         if (formTitle) formTitle.textContent = 'Add Address';
+     }
+      if (placeOrderBtn && (!'<%= userAddress?.name %>')){
+        placeOrderBtn.disabled = true;
+      }
+
+ </script>
+

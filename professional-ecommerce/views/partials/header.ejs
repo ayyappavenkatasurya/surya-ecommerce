@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %> | Professional Ecommerce</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header class="app-header">
+        <nav class="navbar">
+            <div class="nav-left">
+                <a href="/" class="app-logo">
+                   <i class="fas fa-shopping-bag"></i> <span class="app-name">EcoPro</span>
+                </a>
+            </div>
+            <div class="nav-center">
+
+            </div>
+            <div class="nav-right">
+                <% if (currentUser) { %>
+                    <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>">Home</a>
+                     <a href="/user/cart" class="nav-link nav-link-cart <%= currentUrl === '/user/cart' ? 'active' : '' %>">
+                         <i class="fas fa-shopping-cart"></i> Cart
+                         <% if (cartItemCount > 0) { %>
+                             <span class="cart-badge"><%= cartItemCount %></span>
+                         <% } %>
+                     </a>
+                    <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>">My Orders</a>
+
+                    <% if (currentUser.role === 'admin') { %>
+                        <a href="/admin/dashboard" class="nav-link <%= currentUrl.startsWith('/admin') ? 'active' : '' %>">Admin Dashboard</a>
+                    <% } %>
+
+                     <% if (currentUser.role === 'delivery_admin') { %>
+                        <a href="/delivery/dashboard" class="nav-link <%= currentUrl.startsWith('/delivery') ? 'active' : '' %>">Delivery Dashboard</a>
+                     <% } %>
+
+                     <form action="/auth/logout" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-logout">Logout (<%= currentUser.name %>)</button>
+                     </form>
+                <% } else { %>
+                    <a href="/auth/login" class="btn btn-login-register">Login / Register</a>
+                <% } %>
+            </div>
+        </nav>
+    </header>
+
+     <%- include('messages') %>
+
+
+    <main class="container">
+

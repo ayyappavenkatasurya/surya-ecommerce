@@ -1,0 +1,33 @@
+<%- include('../partials/header', { title: title || 'Verify OTP' }) %>
+
+<div class="auth-container">
+    <h1>Verify OTP</h1>
+    <p>An OTP has been sent to <strong><%= email %></strong>. Please enter it below.</p>
+
+    <%# --- Spinner Class Added & Input Attributes Updated --- %>
+    <form action="/auth/verify-otp" method="POST" class="auth-form form-submit-spinner">
+         <input type="hidden" name="email" value="<%= email %>">
+        <div class="form-group">
+            <label for="otp">OTP Code:</label>
+            <input type="text" <%# Changed type to text for better compatibility %>
+                   id="otp"
+                   name="otp"
+                   required
+                   pattern="\d{6}" <%# Ensures exactly 6 digits %>
+                   maxlength="6"  <%# Limits input length %>
+                   inputmode="numeric" <%# Suggests numeric keyboard on mobile %>
+                   autocomplete="one-time-code" <%# Helps password managers/browsers %>
+                   title="Enter the 6-digit OTP code received"> <%# Clear hint %>
+        </div>
+        <button type="submit" class="btn btn-primary">Verify OTP</button>
+    </form>
+    <div class="auth-links">
+        <p>Didn't receive the OTP?</p>
+        <form action="/auth/resend-otp" method="POST" style="display:inline;" class="form-submit-spinner">
+             <input type="hidden" name="email" value="<%= email %>">
+             <button type="submit" class="btn btn-secondary btn-sm">Resend OTP</button>
+         </form>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,17 @@
+<%- include('./partials/header', { title: 'Error' }) %>
+
+<div class="error-container container">
+    <h1>Error <%= typeof statusCode !== 'undefined' ? statusCode : '' %></h1>
+    <p class="lead text-danger"><%= message %></p>
+
+    <% if (process.env.NODE_ENV === 'development' && stack) { %>
+        <details style="white-space: pre-wrap; margin-top: 20px; background: #f1f1f1; padding: 10px; border-radius: 5px; font-size: 0.8em;">
+            <summary>Stack Trace (Development Mode)</summary>
+            <code><%= stack %></code>
+        </details>
+    <% } %>
+
+    <p style="margin-top: 20px;"><a href="/" class="btn btn-primary">Go back to Home</a></p>
+</div>
+
+<%- include('./partials/footer') %>

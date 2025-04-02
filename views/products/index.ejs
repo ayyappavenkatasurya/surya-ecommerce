@@ -1,0 +1,59 @@
+<%# views/products/index.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="product-index-container">
+    <h1><%= title %></h1>
+
+    <div class="search-bar-container">
+        <form action="/products" method="GET" class="search-form">
+            <input type="text" name="search" placeholder="Search products by name, category..." value="<%= searchTerm %>" aria-label="Search Products">
+            <button type="submit" class="btn" aria-label="Submit Search"><i class="fas fa-search"></i></button>
+             <% if (searchTerm) { %>
+                 <a href="/" class="btn btn-clear-search">Clear</a>
+             <% } %>
+        </form>
+    </div>
+
+    <% if (products.length > 0) { %>
+        <div class="product-grid">
+            <% products.forEach(product => { %>
+                <div class="product-card">
+                    <a href="/products/<%= product._id %>" class="product-link">
+                        <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-image">
+                        <div class="product-info">
+                            <h3 class="product-name"><%= product.name %></h3>
+                            <%# --- CURRENCY UPDATE --- %>
+                            <%# Safely handle potentially missing price before formatting %>
+                            <p class="product-price">₹<%= (typeof product.price === 'number' ? product.price : 0).toFixed(2) %></p>
+                            <%# --- END CURRENCY UPDATE --- %>
+                            <p class="product-stock">Stock: <%= product.stock %></p>
+                            <% if (product.numReviews > 0) { %>
+                                 <p class="product-rating">
+                                    <% for(let i=1; i<=5; i++) { %>
+                                        <i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i>
+                                    <% } %>
+                                    (<%= product.numReviews %>)
+                                 </p>
+                            <% } else { %>
+                                <p class="product-rating"> </p> <%# Keep space for alignment %>
+                            <% } %>
+                        </div>
+                    </a>
+                     <%# --- Spinner Class Added --- %>
+                     <form action="/user/cart/add" method="POST" class="add-to-cart-form form-submit-spinner">
+                         <input type="hidden" name="productId" value="<%= product._id %>">
+                         <input type="hidden" name="quantity" value="1">
+                        <button type="submit" class="btn btn-primary btn-add-to-cart" <%= product.stock <= 0 ? 'disabled' : '' %>>
+                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
+                         </button>
+                    </form>
+                </div>
+            <% }) %>
+        </div>
+    <% } else { %>
+        <p>No products found matching your criteria.</p>
+    <% } %>
+
+</div>
+
+<%- include('../partials/footer') %>

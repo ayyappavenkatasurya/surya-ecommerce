@@ -1,0 +1,143 @@
+<%- include('../partials/header', { title: product.name }) %>
+
+<div class="product-detail-container">
+   <div class="product-detail-main">
+        <div class="product-detail-image">
+           <img src="<%= product.imageUrl %>" alt="<%= product.name %>">
+        </div>
+       <div class="product-detail-info">
+            <h1><%= product.name %></h1>
+            <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
+            <p class="detail-stock">Available Stock: <%= product.stock %></p>
+
+           <% if (product.numReviews > 0) { %>
+                <p class="detail-rating">
+                    Rating:
+                   <% for(let i=1; i<=5; i++) { %>
+                       <i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i>
+                   <% } %>
+                    (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
+                </p>
+            <% } else { %>
+                <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
+            <% } %>
+
+            <p>Seller: <%= product.sellerEmail %></p>
+
+           <div class="product-actions">
+                <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
+                   <input type="hidden" name="productId" value="<%= product._id %>">
+                    <div class="quantity-selector">
+                       <label for="quantity">Qty:</label>
+                        <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" <%= product.stock <= 0 ? 'disabled' : '' %>>
+                        <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
+                    </button>
+               </form>
+
+                 <% if (product.stock > 0) { %>
+                 <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
+                       <input type="hidden" name="productId" value="<%= product._id %>">
+                       <input type="hidden" name="quantity" value="1">
+                      <button type="submit" class="btn btn-success">Buy Now</button>
+                    </form>
+                 <% } else {%>
+                   <button class="btn btn-success" disabled>Buy Now</button>
+                 <% } %>
+           </div>
+
+           <!-- Share Functionality -->
+           <div class="share-section">
+               <button id="share-product-btn" class="btn btn-secondary btn-sm"
+                       data-title="<%= product.name %>"
+                       data-text="Check out this product: <%= product.name %>"
+                       data-url="<%= fullUrl %>">
+                   <i class="fas fa-share-alt"></i> Share
+               </button>
+               <div id="fallback-share-links" class="fallback-share-links hidden">
+                   <span>Share via:</span>
+                   <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
+                   <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
+                   <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
+                   <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
+               </div>
+           </div>
+           <!-- End Share Functionality -->
+
+           <div class="product-specifications">
+                <h3>Specifications</h3>
+                <pre><%= product.specifications || 'No specifications provided.' %></pre>
+            </div>
+       </div>
+    </div>
+
+   <div class="product-rating-section">
+        <h3>Rate This Product</h3>
+        <% if (userCanRate) { %>
+            <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
+                <!-- RATING STARS SECTION (Loop 5 down to 1) -->
+                <div class="rating-stars">
+                    <% for (let i = 5; i >= 1; i--) { %>
+                       <input type="radio" id="star<%= i %>" name="rating" value="<%= i %>" <%= userRating === i ? 'checked' : '' %> required>
+                       <label for="star<%= i %>" title="<%= i %> stars"><i class="fas fa-star"></i></label>
+                    <% } %>
+                </div>
+                <!-- END RATING STARS SECTION -->
+                <button type="submit" class="btn btn-primary">Submit Rating</button>
+            </form>
+        <% } else { %>
+           <p><a href="/auth/login?returnTo=<%= encodeURIComponent(currentUrl) %>">Login</a> to rate this product.</p>
+        <% } %>
+   </div>
+
+    <!-- Rating Statistics Section -->
+    <div class="rating-stats-container">
+        <h3>Ratings & Reviews</h3>
+         <% if (totalRatings > 0) { %>
+             <div class="rating-summary">
+                 <div class="rating-average">
+                     <span class="rating-average-value"><%= product.averageRating.toFixed(1) %></span> <i class="fas fa-star"></i>
+                 </div>
+                 <div class="rating-total">
+                     <%= totalRatings %> Rating<%= totalRatings !== 1 ? 's' : '' %>
+                 </div>
+             </div>
+
+            <div class="rating-bars">
+                <% for (let i = 5; i >= 1; i--) { %>
+                    <%
+                        const count = ratingCounts[i] || 0;
+                        const percentage = totalRatings > 0 ? (count / totalRatings) * 100 : 0;
+                    %>
+                     <div class="rating-bar-row">
+                         <span class="rating-bar-label"><%= i %> <i class="fas fa-star"></i></span>
+                         <div class="rating-bar-progress">
+                             <!-- Instead of inline CSS, we set the computed percentage as a data attribute -->
+                             <div class="rating-bar-fill" data-width="<%= percentage.toFixed(1) %>"></div>
+                         </div>
+                         <span class="rating-bar-count"><%= count %></span>
+                     </div>
+                 <% } %>
+            </div>
+        <% } else { %>
+            <p>No ratings yet for this product.</p>
+         <% } %>
+    </div>
+    <!-- End Rating Statistics Section -->
+
+</div>
+
+<!-- Script to set dynamic widths for rating bars -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
+        var width = el.getAttribute('data-width');
+        if (width) {
+            el.style.width = width + '%';
+        }
+    });
+});
+</script>
+
+<%- include('../partials/footer') %>

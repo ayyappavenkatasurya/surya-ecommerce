@@ -1,0 +1,49 @@
+ <%- include('../partials/header', { title: 'Manage Users' }) %>
+
+<div class="admin-manage-container">
+    <h1>Manage Users</h1>
+
+    <% if (users.length > 0) { %>
+         <table class="data-table">
+             <thead>
+                <tr>
+                     <th>Name</th>
+                    <th>Email</th>
+                     <th>Role</th>
+                     <th>Registered On</th>
+                     <th>Verified</th>
+                    <th>Actions</th>
+                 </tr>
+             </thead>
+            <tbody>
+                <% users.forEach(user => { %>
+                    <tr>
+                         <td><%= user.name %></td>
+                        <td><%= user.email %></td>
+                        <td>
+                            <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form">
+                                 <select name="role" onchange="this.form.submit()">
+                                     <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                                    <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                     <option value="delivery_admin" <%= user.role === 'delivery_admin' ? 'selected' : '' %>>Delivery Admin</option>
+                                 </select>
+                                 <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
+                            </form>
+                        </td>
+                         <td><%= new Date(user.createdAt).toLocaleDateString() %></td>
+                         <td><%= user.isVerified ? 'Yes' : 'No' %></td>
+                         <td class="actions-cell">
+                             <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');">
+                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
+                            </form>
+                         </td>
+                    </tr>
+                 <% }) %>
+            </tbody>
+        </table>
+     <% } else { %>
+         <p>No other users registered.</p>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

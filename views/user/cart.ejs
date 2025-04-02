@@ -1,0 +1,65 @@
+<%# views/user/cart.ejs %>
+<%- include('../partials/header', { title: 'Shopping Cart' }) %>
+
+<div class="cart-container">
+    <h1>Your Shopping Cart</h1>
+
+    <% if (cart.length > 0) { %>
+        <div class="cart-items">
+            <% cart.forEach(item => { %>
+                <div class="cart-item" data-product-id="<%= item.productId %>">
+                    <div class="cart-item-image">
+                        <a href="/products/<%= item.productId %>"><img src="<%= item.imageUrl %>" alt="<%= item.name %>"></a>
+                    </div>
+                    <div class="cart-item-details">
+                        <h3 class="cart-item-name"><%= item.name %></h3>
+                        <%# --- CURRENCY UPDATE --- %>
+                        <%# Safely handle potentially missing item price %>
+                        <p class="cart-item-price">₹<%= (typeof item.price === 'number' ? item.price : 0).toFixed(2) %></p>
+                        <%# --- END CURRENCY UPDATE --- %>
+                         <p class="cart-item-stock">Stock: <%= item.stock %></p>
+                    </div>
+                    <div class="cart-item-quantity">
+                        <label for="quantity-<%= item.productId %>">Qty:</label>
+                        <input type="number"
+                               id="quantity-<%= item.productId %>"
+                               class="quantity-input"
+                               name="quantity"
+                               value="<%= item.quantity %>"
+                               min="0" <%# Allow 0 for removal via update %>
+                               max="<%= item.stock %>"
+                               data-product-id="<%= item.productId %>"
+                               data-item-price="<%= item.price %>"
+                               aria-label="Quantity for <%= item.name %>">
+                        <button class="btn btn-secondary btn-sm btn-update-qty" data-product-id="<%= item.productId %>">Update</button> <%# Spinner handled by AJAX logic %>
+                     </div>
+                     <div class="cart-item-subtotal">
+                         <%# --- CURRENCY UPDATE --- %>
+                         <%# Safely handle potentially missing item subtotal %>
+                         Subtotal: ₹<span class="item-subtotal-value"><%= (typeof item.subtotal === 'number' ? item.subtotal : 0).toFixed(2) %></span>
+                         <%# --- END CURRENCY UPDATE --- %>
+                    </div>
+                    <div class="cart-item-remove">
+                        <%# --- Spinner Class Added --- %>
+                        <form action="/user/cart/remove/<%= item.productId %>" method="POST" class="form-submit-spinner">
+                            <button type="submit" class="btn btn-danger btn-sm">× Remove</button>
+                         </form>
+                     </div>
+                </div>
+            <% }) %>
+        </div>
+
+         <div class="cart-summary">
+             <%# --- CURRENCY UPDATE --- %>
+             <%# Safely handle potentially missing cart total %>
+             <h2>Cart Total: ₹<span id="cart-total-value"><%= (typeof cartTotal === 'number' ? cartTotal : 0).toFixed(2) %></span></h2>
+             <%# --- END CURRENCY UPDATE --- %>
+             <a href="/user/checkout" class="btn btn-success btn-checkout">Proceed to Checkout</a>
+        </div>
+
+    <% } else { %>
+        <p>Your cart is empty. <a href="/">Continue Shopping</a></p>
+    <% } %>
+</div>
+
+ <%- include('../partials/footer') %>
