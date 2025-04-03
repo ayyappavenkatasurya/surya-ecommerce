@@ -65,12 +65,15 @@ exports.getEditProductPage = async (req, res, next) => {
      }
  };
 
+// --- UPDATED getManageOrdersPage function ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl') // Populate needed fields
-                                   .lean(); // Use lean for performance in rendering
+                                   // Ensure productId is populated with _id, name, imageUrl
+                                   // priceAtOrder is already in the OrderProductSchema
+                                   .populate('products.productId', 'name imageUrl _id')
+                                   .lean(); // Use lean for performance
 
         orders.forEach(order => {
             order.formattedOrderDate = new Date(order.orderDate).toLocaleString();
@@ -78,11 +81,8 @@ exports.getManageOrdersPage = async (req, res, next) => {
             order.canBeCancelledByAdmin = ['Pending', 'Out for Delivery'].includes(order.status);
             order.canBeAssignedByAdmin = order.status === 'Pending';
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
-            // --- ADDED flag for unassign button ---
             order.canBeUnassignedByAdmin = order.status === 'Out for Delivery';
-            // --- END ---
-            // Add a primary image URL for the table display
-            order.primaryImageUrl = order.products?.[0]?.imageUrl;
+            // No primaryImageUrl needed here, handled in view
         });
 
          const deliveryAdmins = await User.find({ role: 'delivery_admin' })
@@ -99,6 +99,8 @@ exports.getManageOrdersPage = async (req, res, next) => {
         next(error);
     }
 };
+// --- END UPDATED getManageOrdersPage function ---
+
 
 exports.getManageUsersPage = async (req, res, next) => {
     try {
