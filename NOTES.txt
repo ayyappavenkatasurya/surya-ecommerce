@@ -2165,313 +2165,364 @@ controllers/userController.js:
 const User = require('../models/User');
 const Product = require('../models/Product');
 
-exports.getCart = async (req, res, next) => {
-  try {
-    const user = await User.findById(req.session.user._id)
-                                .populate('cart.productId')
-                                .lean();
-
-    if (!user) {
-       req.flash('error_msg', 'User not found.');
-       // Ensure session is destroyed before redirecting if user is invalid
-       return req.session.destroy(err => {
-            if(err) return next(err);
-            res.redirect('/auth/login');
-       });
-     }
-
-    let cartTotal = 0;
-    const populatedCart = user.cart.map(item => {
-         if (!item.productId) {
-             console.warn(`Cart item refers to a non-existent product ID: ${item._id} for user: ${user.email}`);
-             // Optionally remove invalid item from cart here
-             // User.updateOne({ _id: user._id }, { $pull: { cart: { _id: item._id } } }).catch(console.error);
-             return null;
-         }
-        const itemSubtotal = item.productId.price * item.quantity;
-        cartTotal += itemSubtotal;
-        return {
-            // Ensure all necessary fields for the view are included
-            _id: item._id, // Might be needed if you have specific item operations
-            productId: item.productId._id,
-            name: item.productId.name,
-            price: item.productId.price,
-            imageUrl: item.productId.imageUrl,
-            stock: item.productId.stock,
-            quantity: item.quantity,
-            subtotal: itemSubtotal
-        };
-     }).filter(item => item !== null); // Filter out null items (invalid products)
-
-     // Update session cart (important if items were filtered)
-     req.session.user.cart = user.cart.filter(item => item.productId); // Store only valid items in session
-
-    res.render('user/cart', {
-      title: 'Your Shopping Cart',
-      cart: populatedCart, // Pass the processed cart data
-      cartTotal: cartTotal
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-exports.addToCart = async (req, res, next) => {
-  const { productId, quantity = 1 } = req.body;
-  const userId = req.session.user._id;
-   const numQuantity = parseInt(quantity, 10);
-
-
-    if (!productId || isNaN(numQuantity) || numQuantity < 1) {
-       req.flash('error_msg', 'Invalid product or quantity.');
-       // Redirect back to the product page or home if referer is missing/invalid
-       return res.redirect(req.headers.referer && req.headers.referer.includes('/products/') ? req.headers.referer : '/');
-   }
-
-  try {
-      const product = await Product.findById(productId);
-      const user = await User.findById(userId); // Fetch the user document
-
-      if (!user) {
-          req.flash('error_msg', 'User session error. Please log in again.');
-          return res.redirect('/auth/login');
-      }
-      if (!product) {
-          req.flash('error_msg', 'Product not found.');
-          // Redirect back safely
-          return res.redirect(req.headers.referer && req.headers.referer.includes('/products/') ? req.headers.referer : '/');
-      }
-
-     if (product.stock < numQuantity) {
-          req.flash('error_msg', `Insufficient stock for ${product.name}. Only ${product.stock} available.`);
-          return res.redirect(`/products/${productId}`); // Redirect specifically to product detail
-      }
-
-     const existingCartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
-
-     if (existingCartItemIndex > -1) {
-         // Item exists, update quantity
-         const existingQuantity = user.cart[existingCartItemIndex].quantity;
-         const newQuantity = existingQuantity + numQuantity;
-          if (product.stock < newQuantity) {
-             req.flash('error_msg', `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total, you have ${existingQuantity} in cart.`);
-              return res.redirect(`/products/${productId}`);
-         }
-          user.cart[existingCartItemIndex].quantity = newQuantity;
-     } else {
-         // Item does not exist, add new item
-         user.cart.push({ productId, quantity: numQuantity });
-     }
-
-      await user.save(); // Save the updated user document
-
-     // Update the cart in the session
-     req.session.user.cart = user.cart;
-     await req.session.save(); // Ensure session is saved before redirect
-
-      req.flash('success_msg', `${product.name} added to cart!`);
-
-       // Handle redirection based on potential query parameter from 'Buy Now'
-       if(req.query.redirectTo === 'checkout') {
-          return res.redirect('/user/checkout'); // Correct checkout path
-      }
-      // --- FIX: Redirect to the correct cart path ---
-      res.redirect('/user/cart');
-      // --- END FIX ---
-
-  } catch (error) {
-       if (error.name === 'CastError') {
-          req.flash('error_msg', 'Invalid product ID format.');
-           return res.redirect('/'); // Redirect home on invalid ID
-        }
-      next(error);
-  }
-};
-
- exports.updateCartQuantity = async (req, res, next) => {
-     const { productId, quantity } = req.body;
-     const userId = req.session.user._id;
-    const numQuantity = parseInt(quantity, 10);
-
-
-      if (!productId || isNaN(numQuantity) || numQuantity < 0) { // Allow 0 for removal
-          return res.status(400).json({ success: false, message: 'Invalid product ID or quantity.' });
-     }
-
+// --- NEW: Get User Profile Page ---
+exports.getUserProfilePage = async (req, res, next) => {
     try {
-        const user = await User.findById(userId);
-         const product = await Product.findById(productId).select('stock price'); // Only fetch needed fields
+        const userId = req.session.user._id;
+        // Select necessary fields including role and address
+        const user = await User.findById(userId).select('name email role address').lean();
 
-         if (!user || !product) {
-            return res.status(404).json({ success: false, message: 'User or Product not found.' });
-         }
-
-         const cartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
-
-        if (cartItemIndex === -1 && numQuantity > 0) { // Don't error if trying to remove non-existent item
-            return res.status(404).json({ success: false, message: 'Item not found in cart.' });
+        if (!user) {
+            req.flash('error_msg', 'User not found. Please log in again.');
+            return req.session.destroy(err => {
+                if (err) return next(err);
+                res.redirect('/auth/login');
+            });
         }
 
-         let itemSubtotal = 0; // Initialize subtotal
-
-         if (numQuantity === 0) {
-             if(cartItemIndex > -1){ // Only splice if item exists
-                 user.cart.splice(cartItemIndex, 1);
-             }
-         } else { // numQuantity > 0
-            if (product.stock < numQuantity) {
-               return res.status(400).json({ success: false, message: `Insufficient stock. Only ${product.stock} available.` });
-             }
-             if(cartItemIndex > -1){
-                 user.cart[cartItemIndex].quantity = numQuantity;
-             } else {
-                 // Should not happen if validation is correct, but handle defensively
-                 user.cart.push({ productId, quantity: numQuantity });
-             }
-             itemSubtotal = (product.price * numQuantity); // Calculate subtotal only if quantity > 0
-        }
-
-        await user.save(); // Save the updated user document
-
-        // Update session cart
-        req.session.user.cart = user.cart;
-
-        // Recalculate total AFTER saving and potentially fetching again or using current data
-         let cartTotal = 0;
-         // Need product prices for recalculation. Fetch populated cart or calculate based on saved data.
-         // Easiest might be to calculate from current user.cart if product data is consistent.
-         // Let's assume we need prices - fetch populated cart for accurate total.
-         const updatedUserPopulated = await User.findById(userId).populate('cart.productId', 'price').lean(); // Fetch only price needed for total
-         updatedUserPopulated.cart.forEach(item => {
-            if(item.productId){
-                cartTotal += (item.productId.price * item.quantity);
-            }
-         });
-
-         await req.session.save(); // Ensure session updated before sending response
-
-        res.json({
-             success: true,
-             message: 'Cart updated successfully.',
-             // Return the new quantity from the updated cart data
-             newQuantity: user.cart.find(item => item.productId.toString() === productId.toString())?.quantity ?? 0, // Use nullish coalescing
-             itemSubtotal: itemSubtotal, // Use calculated subtotal
-             cartTotal: cartTotal, // Use recalculated total
-             itemId: productId
-         });
+        res.render('user/profile', {
+            title: 'My Profile',
+            user: user // Pass the user object to the view
+        });
 
     } catch (error) {
-        console.error("Cart Update Error:", error);
-        res.status(500).json({ success: false, message: 'Error updating cart quantity.' });
+        next(error);
     }
 };
+// --- END NEW FUNCTION ---
 
-exports.removeFromCart = async (req, res, next) => {
-    const { productId } = req.params; // Get productId from URL params
+// --- Modify saveAddress to handle redirection ---
+exports.saveAddress = async (req, res, next) => {
+    // --- ADD source field ---
+    const { name, phone, pincode, cityVillage, landmarkNearby, source } = req.body;
     const userId = req.session.user._id;
 
-    if (!productId) {
-       // This case should ideally not happen if the route is defined correctly
-       req.flash('error_msg', 'Product ID is required.');
-       // --- FIX: Redirect to the correct cart path ---
-       return res.redirect('/user/cart');
-       // --- END FIX ---
-     }
+    // Determine the redirect path based on the source
+    const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
+
+    // Basic validation for required fields
+    if (!name || !phone || !pincode || !cityVillage) {
+        req.flash('error_msg', 'Please provide Name, Phone, Pincode, and City/Village.');
+        // Redirect back to the determined path
+        return res.redirect(redirectPath);
+    }
+
+    // Phone number validation (simple example: 10-15 digits)
+    if (!/^\d{10,15}$/.test(phone.trim())) {
+        req.flash('error_msg', 'Please enter a valid phone number (10-15 digits, numbers only).');
+        return res.redirect(redirectPath);
+    }
+    // Pincode validation (simple example: 6 digits)
+     if (!/^\d{6}$/.test(pincode.trim())) {
+        req.flash('error_msg', 'Please enter a valid 6-digit pincode.');
+        return res.redirect(redirectPath);
+    }
+
 
     try {
         const user = await User.findById(userId);
-         if (!user) {
-             req.flash('error_msg', 'User not found.');
+        if (!user) {
+            req.flash('error_msg', 'User not found.');
             return res.redirect('/auth/login');
         }
 
-         const initialCartLength = user.cart.length;
-
-        // Filter out the item to remove
-        user.cart = user.cart.filter(item => item.productId.toString() !== productId.toString());
-
-         // Check if an item was actually removed
-         if(user.cart.length === initialCartLength){
-            // Item wasn't in the cart in the first place
-            req.flash('error_msg', 'Item not found in cart.');
-            // --- FIX: Redirect to the correct cart path ---
-            return res.redirect('/user/cart');
-            // --- END FIX ---
-         }
-
-        // Save the user document with the updated cart
-        await user.save();
-
-         // Update the session cart
-         req.session.user.cart = user.cart;
-         await req.session.save(); // Ensure session is saved
-
-         req.flash('success_msg', 'Item removed from cart.');
-         // --- FIX: Redirect to the correct cart path ---
-         res.redirect('/user/cart');
-         // --- END FIX ---
-
-    } catch (error) {
-       if (error.name === 'CastError') {
-          req.flash('error_msg', 'Invalid product ID format.');
-           // --- FIX: Redirect to the correct cart path ---
-           return res.redirect('/user/cart');
-           // --- END FIX ---
-       }
-        next(error); // Pass other errors to the handler
-    }
-};
-
- exports.saveAddress = async (req, res, next) => {
-     const { name, phone, pincode, cityVillage, landmarkNearby } = req.body;
-     const userId = req.session.user._id;
-
-     // Basic validation for required fields
-     if (!name || !phone || !pincode || !cityVillage) {
-         req.flash('error_msg', 'Please provide Name, Phone, Pincode, and City/Village.');
-         // Redirect back to checkout page
-         return res.redirect('/user/checkout');
-     }
-
-    try {
-        const user = await User.findById(userId);
-         if (!user) {
-             req.flash('error_msg', 'User not found.');
-            return res.redirect('/auth/login');
-         }
-
-         // Update or set the address subdocument
-         user.address = {
+        // Update or set the address subdocument
+        user.address = {
             name: name.trim(),
             phone: phone.trim(),
             pincode: pincode.trim(),
             cityVillage: cityVillage.trim(),
-            landmarkNearby: landmarkNearby ? landmarkNearby.trim() : '' // Handle optional field
-         };
+            landmarkNearby: landmarkNearby ? landmarkNearby.trim() : ''
+        };
 
         await user.save(); // Validate and save the user document
 
         // Update session with the new address
         req.session.user.address = user.address;
-         await req.session.save(); // Save session
+        await req.session.save(); // Save session
 
         req.flash('success_msg', 'Address saved successfully.');
-         // Redirect back to the checkout page after saving
-         res.redirect('/user/checkout');
+        // Redirect back to the determined path after saving
+        res.redirect(redirectPath);
 
     } catch (error) {
         if (error.name === 'ValidationError') {
             // Extract and flash validation errors
             let errors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', errors.join(' '));
-            return res.redirect('/user/checkout');
-       }
+            return res.redirect(redirectPath);
+        }
         next(error); // Pass other errors to handler
     }
- };
+};
+// --- END MODIFICATION ---
+
+
+// --- Existing Cart functions remain the same ---
+exports.getCart = async (req, res, next) => {
+    // ... (keep existing code)
+    try {
+        const user = await User.findById(req.session.user._id)
+                                    .populate('cart.productId')
+                                    .lean();
+
+        if (!user) {
+           req.flash('error_msg', 'User not found.');
+           // Ensure session is destroyed before redirecting if user is invalid
+           return req.session.destroy(err => {
+                if(err) return next(err);
+                res.redirect('/auth/login');
+           });
+         }
+
+        let cartTotal = 0;
+        const populatedCart = user.cart.map(item => {
+             if (!item.productId) {
+                 console.warn(`Cart item refers to a non-existent product ID: ${item._id} for user: ${user.email}`);
+                 // Optionally remove invalid item from cart here
+                 // User.updateOne({ _id: user._id }, { $pull: { cart: { _id: item._id } } }).catch(console.error);
+                 return null;
+             }
+            const itemSubtotal = item.productId.price * item.quantity;
+            cartTotal += itemSubtotal;
+            return {
+                // Ensure all necessary fields for the view are included
+                _id: item._id, // Might be needed if you have specific item operations
+                productId: item.productId._id,
+                name: item.productId.name,
+                price: item.productId.price,
+                imageUrl: item.productId.imageUrl,
+                stock: item.productId.stock,
+                quantity: item.quantity,
+                subtotal: itemSubtotal
+            };
+         }).filter(item => item !== null); // Filter out null items (invalid products)
+
+         // Update session cart (important if items were filtered)
+         req.session.user.cart = user.cart.filter(item => item.productId); // Store only valid items in session
+
+        res.render('user/cart', {
+          title: 'Your Shopping Cart',
+          cart: populatedCart, // Pass the processed cart data
+          cartTotal: cartTotal
+        });
+      } catch (error) {
+        next(error);
+      }
+};
+
+exports.addToCart = async (req, res, next) => {
+    // ... (keep existing code)
+    const { productId, quantity = 1 } = req.body;
+      const userId = req.session.user._id;
+       const numQuantity = parseInt(quantity, 10);
+
+
+        if (!productId || isNaN(numQuantity) || numQuantity < 1) {
+           req.flash('error_msg', 'Invalid product or quantity.');
+           // Redirect back to the product page or home if referer is missing/invalid
+           return res.redirect(req.headers.referer && req.headers.referer.includes('/products/') ? req.headers.referer : '/');
+       }
+
+      try {
+          const product = await Product.findById(productId);
+          const user = await User.findById(userId); // Fetch the user document
+
+          if (!user) {
+              req.flash('error_msg', 'User session error. Please log in again.');
+              return res.redirect('/auth/login');
+          }
+          if (!product) {
+              req.flash('error_msg', 'Product not found.');
+              // Redirect back safely
+              return res.redirect(req.headers.referer && req.headers.referer.includes('/products/') ? req.headers.referer : '/');
+          }
+
+         if (product.stock < numQuantity) {
+              req.flash('error_msg', `Insufficient stock for ${product.name}. Only ${product.stock} available.`);
+              return res.redirect(`/products/${productId}`); // Redirect specifically to product detail
+          }
+
+         const existingCartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
+
+         if (existingCartItemIndex > -1) {
+             // Item exists, update quantity
+             const existingQuantity = user.cart[existingCartItemIndex].quantity;
+             const newQuantity = existingQuantity + numQuantity;
+              if (product.stock < newQuantity) {
+                 req.flash('error_msg', `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total, you have ${existingQuantity} in cart.`);
+                  return res.redirect(`/products/${productId}`);
+             }
+              user.cart[existingCartItemIndex].quantity = newQuantity;
+         } else {
+             // Item does not exist, add new item
+             user.cart.push({ productId, quantity: numQuantity });
+         }
+
+          await user.save(); // Save the updated user document
+
+         // Update the cart in the session
+         req.session.user.cart = user.cart;
+         await req.session.save(); // Ensure session is saved before redirect
+
+          req.flash('success_msg', `${product.name} added to cart!`);
+
+           // Handle redirection based on potential query parameter from 'Buy Now'
+           if(req.query.redirectTo === 'checkout') {
+              return res.redirect('/user/checkout'); // Correct checkout path
+          }
+          // --- FIX: Redirect to the correct cart path ---
+          res.redirect('/user/cart');
+          // --- END FIX ---
+
+      } catch (error) {
+           if (error.name === 'CastError') {
+              req.flash('error_msg', 'Invalid product ID format.');
+               return res.redirect('/'); // Redirect home on invalid ID
+            }
+          next(error);
+      }
+};
+
+exports.updateCartQuantity = async (req, res, next) => {
+    // ... (keep existing code)
+         const { productId, quantity } = req.body;
+         const userId = req.session.user._id;
+        const numQuantity = parseInt(quantity, 10);
+
+
+          if (!productId || isNaN(numQuantity) || numQuantity < 0) { // Allow 0 for removal
+              return res.status(400).json({ success: false, message: 'Invalid product ID or quantity.' });
+         }
+
+        try {
+            const user = await User.findById(userId);
+             const product = await Product.findById(productId).select('stock price'); // Only fetch needed fields
+
+             if (!user || !product) {
+                return res.status(404).json({ success: false, message: 'User or Product not found.' });
+             }
+
+             const cartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
+
+            if (cartItemIndex === -1 && numQuantity > 0) { // Don't error if trying to remove non-existent item
+                return res.status(404).json({ success: false, message: 'Item not found in cart.' });
+            }
+
+             let itemSubtotal = 0; // Initialize subtotal
+
+             if (numQuantity === 0) {
+                 if(cartItemIndex > -1){ // Only splice if item exists
+                     user.cart.splice(cartItemIndex, 1);
+                 }
+             } else { // numQuantity > 0
+                if (product.stock < numQuantity) {
+                   return res.status(400).json({ success: false, message: `Insufficient stock. Only ${product.stock} available.` });
+                 }
+                 if(cartItemIndex > -1){
+                     user.cart[cartItemIndex].quantity = numQuantity;
+                 } else {
+                     // Should not happen if validation is correct, but handle defensively
+                     user.cart.push({ productId, quantity: numQuantity });
+                 }
+                 itemSubtotal = (product.price * numQuantity); // Calculate subtotal only if quantity > 0
+            }
+
+            await user.save(); // Save the updated user document
+
+            // Update session cart
+            req.session.user.cart = user.cart;
+
+            // Recalculate total AFTER saving and potentially fetching again or using current data
+             let cartTotal = 0;
+             // Need product prices for recalculation. Fetch populated cart or calculate based on saved data.
+             // Easiest might be to calculate from current user.cart if product data is consistent.
+             // Let's assume we need prices - fetch populated cart for accurate total.
+             const updatedUserPopulated = await User.findById(userId).populate('cart.productId', 'price').lean(); // Fetch only price needed for total
+             updatedUserPopulated.cart.forEach(item => {
+                if(item.productId){
+                    cartTotal += (item.productId.price * item.quantity);
+                }
+             });
+
+             await req.session.save(); // Ensure session updated before sending response
+
+            res.json({
+                 success: true,
+                 message: 'Cart updated successfully.',
+                 // Return the new quantity from the updated cart data
+                 newQuantity: user.cart.find(item => item.productId.toString() === productId.toString())?.quantity ?? 0, // Use nullish coalescing
+                 itemSubtotal: itemSubtotal, // Use calculated subtotal
+                 cartTotal: cartTotal, // Use recalculated total
+                 itemId: productId
+             });
+
+        } catch (error) {
+            console.error("Cart Update Error:", error);
+            res.status(500).json({ success: false, message: 'Error updating cart quantity.' });
+        }
+};
+
+exports.removeFromCart = async (req, res, next) => {
+    // ... (keep existing code)
+    const { productId } = req.params; // Get productId from URL params
+        const userId = req.session.user._id;
+
+        if (!productId) {
+           // This case should ideally not happen if the route is defined correctly
+           req.flash('error_msg', 'Product ID is required.');
+           // --- FIX: Redirect to the correct cart path ---
+           return res.redirect('/user/cart');
+           // --- END FIX ---
+         }
+
+        try {
+            const user = await User.findById(userId);
+             if (!user) {
+                 req.flash('error_msg', 'User not found.');
+                return res.redirect('/auth/login');
+            }
+
+             const initialCartLength = user.cart.length;
+
+            // Filter out the item to remove
+            user.cart = user.cart.filter(item => item.productId.toString() !== productId.toString());
+
+             // Check if an item was actually removed
+             if(user.cart.length === initialCartLength){
+                // Item wasn't in the cart in the first place
+                req.flash('error_msg', 'Item not found in cart.');
+                // --- FIX: Redirect to the correct cart path ---
+                return res.redirect('/user/cart');
+                // --- END FIX ---
+             }
+
+            // Save the user document with the updated cart
+            await user.save();
+
+             // Update the session cart
+             req.session.user.cart = user.cart;
+             await req.session.save(); // Ensure session is saved
+
+             req.flash('success_msg', 'Item removed from cart.');
+             // --- FIX: Redirect to the correct cart path ---
+             res.redirect('/user/cart');
+             // --- END FIX ---
+
+        } catch (error) {
+           if (error.name === 'CastError') {
+              req.flash('error_msg', 'Invalid product ID format.');
+               // --- FIX: Redirect to the correct cart path ---
+               return res.redirect('/user/cart');
+               // --- END FIX ---
+           }
+            next(error); // Pass other errors to the handler
+        }
+};
 
 exports.getCheckoutPage = async (req, res, next) => {
-    try {
+    // ... (keep existing code)
+     try {
         const user = await User.findById(req.session.user._id)
                                .populate('cart.productId') // Populate product details
                                .lean(); // Use lean for read-only rendering
@@ -2543,6 +2594,8 @@ exports.getCheckoutPage = async (req, res, next) => {
         next(error); // Pass errors to the main error handler
     }
 };
+
+
 middleware/authMiddleware.js:
 const User = require('../models/User');
 
@@ -3212,6 +3265,20 @@ select:focus {
 .btn-outline-secondary { color: var(--secondary-color); border-color: var(--secondary-color); background-color: transparent;}
 .btn-outline-secondary:hover { color: #fff; background-color: var(--secondary-color); }
 
+/* Icon-only or text buttons */
+.btn-text {
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--link-color); /* Or specific color */
+    padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.4);
+}
+.btn-text:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary-hover);
+}
+.btn-text.btn-danger { color: var(--danger-color); }
+.btn-text.btn-danger:hover { color: var(--danger-hover); }
+
 
 .btn-sm {
   padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.5);
@@ -3271,7 +3338,7 @@ select:focus {
 
 /* --- Header & Navigation --- */
 .app-header {
-  background-color: var(--dark-color);
+  background-color: var( --primary-color);
   color: var(--light-color);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   position: sticky; /* Make header sticky */
@@ -3323,6 +3390,10 @@ select:focus {
   flex-direction: column; /* Stack icon and text */
   align-items: center;
   font-size: 0.75rem; /* Smaller text for mobile */
+  text-decoration: none;
+}
+.nav-link span {
+  display: none; /* Hide text on mobile */
 }
 .nav-link i {
     font-size: 1.1rem; /* Icon size */
@@ -3352,26 +3423,37 @@ select:focus {
   line-height: 1;
 }
 
-.btn-logout { /* Make logout more icon like */
-    background: none;
-    border: none;
-    color: var(--light-color);
-    font-size: 0.75rem; /* Consistent size */
-    padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.6);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-.btn-logout i {
-    font-size: 1.1rem;
-    margin-bottom: 2px;
-}
-.btn-logout span {
-    display: none; /* Hide "(username)" text on mobile */
-}
 .btn-login-register { /* Simplify login button */
     font-size: 0.9rem;
     padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.8);
+}
+
+/* Header Avatar Link */
+.profile-avatar-link {
+    display: inline-flex; /* Use flex to center content */
+    align-items: center;
+    justify-content: center;
+    width: 38px; /* Adjust size as needed */
+    height: 38px;
+    border-radius: 50%; /* Make it circular */
+    background-color: var(--light-color); /* Or use a different color */
+    color:black;
+    font-weight: bold;
+    font-size: 0.9rem; /* Adjust font size */
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    margin-left: calc(var(--spacing-unit) * 0.5); /* Spacing from other nav items */
+    border: 1px solid transparent; /* Placeholder for active state */
+}
+
+.profile-avatar-link:hover,
+.profile-avatar-link.active {
+    text-decoration: none;
+    border-color: var(--light-color); /* Highlight active */
+}
+
+.profile-avatar-initials {
+    line-height: 1; /* Helps vertical alignment */
 }
 
 
@@ -3385,7 +3467,6 @@ select:focus {
 }
 
 /* --- Footer --- */
-/* Optional: Basic mobile footer or bottom spacer */
 .app-footer {
   padding: var(--spacing-unit);
   text-align: center;
@@ -3393,7 +3474,7 @@ select:focus {
   color: var(--secondary-color);
   background-color: var(--light-color);
   border-top: 1px solid var(--border-color);
-  display: none; /* Hide traditional footer on mobile */
+  margin-top: auto; /* Push footer to bottom */
 }
 
 
@@ -3471,10 +3552,6 @@ select:focus {
   font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: calc(var(--spacing-unit) * 0.25);
-  /* Allow wrapping on mobile if needed */
-  /* white-space: nowrap; */
-  /* overflow: hidden; */
-  /* text-overflow: ellipsis; */
   line-height: 1.3;
   height: 2.6em; /* Limit to roughly 2 lines */
   overflow: hidden; /* Hide overflow */
@@ -3601,7 +3678,6 @@ select:focus {
 /* --- Corrected Rating Stars CSS for LTR Interaction --- */
 .rating-stars {
   display: inline-flex; /* Use flexbox */
-  /* Visually reverse the order (5, 4, 3, 2, 1) so sibling selector works for LTR highlighting */
   flex-direction: row-reverse;
   justify-content: flex-end; /* Align items to the start (effectively left) */
   margin-bottom: calc(var(--spacing-unit) * 0.8);
@@ -3622,15 +3698,12 @@ select:focus {
 }
 
 /* Hover effect: Highlight stars up to the hovered one */
-/* When hovering a label, IT and all labels BEFORE it (which are ~ siblings in reversed order) turn gold */
 .rating-stars label:hover,
 .rating-stars label:hover ~ label {
   color: #f8d347; /* Gold color */
 }
 
 /* Checked effect: Keep stars highlighted up to the checked one */
-/* The star corresponding to the checked radio (:checked ~ label selects siblings AFTER it) */
-/* Since flex order is reversed, this selects stars visually to the left */
 .rating-stars input[type="radio"]:checked ~ label {
   color: #f8d347; /* Gold color */
 }
@@ -3884,16 +3957,10 @@ select:focus {
     white-space: nowrap;
 }
 .order-header strong { color: var(--text-color); }
+/* Use status-badge for consistency */
 .order-status {
-    font-weight: bold;
-    padding: 0.1em 0.4em;
-    border-radius: var(--border-radius);
-    color: rgb(255, 255, 255);
-    /* Default style, will be overridden by status- class */
-    background-color: var(--secondary-color);
-    font-size: 0.9em;
     display: inline-block;
-    vertical-align: middle;
+    /* padding, font-size etc. inherited from status-badge */
 }
 
 .order-body {
@@ -3946,11 +4013,11 @@ select:focus {
     display: inline-block;
     vertical-align: middle;
 }
-.status-pending, .status-badge.status-pending { background-color: var(--warning-color); color: #333;}
-.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: var(--info-color); }
-.status-delivered, .status-badge.status-delivered { background-color: var(--success-color); }
-.status-cancelled, .status-badge.status-cancelled { background-color: var(--danger-color); }
-.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 1; /* Fade cancelled orders */ }
+.status-pending, .status-badge.status-pending { background-color: rgb(255, 255, 230); color: #000000;}
+.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: rgb(198, 198, 255); }
+.status-delivered, .status-badge.status-delivered { background-color: rgb(216, 255, 216); }
+.status-cancelled, .status-badge.status-cancelled { background-color: rgb(255, 218, 218); }
+.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; /* Slightly fade cancelled */ }
 
 
 /* --- Admin & Delivery Common Styles --- */
@@ -3971,10 +4038,15 @@ select:focus {
 }
 
 /* --- Data Tables (Mobile First) --- */
+.table-container { /* Optional wrapper for styling */
+    overflow-x: auto; /* Add horizontal scroll on mobile if table content is too wide */
+    margin-bottom: var(--spacing-unit);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: var(--spacing-unit);
   font-size: 0.9rem;
 }
 
@@ -3991,6 +4063,19 @@ select:focus {
   background-color: var(--card-bg);
   box-shadow: var(--card-shadow);
 }
+/* Remove margin/border if inside .table-container */
+.table-container .data-table tbody tr {
+    margin-bottom: 0;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+    box-shadow: none;
+    padding: calc(var(--spacing-unit) * 0.5); /* Adjust padding */
+}
+.table-container .data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
 
 .data-table td {
   display: block; /* Stack cells vertically */
@@ -4011,6 +4096,10 @@ select:focus {
   text-align: left;
   padding-right: 10px;
   color: #555;
+  width: 40%; /* Give label some width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Special cell styling */
@@ -4018,11 +4107,13 @@ select:focus {
   max-width: 50px; /* Smaller image in mobile table cell */
   border-radius: 4px;
   display: inline-block; /* Adjust display for right align */
+  margin-left: 45%; /* Push image past the label space */
 }
 
 /* Adjust td padding if it contains specific content types */
-.data-table td:has(img) { text-align: left; padding: 5px 0; }
+.data-table td:has(img) { text-align: right; padding: 5px 0; } /* Keep right align for image */
 .data-table td:has(form), .actions-cell { padding: 10px 0;}
+.data-table td:has(form) { margin-left: 45%; } /* Push form controls past label */
 
 /* Actions Cell Specific */
 .actions-cell form, .actions-cell .btn {
@@ -4035,6 +4126,7 @@ select:focus {
     border-top: 1px dashed #ccc;
     padding-top: calc(var(--spacing-unit) * 0.5);
     margin-top: calc(var(--spacing-unit) * 0.5);
+    text-align: left; /* Align content left within group */
 }
 .action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 .action-group-title {
@@ -4058,19 +4150,21 @@ select:focus {
 .data-table td:has(label) {
     text-align: left;
 }
+.data-table td:has(label) > * { /* Ensure content in labeled cell is also aligned left */
+    margin-left: 45%;
+}
 
 /* Input sizes in table forms */
+.verify-otp-form { display: flex; align-items: center; gap: 5px; }
 .verify-otp-form input[name="otp"] {
-    width: 100px;
-    margin-right: 5px;
-    display: inline-block; /* allow button beside */
-    width: calc(100% - 100px); /* Adjust based on button size */
+    flex-grow: 1;
     max-width: 120px;
     padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
     font-size: 0.9rem;
+    text-align: center;
 }
 .verify-otp-form button {
-    display: inline-block; /* allow beside input */
+    flex-shrink: 0;
     width: auto;
     padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
 }
@@ -4238,6 +4332,83 @@ select:focus {
 /* --- End Rating Statistics --- */
 
 
+/* --- Profile Page --- */
+.profile-container {
+    max-width: 800px; /* Adjust as needed */
+    margin: var(--spacing-unit) auto;
+    padding: calc(var(--spacing-unit) * 1.5);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+}
+
+.profile-container h1 {
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+.profile-container > p.text-muted { /* Target the welcome message */
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+
+.profile-section {
+    margin-top: calc(var(--spacing-unit) * 1.5);
+    padding-top: calc(var(--spacing-unit) * 1);
+    border-top: 1px solid var(--border-color);
+}
+.profile-section:first-of-type { /* Remove top border from the first section if needed */
+    /* border-top: none; */
+    /* padding-top: 0; */
+}
+
+
+.profile-section h2 {
+    font-size: 1.4rem;
+    margin-bottom: calc(var(--spacing-unit) * 0.8);
+    color: var(--primary-color);
+}
+
+/* Address Section Specifics */
+#saved-address-display p {
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+    line-height: 1.5;
+    font-size: 1rem;
+}
+#saved-address-display strong {
+    font-weight: 500;
+}
+#edit-address-btn {
+    margin-top: calc(var(--spacing-unit) * 0.5);
+}
+
+.address-form {
+    max-width: 500px; /* Limit form width within the section */
+}
+.address-form h3 {
+    font-size: 1.2rem;
+    margin-bottom: var(--spacing-unit);
+    font-weight: 500;
+}
+#cancel-edit-btn {
+    margin-left: calc(var(--spacing-unit) * 0.5);
+}
+
+/* Dashboard Links */
+.dashboards-section .btn {
+    margin-right: 10px;
+    margin-bottom: 10px; /* Space between buttons if they wrap */
+}
+
+/* Logout Section */
+.logout-section .btn {
+    min-width: 120px; /* Give logout button some width */
+}
+
+
+
 /* --- Media Queries (Example: Tablet and Desktop Overrides) --- */
 
 @media (min-width: 768px) {
@@ -4251,11 +4422,10 @@ select:focus {
   /* Header */
   .app-logo .app-name { display: inline; } /* Show text logo */
   .nav-link { flex-direction: row; font-size: 0.9rem; } /* Text beside icon */
+  .nav-link span { display: inline; } /* Show text */
   .nav-link i { margin-right: 0.4rem; margin-bottom: 0; font-size: 1rem; }
   .nav-right { gap: var(--spacing-unit); } /* Wider gap */
-  .btn-logout { font-size: 0.9rem; flex-direction: row; }
-  .btn-logout span { display: inline; margin-left: 0.3rem;}
-  .btn-logout i { margin-bottom: 0; margin-right: 0.3rem; }
+
 
   /* Footer */
   .app-footer { display: block; /* Show footer */}
@@ -4299,7 +4469,7 @@ select:focus {
    }
    .cart-item-quantity { grid-area: quantity; justify-content: center; } /* Center qty control */
    .cart-item-subtotal { display: none; /* Subtotal calculated by price*qty, not displayed explicitly here */ }
-   .cart-item-remove { grid-area: remove; align-self: center; } /* Center remove btn vertically */
+   .cart-item-remove { grid-area: remove; align-self: center; text-align: center; } /* Center remove btn */
 
 
    /* Checkout */
@@ -4312,6 +4482,7 @@ select:focus {
     .checkout-summary { flex: 1 1 45%; }
 
    /* Tables */
+   .table-container { border: none; border-radius: 0; } /* Remove border from wrapper on desktop */
    .data-table thead { display: table-header-group; } /* Show header */
    .data-table tbody tr {
        display: table-row; /* Standard row layout */
@@ -4322,6 +4493,7 @@ select:focus {
        background-color: transparent; /* Reset mobile background */
        border-bottom: 1px solid var(--border-color); /* Separator between rows */
    }
+   .data-table tbody tr:last-child { border-bottom: none; }
    .data-table td {
        display: table-cell; /* Standard cell layout */
        text-align: left; /* Default left align */
@@ -4329,6 +4501,7 @@ select:focus {
        vertical-align: middle;
        border-bottom: none;
        position: static; /* Reset position */
+       margin-left: 0 !important; /* Override mobile margin */
    }
     .data-table td::before { content: none; /* Remove label */} /* Remove labels */
     .data-table td:has(form), .actions-cell {
@@ -4337,8 +4510,11 @@ select:focus {
    }
    .inline-form { display: inline-block; margin: 0 5px 0 0;}
    .inline-form > * { margin-bottom: 0; }
-   .action-group { border: none; padding: 0; margin: 0;} /* Reset action group styles for inline desktop */
+   .action-group { border: none; padding: 0; margin: 0; display: inline-block; vertical-align: middle; margin-right: 10px;} /* Reset action group styles for inline desktop */
    .action-group-title { display: none; } /* Hide titles in desktop table cells */
+   .actions-cell > form, .actions-cell > div > form { display: inline-block; } /* Actions inline */
+   .actions-cell > a { display: inline-block; margin-right: 5px; vertical-align: middle;}
+
 
    /* Center specific columns (example - adjust indices as needed) */
    /* Adjust selectors based on actual table structures */
@@ -4371,7 +4547,8 @@ select:focus {
 
 
    /* Adjust image size */
-   .table-img { max-width: 60px; }
+   .table-img { max-width: 60px; margin-left: 0; }
+   .data-table td:has(img) { text-align: left; } /* Image cell left aligned */
 
     /* Dashboard grids */
     .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
@@ -4397,6 +4574,11 @@ select:focus {
         flex-grow: 1; /* Allow bars to take remaining space */
     }
 
+    /* Profile Page */
+    .profile-container {
+        padding: calc(var(--spacing-unit) * 2);
+    }
+
 
 } /* End 768px */
 
@@ -4412,6 +4594,8 @@ select:focus {
   .admin-actions-grid { grid-template-columns: repeat(5, 1fr); } /* Adjust grid for admin dash */
 
 } /* End 1024px */
+
+
 public/js/main.js:
 console.log("Main JS loaded.");
 
@@ -4870,22 +5054,27 @@ router.get('/:id', productController.getProductDetails);
 module.exports = router;
 
 routes/userRoutes.js:
+// routes/userRoutes.js
 const express = require('express');
 const userController = require('../controllers/userController');
 const { isAuthenticated } = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.use(isAuthenticated);
+router.use(isAuthenticated); // Apply to all user routes
+
+// --- ADD NEW PROFILE ROUTE ---
+router.get('/profile', userController.getUserProfilePage);
+// --- END NEW ROUTE ---
 
 router.get('/cart', userController.getCart);
 router.post('/cart/add', userController.addToCart);
- router.post('/cart/update', userController.updateCartQuantity);
- router.post('/cart/remove/:productId', userController.removeFromCart);
+router.post('/cart/update', userController.updateCartQuantity);
+router.post('/cart/remove/:productId', userController.removeFromCart);
 
- router.post('/address/save', userController.saveAddress);
+router.post('/address/save', userController.saveAddress); // Keep existing save route
 
- router.get('/checkout', userController.getCheckoutPage);
+router.get('/checkout', userController.getCheckoutPage);
 
 module.exports = router;
 
@@ -5766,13 +5955,13 @@ views/auth/reset-password.ejs :
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | miniapp</title> <%# Simple Name Change Example %>
+    <title><%= title %> | miniapp</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/css/style.css"> <%# Link the stylesheet %>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <header class="app-header">
@@ -5780,15 +5969,13 @@ views/auth/reset-password.ejs :
             <div class="nav-left">
                 <a href="/" class="app-logo">
                    <i class="fas fa-shopping-bag"></i>
-                   <span class="app-name">miniapp</span> <%# Text name hidden on mobile by CSS %>
+                   <span class="app-name">miniapp</span>
                 </a>
-                 <%# Add search icon toggle button here if needed %>
             </div>
-            <%# <div class="nav-center"> Optional: Mobile search could expand here </div> %>
             <div class="nav-right">
                 <% if (currentUser) { %>
                     <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home">
-                        <i class="fas fa-home"></i> <span>Home</span> <%# Span hidden mobile %>
+                        <i class="fas fa-home"></i> <span>Home</span>
                     </a>
                      <a href="/user/cart" class="nav-link nav-link-cart <%= currentUrl === '/user/cart' ? 'active' : '' %>" title="Cart">
                          <i class="fas fa-shopping-cart"></i>
@@ -5797,40 +5984,17 @@ views/auth/reset-password.ejs :
                          <% } else { %>
                              <span class="cart-badge" style="display: none;">0</span>
                          <% } %>
-                          <span>Cart</span> <%# Span hidden mobile %>
+                          <span>Cart</span>
                      </a>
                     <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders">
-                        <i class="fas fa-box"></i> <span>Orders</span> <%# Span hidden mobile %>
+                        <i class="fas fa-box"></i> <span>Orders</span>
                     </a>
 
-                    <%# --- START: Profile Avatar & Dropdown --- %>
-                    <div class="profile-section">
-                        <button id="profile-avatar-btn" class="profile-avatar-trigger" title="Profile Menu" aria-haspopup="true" aria-expanded="false">
-                             <%= userInitials %>
-                        </button>
-                        <div id="profile-menu" class="profile-dropdown" role="menu">
-                            <% if (currentUser.role === 'admin') { %>
-                                <a href="/admin/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/admin') ? 'active' : '' %>">
-                                    <i class="fas fa-user-shield"></i> Admin Dashboard
-                                </a>
-                            <% } %>
-                            <% if (currentUser.role === 'delivery_admin') { %>
-                                <a href="/delivery/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/delivery') && !currentUrl.endsWith('/contact') ? 'active' : '' %>">
-                                    <i class="fas fa-truck"></i> Delivery Dashboard
-                                </a>
-                                <a href="/delivery/contact" role="menuitem" class="dropdown-item <%= currentUrl === '/delivery/contact' ? 'active' : '' %>">
-                                    <i class="fas fa-phone-alt"></i> Contact Info
-                                </a>
-                            <% } %>
-                             <hr class="dropdown-divider">
-                             <form action="/auth/logout" method="POST" class="form-logout-dropdown">
-                                <button type="submit" class="dropdown-item-button" role="menuitem">
-                                    <i class="fas fa-sign-out-alt"></i> Logout
-                                </button>
-                             </form>
-                         </div>
-                     </div>
-                     <%# --- END: Profile Avatar & Dropdown --- %>
+                    <%# --- START: Profile Avatar Link --- %>
+                    <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile">
+                         <span class="profile-avatar-initials"><%= userInitials %></span>
+                    </a>
+                    <%# --- END: Profile Avatar Link --- %>
 
                 <% } else { %>
                     <a href="/auth/login" class="btn btn-login-register">
@@ -5839,12 +6003,12 @@ views/auth/reset-password.ejs :
                 <% } %>
             </div>
         </nav>
-         <%# Mobile search bar could be placed outside nav, revealed by JS %>
     </header>
 
-     <%- include('messages') %> <%# Keep messages below header %>
+     <%- include('messages') %>
 
-    <main class="container"> <%# Keep main container %>
+    <main class="container">
+
 
  views/partials/messages.ejs :
 <% if (success_msg && success_msg.length > 0) { %>
@@ -6319,6 +6483,103 @@ views/user/my-orders.ejs :
     <% } else { %>
         <p>You haven't placed any orders yet. <a href="/">Start Shopping!</a></p>
     <% } %>
+</div>
+
+<%- include('../partials/footer') %>
+
+
+views/user/profile.ejs:
+<%# views/user/profile.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="profile-container">
+    <h1>My Profile</h1>
+    <p class="text-muted mb-3">Welcome, <%= user.name %> (<%= user.email %>)</p>
+
+    <%# --- Conditional Dashboards --- %>
+    <div class="profile-section dashboards-section">
+        <h2>Dashboards</h2>
+        <% if (user.role === 'admin') { %>
+            <p><a href="/admin/dashboard" class="btn btn-info"><i class="fas fa-user-shield"></i> Go to Admin Dashboard</a></p>
+        <% } %>
+        <% if (user.role === 'delivery_admin') { %>
+            <p><a href="/delivery/dashboard" class="btn btn-warning"><i class="fas fa-truck"></i> Go to Delivery Dashboard</a></p>
+            <p><a href="/delivery/contact" class="btn btn-secondary"><i class="fas fa-phone-alt"></i> Update Delivery Contact</a></p> <%# Link to contact page %>
+        <% } %>
+        <% if (user.role === 'user') { %>
+            <p>You have standard user access.</p>
+        <% } %>
+    </div>
+
+    <%# --- Address Management --- %>
+    <div class="profile-section address-section">
+        <h2>My Address</h2>
+        <%# Display saved address if it exists %>
+        <div id="saved-address-display" class="<%= (!user.address || !user.address.name) ? 'hidden' : '' %>">
+            <% if (user.address && user.address.name) { %>
+                <p><strong><%= user.address.name %></strong></p>
+                <p><%= user.address.phone %></p>
+                <p><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %></p>
+                <p>Pincode: <%= user.address.pincode %></p>
+                <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+            <% } %>
+        </div>
+
+        <%# Address form (hidden initially if address exists) %>
+        <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner">
+            <h3><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
+            <input type="hidden" name="source" value="profile"> <%# IMPORTANT: Tells backend where save request came from %>
+            <div class="form-group">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" value="<%= user.address?.name || '' %>" required autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone Number:</label>
+                <input type="tel"
+                       id="phone"
+                       name="phone"
+                       value="<%= user.address?.phone || '' %>"
+                       required
+                       pattern="\d{10,15}"
+                       minlength="10"
+                       maxlength="15"
+                       title="Enter 10 to 15 digit phone number (numbers only)"
+                       autocomplete="tel">
+            </div>
+            <div class="form-group">
+                <label for="pincode">Pincode:</label>
+                <input type="text"
+                       id="pincode"
+                       name="pincode"
+                       value="<%= user.address?.pincode || '' %>"
+                       required
+                       pattern="\d{6}"
+                       maxlength="6"
+                       inputmode="numeric"
+                       title="Enter 6-digit Pincode"
+                       autocomplete="postal-code">
+            </div>
+            <div class="form-group">
+                <label for="cityVillage">City / Village:</label>
+                <input type="text" id="cityVillage" name="cityVillage" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
+            </div>
+            <div class="form-group">
+                <label for="landmarkNearby">Landmark / Nearby (Optional):</label>
+                <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= user.address?.landmarkNearby || '' %>">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Address</button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel</button> <%# Hide cancel if adding new %>
+        </form>
+    </div>
+
+    <%# --- Logout Section --- %>
+    <div class="profile-section logout-section">
+        <h2>Account Actions</h2>
+        <form action="/auth/logout" method="POST" class="form-submit-spinner">
+            <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </form>
+    </div>
+
 </div>
 
 <%- include('../partials/footer') %>
