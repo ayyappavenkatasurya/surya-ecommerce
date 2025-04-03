@@ -292,7 +292,7 @@ select:focus {
 
 /* --- Header & Navigation --- */
 .app-header {
-  background-color: var(--dark-color);
+  background-color: var(--primary-color);
   color: var(--light-color);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   position: sticky; /* Make header sticky */
@@ -1275,14 +1275,14 @@ select:focus {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px; /* Avatar size */
-  height: 36px;
+  width: 38px; /* Avatar size */
+  height: 38px;
   border-radius: 50%; /* Make it circular */
   background-color: var(--primary-color); /* Use a theme color */
   color: #fff;
-  font-weight: 500;
+  font-weight:bold;
   font-size: 0.9rem;
-  border: 1px solid var(--primary-hover);
+  border: 1px solid var(--light-color);
   cursor: pointer;
   transition: background-color 0.2s, box-shadow 0.2s;
   overflow: hidden; /* Just in case */
@@ -1293,11 +1293,11 @@ select:focus {
 
 .profile-avatar-trigger:hover {
   background-color: var(--primary-hover);
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.3);
+  box-shadow: 0 0 0 3px rgb(0, 123, 255);
 }
 .profile-avatar-trigger:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.612);
 }
 
 .profile-dropdown {

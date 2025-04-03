@@ -24,11 +24,16 @@
                     <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                         <td data-label="Image">
                             <%# Use primaryImageUrl added in controller %>
-                            <% if (order.primaryImageUrl) { %>
-                                <a href="/products/<%= order.products[0].productId %>">
+                            <%# --- MODIFICATION START: Wrap image with link --- %>
+                            <% if (order.products && order.products.length > 0 && order.products[0].productId && order.primaryImageUrl) { %>
+                                <%# Check if productId (populated object) exists %>
+                                <a href="/products/<%= order.products[0].productId._id %>" title="View Product: <%= order.products[0].name %>">
                                     <img src="<%= order.primaryImageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
                                 </a>
-                            <% } else { %> <span class="text-muted">N/A</span> <% } %>
+                            <% } else { %>
+                                <span class="text-muted">N/A</span>
+                            <% } %>
+                             <%# --- MODIFICATION END --- %>
                         </td>
                         <td data-label="Order ID"><%= order._id %></td>
                          <td data-label="Date"><%= order.formattedOrderDate %></td>
