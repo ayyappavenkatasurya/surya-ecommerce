@@ -14,17 +14,17 @@
   --primary-hover: #0056b3;
   --secondary-color: #6c757d;
   --secondary-hover: #5a6268;
-  --success-color: #00a827;
-  --success-hover: #00cc2c;
-  --danger-color: #ff9ba5;
-  --danger-hover: #ff9da7;
-  --warning-color: #ffdf7e;
-  --warning-hover: #ffeebb;
-  --info-color: #00a6c0;
-  --info-hover: #00c3e1;
+  --success-color: #28a745;
+  --success-hover: #218838;
+  --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --warning-color: #ffc107;
+  --warning-hover: #e0a800;
+  --info-color: #17a2b8;
+  --info-hover: #138496;
   --light-color: #f8f9fa;
-  --dark-color: #000000;
-  --text-color: #000000;
+  --dark-color: #343a40;
+  --text-color: #333;
   --link-color: var(--primary-color);
   --bg-color: #fff;
   --border-color: #dee2e6;
@@ -89,7 +89,7 @@ ul, ol {
   text-align: center;
 }
 .text-danger {
-  color:rgb(0, 0, 0)!important;
+  color: var(--danger-color) !important;
 }
 .text-success {
   color: var(--success-color) !important;
@@ -233,6 +233,20 @@ select:focus {
 .btn-outline-secondary { color: var(--secondary-color); border-color: var(--secondary-color); background-color: transparent;}
 .btn-outline-secondary:hover { color: #fff; background-color: var(--secondary-color); }
 
+/* Icon-only or text buttons */
+.btn-text {
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--link-color); /* Or specific color */
+    padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.4);
+}
+.btn-text:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary-hover);
+}
+.btn-text.btn-danger { color: var(--danger-color); }
+.btn-text.btn-danger:hover { color: var(--danger-hover); }
+
 
 .btn-sm {
   padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.5);
@@ -292,7 +306,7 @@ select:focus {
 
 /* --- Header & Navigation --- */
 .app-header {
-  background-color: var(--primary-color);
+  background-color: var( --primary-color);
   color: var(--light-color);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   position: sticky; /* Make header sticky */
@@ -316,7 +330,7 @@ select:focus {
   align-items: center;
 }
 .nav-right {
-    gap: calc(var(--spacing-unit) * 0.8); /* Spacing between right nav items */
+    gap: calc(var(--spacing-unit) * 0.5); /* Spacing between right nav items */
 }
 
 .app-logo {
@@ -344,6 +358,10 @@ select:focus {
   flex-direction: column; /* Stack icon and text */
   align-items: center;
   font-size: 0.75rem; /* Smaller text for mobile */
+  text-decoration: none;
+}
+.nav-link span {
+  display: none; /* Hide text on mobile */
 }
 .nav-link i {
     font-size: 1.1rem; /* Icon size */
@@ -373,33 +391,37 @@ select:focus {
   line-height: 1;
 }
 
-/* Original Logout button style (now replaced by avatar, kept for reference/fallback maybe) */
-.btn-logout { /* Make logout more icon like */
-    background: none;
-    border: none;
-    color: var(--light-color);
-    font-size: 0.75rem; /* Consistent size */
-    padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.6);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-.btn-logout i {
-    font-size: 1.1rem;
-    margin-bottom: 2px;
-}
-.btn-logout span {
-    display: none; /* Hide "(username)" text on mobile */
-}
-.form-logout {
-    display: none; /* Hide this form as it's replaced by the dropdown */
-}
-/* --- End Original Logout --- */
-
-
 .btn-login-register { /* Simplify login button */
     font-size: 0.9rem;
     padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.8);
+}
+
+/* Header Avatar Link */
+.profile-avatar-link {
+    display: inline-flex; /* Use flex to center content */
+    align-items: center;
+    justify-content: center;
+    width: 38px; /* Adjust size as needed */
+    height: 38px;
+    border-radius: 50%; /* Make it circular */
+    background-color: var(--light-color); /* Or use a different color */
+    color:black;
+    font-weight: bold;
+    font-size: 0.9rem; /* Adjust font size */
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+    margin-left: calc(var(--spacing-unit) * 0.5); /* Spacing from other nav items */
+    border: 1px solid transparent; /* Placeholder for active state */
+}
+
+.profile-avatar-link:hover,
+.profile-avatar-link.active {
+    text-decoration: none;
+    border-color: var(--light-color); /* Highlight active */
+}
+
+.profile-avatar-initials {
+    line-height: 1; /* Helps vertical alignment */
 }
 
 
@@ -413,7 +435,6 @@ select:focus {
 }
 
 /* --- Footer --- */
-/* Optional: Basic mobile footer or bottom spacer */
 .app-footer {
   padding: var(--spacing-unit);
   text-align: center;
@@ -421,7 +442,7 @@ select:focus {
   color: var(--secondary-color);
   background-color: var(--light-color);
   border-top: 1px solid var(--border-color);
-  display: none; /* Hide traditional footer on mobile */
+  margin-top: auto; /* Push footer to bottom */
 }
 
 
@@ -499,10 +520,6 @@ select:focus {
   font-size: 0.95rem;
   font-weight: 500;
   margin-bottom: calc(var(--spacing-unit) * 0.25);
-  /* Allow wrapping on mobile if needed */
-  /* white-space: nowrap; */
-  /* overflow: hidden; */
-  /* text-overflow: ellipsis; */
   line-height: 1.3;
   height: 2.6em; /* Limit to roughly 2 lines */
   overflow: hidden; /* Hide overflow */
@@ -629,7 +646,6 @@ select:focus {
 /* --- Corrected Rating Stars CSS for LTR Interaction --- */
 .rating-stars {
   display: inline-flex; /* Use flexbox */
-  /* Visually reverse the order (5, 4, 3, 2, 1) so sibling selector works for LTR highlighting */
   flex-direction: row-reverse;
   justify-content: flex-end; /* Align items to the start (effectively left) */
   margin-bottom: calc(var(--spacing-unit) * 0.8);
@@ -650,15 +666,12 @@ select:focus {
 }
 
 /* Hover effect: Highlight stars up to the hovered one */
-/* When hovering a label, IT and all labels BEFORE it (which are ~ siblings in reversed order) turn gold */
 .rating-stars label:hover,
 .rating-stars label:hover ~ label {
   color: #f8d347; /* Gold color */
 }
 
 /* Checked effect: Keep stars highlighted up to the checked one */
-/* The star corresponding to the checked radio (:checked ~ label selects siblings AFTER it) */
-/* Since flex order is reversed, this selects stars visually to the left */
 .rating-stars input[type="radio"]:checked ~ label {
   color: #f8d347; /* Gold color */
 }
@@ -912,16 +925,10 @@ select:focus {
     white-space: nowrap;
 }
 .order-header strong { color: var(--text-color); }
+/* Use status-badge for consistency */
 .order-status {
-    font-weight: bold;
-    padding: 0.1em 0.4em;
-    border-radius: var(--border-radius);
-    color: rgb(255, 255, 255);
-    /* Default style, will be overridden by status- class */
-    background-color: var(--secondary-color);
-    font-size: 0.9em;
     display: inline-block;
-    vertical-align: middle;
+    /* padding, font-size etc. inherited from status-badge */
 }
 
 .order-body {
@@ -974,11 +981,11 @@ select:focus {
     display: inline-block;
     vertical-align: middle;
 }
-.status-pending, .status-badge.status-pending { background-color: var(--warning-color); color: #333;}
-.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: var(--info-color); }
-.status-delivered, .status-badge.status-delivered { background-color: var(--success-color); }
-.status-cancelled, .status-badge.status-cancelled { background-color: var(--danger-color); }
-.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 1; /* Fade cancelled orders */ }
+.status-pending, .status-badge.status-pending { background-color: rgb(255, 255, 230); color: #000000;}
+.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: rgb(198, 198, 255); }
+.status-delivered, .status-badge.status-delivered { background-color: rgb(216, 255, 216); }
+.status-cancelled, .status-badge.status-cancelled { background-color: rgb(255, 218, 218); }
+.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; /* Slightly fade cancelled */ }
 
 
 /* --- Admin & Delivery Common Styles --- */
@@ -999,10 +1006,15 @@ select:focus {
 }
 
 /* --- Data Tables (Mobile First) --- */
+.table-container { /* Optional wrapper for styling */
+    overflow-x: auto; /* Add horizontal scroll on mobile if table content is too wide */
+    margin-bottom: var(--spacing-unit);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: var(--spacing-unit);
   font-size: 0.9rem;
 }
 
@@ -1019,6 +1031,19 @@ select:focus {
   background-color: var(--card-bg);
   box-shadow: var(--card-shadow);
 }
+/* Remove margin/border if inside .table-container */
+.table-container .data-table tbody tr {
+    margin-bottom: 0;
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+    box-shadow: none;
+    padding: calc(var(--spacing-unit) * 0.5); /* Adjust padding */
+}
+.table-container .data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
 
 .data-table td {
   display: block; /* Stack cells vertically */
@@ -1039,6 +1064,10 @@ select:focus {
   text-align: left;
   padding-right: 10px;
   color: #555;
+  width: 40%; /* Give label some width */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Special cell styling */
@@ -1046,11 +1075,13 @@ select:focus {
   max-width: 50px; /* Smaller image in mobile table cell */
   border-radius: 4px;
   display: inline-block; /* Adjust display for right align */
+  margin-left: 45%; /* Push image past the label space */
 }
 
 /* Adjust td padding if it contains specific content types */
-.data-table td:has(img) { text-align: left; padding: 5px 0; }
+.data-table td:has(img) { text-align: right; padding: 5px 0; } /* Keep right align for image */
 .data-table td:has(form), .actions-cell { padding: 10px 0;}
+.data-table td:has(form) { margin-left: 45%; } /* Push form controls past label */
 
 /* Actions Cell Specific */
 .actions-cell form, .actions-cell .btn {
@@ -1063,6 +1094,7 @@ select:focus {
     border-top: 1px dashed #ccc;
     padding-top: calc(var(--spacing-unit) * 0.5);
     margin-top: calc(var(--spacing-unit) * 0.5);
+    text-align: left; /* Align content left within group */
 }
 .action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 .action-group-title {
@@ -1086,19 +1118,21 @@ select:focus {
 .data-table td:has(label) {
     text-align: left;
 }
+.data-table td:has(label) > * { /* Ensure content in labeled cell is also aligned left */
+    margin-left: 45%;
+}
 
 /* Input sizes in table forms */
+.verify-otp-form { display: flex; align-items: center; gap: 5px; }
 .verify-otp-form input[name="otp"] {
-    width: 100px;
-    margin-right: 5px;
-    display: inline-block; /* allow button beside */
-    width: calc(100% - 100px); /* Adjust based on button size */
+    flex-grow: 1;
     max-width: 120px;
     padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
     font-size: 0.9rem;
+    text-align: center;
 }
 .verify-otp-form button {
-    display: inline-block; /* allow beside input */
+    flex-shrink: 0;
     width: auto;
     padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
 }
@@ -1265,106 +1299,82 @@ select:focus {
 }
 /* --- End Rating Statistics --- */
 
-/* --- Profile Avatar & Dropdown --- */
-.profile-section {
-  position: relative; /* Container for absolute positioning */
-  margin-left: calc(var(--spacing-unit) * 0.5); /* Spacing from other nav items */
+
+/* --- Profile Page --- */
+.profile-container {
+    max-width: 800px; /* Adjust as needed */
+    margin: var(--spacing-unit) auto;
+    padding: calc(var(--spacing-unit) * 1.5);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
 }
 
-.profile-avatar-trigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px; /* Avatar size */
-  height: 38px;
-  border-radius: 50%; /* Make it circular */
-  background-color: var(--primary-color); /* Use a theme color */
-  color: #fff;
-  font-weight:bold;
-  font-size: 0.9rem;
-  border: 1px solid var(--light-color);
-  cursor: pointer;
-  transition: background-color 0.2s, box-shadow 0.2s;
-  overflow: hidden; /* Just in case */
-  text-transform: uppercase; /* Consistent initials case */
-  padding: 0; /* Remove default padding */
-  user-select: none; /* Prevent text selection */
-}
-
-.profile-avatar-trigger:hover {
-  background-color: var(--primary-hover);
-  box-shadow: 0 0 0 3px rgb(0, 123, 255);
-}
-.profile-avatar-trigger:focus {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.612);
-}
-
-.profile-dropdown {
-  display: none; /* Hidden by default */
-  position: absolute;
-  top: calc(100% + 8px); /* Position below the avatar */
-  right: 0;
-  min-width: 200px; /* Minimum width */
-  background-color: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1010; /* Ensure it's above other content */
-  padding: calc(var(--spacing-unit) * 0.5) 0; /* Padding top/bottom */
-  overflow: hidden; /* Clips content if needed */
-}
-
-.profile-dropdown.show {
-  display: block; /* Show the dropdown */
-}
-
-.profile-dropdown .dropdown-item,
-.profile-dropdown .dropdown-item-button {
-  display: block;
-  width: 100%;
-  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
-  color: var(--text-color);
-  text-decoration: none;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.15s ease-in-out;
-}
-.profile-dropdown .dropdown-item i,
-.profile-dropdown .dropdown-item-button i {
-    margin-right: calc(var(--spacing-unit) * 0.5);
-    width: 1.1em; /* Ensure icons align */
+.profile-container h1 {
+    font-size: 1.8rem;
     text-align: center;
-    color: var(--secondary-color);
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+.profile-container > p.text-muted { /* Target the welcome message */
+    text-align: center;
+    font-size: 1.1rem;
 }
 
 
-.profile-dropdown .dropdown-item:hover,
-.profile-dropdown .dropdown-item-button:hover,
-.profile-dropdown .dropdown-item.active {
-  background-color: #f0f0f0; /* Subtle hover/active background */
-  color: var(--text-color);
+.profile-section {
+    margin-top: calc(var(--spacing-unit) * 1.5);
+    padding-top: calc(var(--spacing-unit) * 1);
+    border-top: 1px solid var(--border-color);
+}
+.profile-section:first-of-type { /* Remove top border from the first section if needed */
+    /* border-top: none; */
+    /* padding-top: 0; */
 }
 
-.profile-dropdown .dropdown-divider {
-  height: 1px;
-  margin: calc(var(--spacing-unit) * 0.5) 0;
-  overflow: hidden;
-  background-color: var(--border-color);
-  border: 0;
+
+.profile-section h2 {
+    font-size: 1.4rem;
+    margin-bottom: calc(var(--spacing-unit) * 0.8);
+    color: var(--primary-color);
 }
 
-/* Specific form styling for dropdown logout */
-.form-logout-dropdown {
-    margin: 0;
-    padding: 0;
+/* Address Section Specifics */
+#saved-address-display p {
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+    line-height: 1.5;
+    font-size: 1rem;
+}
+#saved-address-display strong {
+    font-weight: 500;
+}
+#edit-address-btn {
+    margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
-/* --- End Profile Avatar & Dropdown --- */
+.address-form {
+    max-width: 500px; /* Limit form width within the section */
+}
+.address-form h3 {
+    font-size: 1.2rem;
+    margin-bottom: var(--spacing-unit);
+    font-weight: 500;
+}
+#cancel-edit-btn {
+    margin-left: calc(var(--spacing-unit) * 0.5);
+}
+
+/* Dashboard Links */
+.dashboards-section .btn {
+    margin-right: 10px;
+    margin-bottom: 10px; /* Space between buttons if they wrap */
+}
+
+/* Logout Section */
+.logout-section .btn {
+    min-width: 120px; /* Give logout button some width */
+}
+
 
 
 /* --- Media Queries (Example: Tablet and Desktop Overrides) --- */
@@ -1380,8 +1390,8 @@ select:focus {
   /* Header */
   .app-logo .app-name { display: inline; } /* Show text logo */
   .nav-link { flex-direction: row; font-size: 0.9rem; } /* Text beside icon */
+  .nav-link span { display: inline; } /* Show text */
   .nav-link i { margin-right: 0.4rem; margin-bottom: 0; font-size: 1rem; }
-  .nav-link span { display: inline; } /* Show nav link text */
   .nav-right { gap: var(--spacing-unit); } /* Wider gap */
 
 
@@ -1427,7 +1437,7 @@ select:focus {
    }
    .cart-item-quantity { grid-area: quantity; justify-content: center; } /* Center qty control */
    .cart-item-subtotal { display: none; /* Subtotal calculated by price*qty, not displayed explicitly here */ }
-   .cart-item-remove { grid-area: remove; align-self: center; } /* Center remove btn vertically */
+   .cart-item-remove { grid-area: remove; align-self: center; text-align: center; } /* Center remove btn */
 
 
    /* Checkout */
@@ -1440,6 +1450,7 @@ select:focus {
     .checkout-summary { flex: 1 1 45%; }
 
    /* Tables */
+   .table-container { border: none; border-radius: 0; } /* Remove border from wrapper on desktop */
    .data-table thead { display: table-header-group; } /* Show header */
    .data-table tbody tr {
        display: table-row; /* Standard row layout */
@@ -1450,6 +1461,7 @@ select:focus {
        background-color: transparent; /* Reset mobile background */
        border-bottom: 1px solid var(--border-color); /* Separator between rows */
    }
+   .data-table tbody tr:last-child { border-bottom: none; }
    .data-table td {
        display: table-cell; /* Standard cell layout */
        text-align: left; /* Default left align */
@@ -1457,6 +1469,7 @@ select:focus {
        vertical-align: middle;
        border-bottom: none;
        position: static; /* Reset position */
+       margin-left: 0 !important; /* Override mobile margin */
    }
     .data-table td::before { content: none; /* Remove label */} /* Remove labels */
     .data-table td:has(form), .actions-cell {
@@ -1465,8 +1478,11 @@ select:focus {
    }
    .inline-form { display: inline-block; margin: 0 5px 0 0;}
    .inline-form > * { margin-bottom: 0; }
-   .action-group { border: none; padding: 0; margin: 0;} /* Reset action group styles for inline desktop */
+   .action-group { border: none; padding: 0; margin: 0; display: inline-block; vertical-align: middle; margin-right: 10px;} /* Reset action group styles for inline desktop */
    .action-group-title { display: none; } /* Hide titles in desktop table cells */
+   .actions-cell > form, .actions-cell > div > form { display: inline-block; } /* Actions inline */
+   .actions-cell > a { display: inline-block; margin-right: 5px; vertical-align: middle;}
+
 
    /* Center specific columns (example - adjust indices as needed) */
    /* Adjust selectors based on actual table structures */
@@ -1499,7 +1515,8 @@ select:focus {
 
 
    /* Adjust image size */
-   .table-img { max-width: 60px; }
+   .table-img { max-width: 60px; margin-left: 0; }
+   .data-table td:has(img) { text-align: left; } /* Image cell left aligned */
 
     /* Dashboard grids */
     .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
@@ -1525,6 +1542,11 @@ select:focus {
         flex-grow: 1; /* Allow bars to take remaining space */
     }
 
+    /* Profile Page */
+    .profile-container {
+        padding: calc(var(--spacing-unit) * 2);
+    }
+
 
 } /* End 768px */
 
@@ -1540,24 +1562,3 @@ select:focus {
   .admin-actions-grid { grid-template-columns: repeat(5, 1fr); } /* Adjust grid for admin dash */
 
 } /* End 1024px */
-
-/* Mobile adjustments for profile avatar */
-@media (max-width: 767px) {
-    .profile-avatar-trigger {
-        width: 32px;
-        height: 32px;
-        font-size: 0.8rem;
-    }
-    .nav-right {
-        gap: calc(var(--spacing-unit) * 0.4); /* Adjust mobile gap */
-    }
-    /* Hide text links on mobile in header */
-    .nav-link span {
-        display: none;
-    }
-    /* Ensure dropdown items are still readable */
-    .profile-dropdown .dropdown-item,
-    .profile-dropdown .dropdown-item-button {
-        font-size: 0.95rem; /* Slightly larger for mobile touch? */
-    }
-}

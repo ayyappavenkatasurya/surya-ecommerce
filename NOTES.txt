@@ -4909,7 +4909,9 @@ const setOTPExpiration = (minutes = 10) => {
 
 module.exports = { generateOTP, setOTPExpiration };
 
-views/admin/assigned-orders-detail.ejs:
+
+views/admin/assigned-orders-detail.ejs :
+
 <%# views/admin/assigned-orders-detail.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
@@ -4976,45 +4978,46 @@ views/admin/assigned-orders-detail.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/admin/dashboard.ejs:
+
+ views/admin/dashboard.ejs : 
 <%- include('../partials/header', { title: 'Admin Dashboard' }) %>
 
 <div class="admin-dashboard-container">
     <h1>Admin Dashboard</h1>
-    <p>Welcome, <%= currentUser.name %>!</p>
+    <p class="text-muted mb-3">Welcome, <%= currentUser.name %>!</p>
 
     <div class="admin-actions-grid">
-         <a href="/admin/upload-product" class="admin-action-card">
+         <a href="/admin/upload-product" class="admin-action-card card"> <%# ADDED .card %>
             <i class="fas fa-upload"></i>
             <h3>Upload Products</h3>
             <p>Add new products to the store.</p>
         </a>
-         <a href="/admin/manage-products" class="admin-action-card">
+         <a href="/admin/manage-products" class="admin-action-card card"> <%# ADDED .card %>
             <i class="fas fa-edit"></i>
             <h3>Manage Products</h3>
             <p>Edit or remove existing products.</p>
          </a>
-        <a href="/admin/manage-orders" class="admin-action-card">
+        <a href="/admin/manage-orders" class="admin-action-card card"> <%# ADDED .card %>
              <i class="fas fa-clipboard-list"></i>
              <h3>Manage Orders</h3>
              <p>View, verify, and assign orders.</p>
         </a>
-        <a href="/admin/manage-users" class="admin-action-card">
+        <a href="/admin/manage-users" class="admin-action-card card"> <%# ADDED .card %>
              <i class="fas fa-users-cog"></i>
              <h3>Manage Users</h3>
              <p>Update roles or remove users.</p>
         </a>
-         <a href="/admin/manage-assigned-orders" class="admin-action-card">
+         <a href="/admin/manage-assigned-orders" class="admin-action-card card"> <%# ADDED .card %>
             <i class="fas fa-shipping-fast"></i>
             <h3>Manage Assigned Orders</h3>
              <p>Track delivery admin progress.</p>
          </a>
-        </div>
     </div>
+</div>
 
  <%- include('../partials/footer') %>
 
-views/admin/edit-product.ejs:
+views/admin/edit-product.ejs :
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
@@ -5053,7 +5056,7 @@ views/admin/edit-product.ejs:
 
  <%- include('../partials/footer') %>
 
-views/admin/manage-assigned-orders.ejs:
+ views/admin/manage-assigned-orders.ejs : 
 <%- include('../partials/header', { title: 'Manage Assigned Orders' }) %>
 
 <div class="admin-manage-container">
@@ -5101,7 +5104,8 @@ views/admin/manage-assigned-orders.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/admin/manage-orders.ejs:
+
+views/admin/manage-orders.ejs : 
 <%# views/admin/manage-orders.ejs %>
 <%- include('../partials/header', { title: 'Manage Orders' }) %>
 
@@ -5128,11 +5132,16 @@ views/admin/manage-orders.ejs:
                     <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                         <td data-label="Image">
                             <%# Use primaryImageUrl added in controller %>
-                            <% if (order.primaryImageUrl) { %>
-                                <a href="/products/<%= order.products[0].productId %>">
+                            <%# --- MODIFICATION START: Wrap image with link --- %>
+                            <% if (order.products && order.products.length > 0 && order.products[0].productId && order.primaryImageUrl) { %>
+                                <%# Check if productId (populated object) exists %>
+                                <a href="/products/<%= order.products[0].productId._id %>" title="View Product: <%= order.products[0].name %>">
                                     <img src="<%= order.primaryImageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
                                 </a>
-                            <% } else { %> <span class="text-muted">N/A</span> <% } %>
+                            <% } else { %>
+                                <span class="text-muted">N/A</span>
+                            <% } %>
+                             <%# --- MODIFICATION END --- %>
                         </td>
                         <td data-label="Order ID"><%= order._id %></td>
                          <td data-label="Date"><%= order.formattedOrderDate %></td>
@@ -5251,18 +5260,19 @@ views/admin/manage-orders.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/admin/manage-products.ejs:
-<%# views/admin/manage-products.ejs %>
+
+views/admin/manage-products.ejs :
+<%# Example: views/admin/manage-products.ejs %>
 <%- include('../partials/header', { title: 'Manage Products' }) %>
 
-<div class="admin-manage-container"> <%# Keep container %>
+<div class="admin-manage-container">
     <h1>Manage Products</h1>
-   <a href="/admin/upload-product" class="btn btn-success mb-3">Upload New Product</a>
+    <a href="/admin/upload-product" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Upload New Product</a>
 
    <% if (products.length > 0) { %>
-       <div class="table-responsive"> <%# Optional wrapper for horizontal scroll if needed %>
-           <table class="data-table"> <%# Apply class %>
-               <thead> <%# Thead hidden on mobile %>
+       <div class="table-container card"> <%# WRAP with .table-container and .card %>
+           <table class="data-table">
+               <thead>
                    <tr>
                        <th>Image</th>
                        <th>Name</th>
@@ -5271,13 +5281,12 @@ views/admin/manage-products.ejs:
                        <th>Stock</th>
                        <th>Sold</th>
                        <th>Rating</th>
-                       <th class="actions-cell">Actions</th> <%# Class hint %>
+                       <th class="actions-cell" style="text-align: right;">Actions</th> <%# Align header right %>
                    </tr>
                 </thead>
                 <tbody>
                    <% products.forEach(product => { %>
                        <tr>
-                           <%# Add data-label matching the TH text for mobile display %>
                            <td data-label="Image"><a href="/products/<%= product._id %>"><img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="table-img"></a></td>
                             <td data-label="Name"><%= product.name %></td>
                             <td data-label="Category"><%= product.category %></td>
@@ -5285,10 +5294,10 @@ views/admin/manage-products.ejs:
                             <td data-label="Stock"><%= product.stock %></td>
                             <td data-label="Sold"><%= product.orderCount %></td>
                             <td data-label="Rating"><%= product.averageRating.toFixed(1) %> (<%= product.numReviews %>)</td>
-                            <td data-label="Actions" class="actions-cell"> <%# Apply class to TD too %>
-                               <a href="/admin/manage-products/edit/<%= product._id %>" class="btn btn-info btn-sm"><i class="fas fa-edit"></i> Edit</a>
+                            <td data-label="Actions" class="actions-cell">
+                               <a href="/admin/manage-products/edit/<%= product._id %>" class="btn btn-text btn-sm" title="Edit"><i class="fas fa-edit"></i></a> <%# Text button for icon %>
                                <form action="/admin/manage-products/remove/<%= product._id %>" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to remove this product: <%= product.name %>?');">
-                                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i> Remove</button>
+                                    <button type="submit" class="btn btn-text btn-danger btn-sm" title="Remove"><i class="fas fa-trash"></i></button> <%# Text button for icon %>
                                </form>
                            </td>
                         </tr>
@@ -5297,12 +5306,13 @@ views/admin/manage-products.ejs:
             </table>
        </div>
    <% } else { %>
-        <p>No products found. <a href="/admin/upload-product">Upload the first product!</a></p>
+        <p class="text-muted mt-3">No products found. <a href="/admin/upload-product">Upload the first product!</a></p>
    <% } %>
 </div>
 
 <%- include('../partials/footer') %>
-views/admin/manage-users.ejs:
+
+ views/admin/manage-users.ejs :
 <%- include('../partials/header', { title: 'Manage Users' }) %>
 
 <div class="admin-manage-container">
@@ -5359,7 +5369,8 @@ views/admin/manage-users.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/admin/upload-product.ejs:
+
+ views/admin/upload-product.ejs : 
 <%- include('../partials/header', { title: 'Upload New Product' }) %>
 
 <div class="admin-manage-container">
@@ -5397,7 +5408,8 @@ views/admin/upload-product.ejs:
 
  <%- include('../partials/footer') %>
 
-views/auth/forgot-password.ejs:
+
+views/auth/forgot-password.ejs :
 <%- include('../partials/header', { title: 'Forgot Password' }) %>
 
 <div class="auth-container">
@@ -5418,7 +5430,8 @@ views/auth/forgot-password.ejs:
 
 <%- include('../partials/footer') %>
 
-views/auth/login.ejs:
+
+ views/auth/login.ejs :
 <%- include('../partials/header', { title: 'Login' }) %>
 
 <div class="auth-container">
@@ -5443,7 +5456,8 @@ views/auth/login.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/auth/register.ejs:
+
+ views/auth/register.ejs : 
 <%- include('../partials/header', { title: 'Register' }) %>
 
 <div class="auth-container">
@@ -5475,7 +5489,8 @@ views/auth/register.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/auth/reset-password.ejs:
+
+views/auth/reset-password.ejs :
 <%- include('../partials/header', { title: 'Reset Password' }) %>
 
 <div class="auth-container">
@@ -5500,9 +5515,9 @@ views/auth/reset-password.ejs:
 
 <%- include('../partials/footer') %>
 
-views/auth/verify-otp.ejs:
-views/delivery/assigned-orders-detail.ejs:
-views/delivery/contact.ejs:
+
+ views/auth/verify-otp.ejs :
+
 <%- include('../partials/header', { title: title || 'Verify OTP' }) %>
 
 <div class="auth-container">
@@ -5536,7 +5551,8 @@ views/delivery/contact.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/delivery/assigned-orders-detail.ejs:
+
+ views/delivery/assigned-orders-detail.ejs :
 <%# views/delivery/assigned-orders-detail.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
@@ -5667,7 +5683,8 @@ views/delivery/assigned-orders-detail.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/delivery/contact.ejs:
+
+ views/delivery/contact.ejs :
 <%# views/delivery/contact.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
@@ -5699,7 +5716,8 @@ views/delivery/contact.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/delivery/dashboard.ejs:
+
+ views/delivery/dashboard.ejs :
 <%- include('../partials/header', { title: 'Delivery Dashboard' }) %>
 
 <div class="delivery-dashboard-container">
@@ -5727,26 +5745,28 @@ views/delivery/dashboard.ejs:
 
  <%- include('../partials/footer') %>
 
-views/partials/footer.ejs:
-    </main>
 
-    <footer class="app-footer desktop-only"> <%# Add desktop-only class %>
-        <p>© <%= new Date().getFullYear() %> Professional Ecommerce. All rights reserved.</p>
-        <%# Maybe add social links or other footer content for desktop %>
+
+ views/partials/footer.ejs :
+    </main> <%# End Main Content Area %>
+
+    <footer class="app-footer desktop-only">
+        <p>© <%= new Date().getFullYear() %> ProShop. All rights reserved.</p>
     </footer>
 
     <script src="/js/main.js"></script>
 
 </body>
 </html>
-views/partials/header.ejs:
-views/partials/messages.ejs:
+
+ views/partials/header.ejs :
+<%# views/partials/header.ejs %>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | ProShop</title> <%# Simple Name Change Example %>
+    <title><%= title %> | miniapp</title> <%# Simple Name Change Example %>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -5760,7 +5780,7 @@ views/partials/messages.ejs:
             <div class="nav-left">
                 <a href="/" class="app-logo">
                    <i class="fas fa-shopping-bag"></i>
-                   <span class="app-name">ProShop</span> <%# Text name hidden on mobile by CSS %>
+                   <span class="app-name">miniapp</span> <%# Text name hidden on mobile by CSS %>
                 </a>
                  <%# Add search icon toggle button here if needed %>
             </div>
@@ -5783,28 +5803,35 @@ views/partials/messages.ejs:
                         <i class="fas fa-box"></i> <span>Orders</span> <%# Span hidden mobile %>
                     </a>
 
-                    <% if (currentUser.role === 'admin') { %>
-                        <a href="/admin/dashboard" class="nav-link <%= currentUrl.startsWith('/admin') ? 'active' : '' %>" title="Admin Dashboard">
-                            <i class="fas fa-user-shield"></i> <span>Admin</span> <%# Span hidden mobile %>
-                        </a>
-                    <% } %>
-
-                     <% if (currentUser.role === 'delivery_admin') { %>
-                         <a href="/delivery/dashboard" class="nav-link <%= currentUrl.startsWith('/delivery') && !currentUrl.endsWith('/contact') ? 'active' : '' %>" title="Delivery Dashboard">
-                            <i class="fas fa-truck"></i> <span>Delivery</span> <%# Span hidden mobile %>
-                         </a>
-                         <a href="/delivery/contact" class="nav-link <%= currentUrl === '/delivery/contact' ? 'active' : '' %>" title="Contact Info">
-                            <i class="fas fa-phone-alt"></i> <span>Contact</span> <%# Span hidden mobile %>
-                         </a>
-                     <% } %>
-
-                     <%# Use a form for Logout for correct method %>
-                     <form action="/auth/logout" method="POST" class="form-logout">
-                        <button type="submit" class="btn-logout" title="Logout">
-                            <i class="fas fa-sign-out-alt"></i>
-                            <span>Logout <span>(<%= currentUser.name %>)</span></span> <%# Span + inner span hidden mobile %>
+                    <%# --- START: Profile Avatar & Dropdown --- %>
+                    <div class="profile-section">
+                        <button id="profile-avatar-btn" class="profile-avatar-trigger" title="Profile Menu" aria-haspopup="true" aria-expanded="false">
+                             <%= userInitials %>
                         </button>
-                     </form>
+                        <div id="profile-menu" class="profile-dropdown" role="menu">
+                            <% if (currentUser.role === 'admin') { %>
+                                <a href="/admin/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/admin') ? 'active' : '' %>">
+                                    <i class="fas fa-user-shield"></i> Admin Dashboard
+                                </a>
+                            <% } %>
+                            <% if (currentUser.role === 'delivery_admin') { %>
+                                <a href="/delivery/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/delivery') && !currentUrl.endsWith('/contact') ? 'active' : '' %>">
+                                    <i class="fas fa-truck"></i> Delivery Dashboard
+                                </a>
+                                <a href="/delivery/contact" role="menuitem" class="dropdown-item <%= currentUrl === '/delivery/contact' ? 'active' : '' %>">
+                                    <i class="fas fa-phone-alt"></i> Contact Info
+                                </a>
+                            <% } %>
+                             <hr class="dropdown-divider">
+                             <form action="/auth/logout" method="POST" class="form-logout-dropdown">
+                                <button type="submit" class="dropdown-item-button" role="menuitem">
+                                    <i class="fas fa-sign-out-alt"></i> Logout
+                                </button>
+                             </form>
+                         </div>
+                     </div>
+                     <%# --- END: Profile Avatar & Dropdown --- %>
+
                 <% } else { %>
                     <a href="/auth/login" class="btn btn-login-register">
                         <i class="fas fa-sign-in-alt"></i> Login / Register
@@ -5818,7 +5845,32 @@ views/partials/messages.ejs:
      <%- include('messages') %> <%# Keep messages below header %>
 
     <main class="container"> <%# Keep main container %>
-views/products/detail.ejs:
+
+ views/partials/messages.ejs :
+<% if (success_msg && success_msg.length > 0) { %>
+  <div class="alert alert-success" role="alert">
+    <%= success_msg %>
+    <button type="button" class="close-alert" onclick="this.parentElement.style.display='none';">&times;</button>
+  </div>
+<% } %>
+
+<% if (error_msg && error_msg.length > 0) { %>
+  <div class="alert alert-danger" role="alert">
+    <%= error_msg %>
+     <button type="button" class="close-alert" onclick="this.parentElement.style.display='none';">&times;</button>
+  </div>
+<% } %>
+
+<% if (error && typeof error !== 'undefined' && error.length > 0) { %>
+  <div class="alert alert-danger" role="alert">
+    <%= error %>
+     <button type="button" class="close-alert" onclick="this.parentElement.style.display='none';">&times;</button>
+  </div>
+<% } %>
+
+
+
+ views/products/detail.ejs :
 <%- include('../partials/header', { title: product.name }) %>
 
 <div class="product-detail-container">
@@ -5963,7 +6015,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <%- include('../partials/footer') %>
 
-views/products/index.ejs:
+
+
+ views/products/index.ejs : 
+<%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="product-index-container">
@@ -5988,7 +6043,8 @@ views/products/index.ejs:
                         <div class="product-info">
                             <h3 class="product-name"><%= product.name %></h3>
                             <%# --- CURRENCY UPDATE --- %>
-                            <p class="product-price">₹<%= product.price.toFixed(2) %></p>
+                            <%# Safely handle potentially missing price before formatting %>
+                            <p class="product-price">₹<%= (typeof product.price === 'number' ? product.price : 0).toFixed(2) %></p>
                             <%# --- END CURRENCY UPDATE --- %>
                             <p class="product-stock">Stock: <%= product.stock %></p>
                             <% if (product.numReviews > 0) { %>
@@ -5999,7 +6055,7 @@ views/products/index.ejs:
                                     (<%= product.numReviews %>)
                                  </p>
                             <% } else { %>
-                                <p class="product-rating">&nbsp;</p> <%# Keep space for alignment %>
+                                <p class="product-rating"> </p> <%# Keep space for alignment %>
                             <% } %>
                         </div>
                     </a>
@@ -6021,7 +6077,8 @@ views/products/index.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/user/cart.ejs:
+
+views/user/cart.ejs : 
 <%# views/user/cart.ejs %>
 <%- include('../partials/header', { title: 'Shopping Cart' }) %>
 
@@ -6038,7 +6095,8 @@ views/user/cart.ejs:
                     <div class="cart-item-details">
                         <h3 class="cart-item-name"><%= item.name %></h3>
                         <%# --- CURRENCY UPDATE --- %>
-                        <p class="cart-item-price">₹<%= item.price.toFixed(2) %></p>
+                        <%# Safely handle potentially missing item price %>
+                        <p class="cart-item-price">₹<%= (typeof item.price === 'number' ? item.price : 0).toFixed(2) %></p>
                         <%# --- END CURRENCY UPDATE --- %>
                          <p class="cart-item-stock">Stock: <%= item.stock %></p>
                     </div>
@@ -6058,7 +6116,8 @@ views/user/cart.ejs:
                      </div>
                      <div class="cart-item-subtotal">
                          <%# --- CURRENCY UPDATE --- %>
-                         Subtotal: ₹<span class="item-subtotal-value"><%= item.subtotal.toFixed(2) %></span>
+                         <%# Safely handle potentially missing item subtotal %>
+                         Subtotal: ₹<span class="item-subtotal-value"><%= (typeof item.subtotal === 'number' ? item.subtotal : 0).toFixed(2) %></span>
                          <%# --- END CURRENCY UPDATE --- %>
                     </div>
                     <div class="cart-item-remove">
@@ -6073,7 +6132,8 @@ views/user/cart.ejs:
 
          <div class="cart-summary">
              <%# --- CURRENCY UPDATE --- %>
-             <h2>Cart Total: ₹<span id="cart-total-value"><%= cartTotal.toFixed(2) %></span></h2>
+             <%# Safely handle potentially missing cart total %>
+             <h2>Cart Total: ₹<span id="cart-total-value"><%= (typeof cartTotal === 'number' ? cartTotal : 0).toFixed(2) %></span></h2>
              <%# --- END CURRENCY UPDATE --- %>
              <a href="/user/checkout" class="btn btn-success btn-checkout">Proceed to Checkout</a>
         </div>
@@ -6084,7 +6144,8 @@ views/user/cart.ejs:
 </div>
 
  <%- include('../partials/footer') %>
-views/user/checkout.ejs:
+
+views/user/checkout.ejs : 
 <%# views/user/checkout.ejs %>
 <%- include('../partials/header', { title: 'Checkout' }) %>
 
@@ -6198,7 +6259,8 @@ views/user/checkout.ejs:
 <%- include('../partials/footer') %>
 
 <%# Checkout specific JS logic was moved to public/js/main.js %>
-views/user/my-orders.ejs:
+
+views/user/my-orders.ejs :
 <%# views/user/my-orders.ejs %>
 <%- include('../partials/header', { title: 'My Orders' }) %>
 
@@ -6260,7 +6322,9 @@ views/user/my-orders.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-views/error.ejs:
+
+
+ views/error.ejs:
 <%- include('./partials/header', { title: 'Error' }) %>
 
 <div class="error-container container">
@@ -6279,7 +6343,21 @@ views/error.ejs:
 
 <%- include('./partials/footer') %>
 
-server.js:
+.env : NODE_ENV=development
+PORT=3000
+MONGO_URI=mongodb+srv://ecommerce:ecommerce@cluster0.jcfuk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+SESSION_SECRET=e6142a6d230d0445c9b050af41bfd1e53ece6270797e546fbdaa97af20f3b77e
+SESSION_MAX_AGE=86400000
+
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USER=ayyappanallamothu4@gmail.com
+MAIL_PASS=yxor nmot lxmq skyc
+MAIL_FROM='"Surya Ecom" ayyappanallamothu4@gmail.com'
+
+
+server.js : 
+
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -6317,7 +6395,6 @@ app.use(
     cookie: {
         maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000', 10),
         httpOnly: true
-
     }
   })
 );
@@ -6328,16 +6405,40 @@ app.use((req, res, next) => {
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
   res.locals.error = req.flash('error');
-// server.js (Add inside the res.locals middleware)
+  res.locals.currentUser = req.session.user || null;
+  res.locals.currentUrl = req.originalUrl;
+  res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
+  res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + item.quantity, 0) || 0;
 
-// ... existing res.locals assignments ...
-res.locals.currentUser = req.session.user || null;
-res.locals.currentUrl = req.originalUrl;
-// Add this line for the full URL needed for sharing
-res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + item.quantity, 0) || 0;
-next();
-// ... rest of the file
+  // --- NEW: Calculate User Initials ---
+  let userInitials = '??'; // Default fallback
+  if (req.session.user && req.session.user.email) {
+    try {
+      // Try splitting by space first (for names), then fallback to email
+      const nameParts = req.session.user.name?.split(' ');
+      if (nameParts && nameParts.length > 1) {
+          userInitials = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+      } else if (nameParts && nameParts.length === 1 && nameParts[0].length >= 2) {
+          userInitials = nameParts[0].substring(0, 2).toUpperCase();
+      }
+       else {
+        // Fallback to email if name didn't work well
+        const emailPrefix = req.session.user.email.split('@')[0];
+        if (emailPrefix.length >= 2) {
+            userInitials = emailPrefix.substring(0, 2).toUpperCase();
+        } else if (emailPrefix.length === 1) {
+            userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase(); // Double the single letter
+        }
+      }
+    } catch (e) {
+      console.error("Error generating initials:", e);
+      // Keep default '??'
+    }
+  }
+  res.locals.userInitials = userInitials;
+  // --- END: Calculate User Initials ---
+
+  next();
 });
 
 
@@ -6352,16 +6453,3 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
-
-.env:
-NODE_ENV=development
-PORT=3000
-MONGO_URI=mongodb://localhost:27017/suryaecommerce
-SESSION_SECRET=e6142a6d230d0435c9b050af41bfd1e53ece6270797e546fbdaa97af20f3b77e
-SESSION_MAX_AGE=86400000
-
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USER=ayyappanallamothu4@gmail.com
-MAIL_PASS=yxor nmot lxmq skyc
-MAIL_FROM='"Surya Eshop" ayyappanallamothu4@gmail.com'

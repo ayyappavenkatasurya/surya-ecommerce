@@ -13,8 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isNaN(newQuantity) || newQuantity < 0) {
                  alert('Invalid quantity');
-                 // Revert input if possible? Or just return.
-                 // quantityInput.value = button.dataset.previousValue || 1; // Needs previous value storage
+                // Revert input if possible? Or just return.
+                // quantityInput.value = button.dataset.previousValue || 1; // Needs previous value storage
                 return;
              }
             const maxStock = parseInt(quantityInput.max, 10);
@@ -40,6 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Basic client-side validation check before showing spinner
                 if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
                     // Let browser handle HTML5 validation messages, don't show spinner
+                    // Need to explicitly trigger the browser's validation UI if needed
+                    form.reportValidity();
                     return;
                 }
 
@@ -68,7 +70,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, index) => {
-                    if (headers[index] !== undefined) {
+                    // Ensure header exists for the index and cell doesn't already have the attribute
+                    if (headers[index] !== undefined && !cell.hasAttribute('data-label')) {
                          cell.setAttribute('data-label', headers[index]);
                     }
                 });
@@ -110,77 +113,96 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Checkout Address Form Toggle ---
-    const editBtn = document.getElementById('edit-address-btn');
-    const cancelBtn = document.getElementById('cancel-edit-btn');
-    const addressForm = document.getElementById('address-form');
-    const savedAddressDiv = document.querySelector('.saved-address');
-    const placeOrderBtn = document.querySelector('.btn-place-order');
-    const formTitle = addressForm?.querySelector('h3');
-    const hasInitialAddress = savedAddressDiv && !savedAddressDiv.classList.contains('hidden');
+    // --- Checkout Address Form Toggle (Keep Existing for Checkout Page) ---
+    const checkoutEditBtn = document.querySelector('.checkout-container #edit-address-btn');
+    const checkoutCancelBtn = document.querySelector('.checkout-container #cancel-edit-btn');
+    const checkoutAddressForm = document.querySelector('.checkout-container #address-form');
+    const checkoutSavedAddressDiv = document.querySelector('.checkout-container .saved-address');
+    const checkoutPlaceOrderBtn = document.querySelector('.checkout-container .btn-place-order');
+    const checkoutHasInitialAddress = checkoutSavedAddressDiv && !checkoutSavedAddressDiv.classList.contains('hidden');
 
-    if (editBtn && addressForm && savedAddressDiv && placeOrderBtn) {
-        editBtn.addEventListener('click', () => {
-            addressForm.classList.remove('hidden');
-            savedAddressDiv.classList.add('hidden');
-            placeOrderBtn.disabled = true; // Disable place order while editing
+    if (checkoutEditBtn && checkoutAddressForm && checkoutSavedAddressDiv && checkoutPlaceOrderBtn) {
+        checkoutEditBtn.addEventListener('click', () => {
+            checkoutAddressForm.classList.remove('hidden');
+            checkoutSavedAddressDiv.classList.add('hidden');
+            checkoutPlaceOrderBtn.disabled = true;
+            const formTitle = checkoutAddressForm.querySelector('h3');
             if(formTitle) formTitle.textContent = 'Edit Address';
         });
     }
-    if (cancelBtn && addressForm && savedAddressDiv && placeOrderBtn) {
-        cancelBtn.addEventListener('click', () => {
-            addressForm.classList.add('hidden');
-            if (hasInitialAddress) {
-                savedAddressDiv.classList.remove('hidden');
-                placeOrderBtn.disabled = false; // Re-enable if initial address was present
+     if (checkoutCancelBtn && checkoutAddressForm && checkoutSavedAddressDiv && checkoutPlaceOrderBtn) {
+        checkoutCancelBtn.addEventListener('click', () => {
+            checkoutAddressForm.classList.add('hidden');
+            if (checkoutHasInitialAddress) {
+                 checkoutSavedAddressDiv.classList.remove('hidden');
+                 checkoutPlaceOrderBtn.disabled = false;
             } else {
-                 placeOrderBtn.disabled = true; // Keep disabled if there was no initial address
+                 // If no initial address, cancelling edit means button should remain disabled
+                 checkoutPlaceOrderBtn.disabled = true;
             }
         });
     }
-     // Initial state check: If no initial address, show form, ensure button is disabled
-     if (!hasInitialAddress && addressForm && placeOrderBtn) {
-         addressForm.classList.remove('hidden');
-         placeOrderBtn.disabled = true;
+    // Initial state check for checkout: If no initial address, show form, ensure button is disabled
+    if (!checkoutHasInitialAddress && checkoutAddressForm && checkoutPlaceOrderBtn) {
+         checkoutAddressForm.classList.remove('hidden');
+         checkoutPlaceOrderBtn.disabled = true;
+         const formTitle = checkoutAddressForm.querySelector('h3');
          if (formTitle) formTitle.textContent = 'Add Address';
-     } else if (hasInitialAddress && placeOrderBtn) {
-         placeOrderBtn.disabled = false; // Ensure enabled if address exists initially
+         // Hide cancel button if adding new on checkout
+         if(checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
+     } else if (checkoutHasInitialAddress && checkoutPlaceOrderBtn) {
+         // Ensure form hidden and button enabled if address exists initially
+         if(checkoutAddressForm) checkoutAddressForm.classList.add('hidden');
+         checkoutPlaceOrderBtn.disabled = false;
+         // Ensure cancel button is visible for editing on checkout
+         if(checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden');
      }
 
-    // --- NEW: Profile Dropdown Toggle Logic ---
-    const profileAvatarBtn = document.getElementById('profile-avatar-btn');
-    const profileMenu = document.getElementById('profile-menu');
 
-    if (profileAvatarBtn && profileMenu) {
-        profileAvatarBtn.addEventListener('click', (event) => {
-            event.stopPropagation(); // Prevent window listener from closing it immediately
-            const isExpanded = profileAvatarBtn.getAttribute('aria-expanded') === 'true';
-            profileMenu.classList.toggle('show');
-            profileAvatarBtn.setAttribute('aria-expanded', !isExpanded);
+    // --- NEW: Profile Page Address Form Toggle ---
+    const profileEditBtn = document.querySelector('.profile-container #edit-address-btn');
+    const profileCancelBtn = document.querySelector('.profile-container #cancel-edit-btn');
+    const profileAddressForm = document.querySelector('.profile-container #address-form');
+    const profileSavedAddressDiv = document.querySelector('.profile-container #saved-address-display');
+    // Check if address display div is VISIBLE on load
+    const profileHasInitialAddress = profileSavedAddressDiv && !profileSavedAddressDiv.classList.contains('hidden');
+
+    if (profileEditBtn && profileAddressForm && profileSavedAddressDiv) {
+        profileEditBtn.addEventListener('click', () => {
+            profileAddressForm.classList.remove('hidden');
+            profileSavedAddressDiv.classList.add('hidden');
+            const formTitle = profileAddressForm.querySelector('h3');
+            if(formTitle) formTitle.textContent = 'Edit Address';
+            // Ensure cancel button is visible when editing
+            if(profileCancelBtn) profileCancelBtn.classList.remove('hidden');
         });
-
-        // Close dropdown if clicking outside
-        window.addEventListener('click', (event) => {
-            // Check if the menu is shown and the click was outside the button and the menu
-            if (profileMenu.classList.contains('show') &&
-                !profileAvatarBtn.contains(event.target) &&
-                !profileMenu.contains(event.target))
-            {
-                profileMenu.classList.remove('show');
-                profileAvatarBtn.setAttribute('aria-expanded', 'false');
-            }
-        });
-
-         // Optional: Close dropdown on Escape key press
-         window.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && profileMenu.classList.contains('show')) {
-                 profileMenu.classList.remove('show');
-                 profileAvatarBtn.setAttribute('aria-expanded', 'false');
-                 profileAvatarBtn.focus(); // Return focus to the button
-             }
-         });
     }
-    // --- END: Profile Dropdown Toggle Logic ---
+
+    if (profileCancelBtn && profileAddressForm && profileSavedAddressDiv) {
+        profileCancelBtn.addEventListener('click', () => {
+            profileAddressForm.classList.add('hidden');
+            // Only show the saved address div if it actually existed initially
+            if (profileHasInitialAddress) {
+                profileSavedAddressDiv.classList.remove('hidden');
+            }
+            // If there was no initial address, clicking cancel just hides the form
+        });
+    }
+
+     // Initial state for profile page: If no address displayed, ensure form is shown
+     if (!profileHasInitialAddress && profileAddressForm) {
+         profileAddressForm.classList.remove('hidden');
+          const formTitle = profileAddressForm.querySelector('h3');
+         if (formTitle) formTitle.textContent = 'Add Address';
+          // Hide cancel button if we are adding address for the first time
+          if(profileCancelBtn) profileCancelBtn.classList.add('hidden');
+     } else if (profileHasInitialAddress && profileAddressForm){
+          // Ensure form is hidden if address exists initially
+          profileAddressForm.classList.add('hidden');
+          // Ensure cancel button is visible if editing existing address (and it exists)
+          if(profileCancelBtn) profileCancelBtn.classList.remove('hidden');
+     }
+     // --- END NEW PROFILE ADDRESS TOGGLE ---
 
 
 }); // End DOMContentLoaded
@@ -189,8 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Cart AJAX Update Function (Revised Spinner/Button Handling) ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
      const originalButtonText = 'Update'; // Define original text
-     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i> Updating...';
+     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>'; // Just spinner for small btn
      const quantityInput = document.getElementById(`quantity-${productId}`); // Get input
+
+     // Store previous value *before* making the request
+     const previousValue = quantityInput ? quantityInput.value : null;
 
      buttonElement.disabled = true;
      buttonElement.innerHTML = loadingButtonText;
@@ -203,27 +228,27 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
             headers: {
                 'Content-Type': 'application/json',
                 // Include CSRF token header if you implement CSRF protection
+                // 'CSRF-Token': csrfToken // Example
             },
             body: JSON.stringify({ productId, quantity })
          });
 
+        const data = await response.json(); // Try to parse JSON regardless of status
+
         if (!response.ok) {
-             const errorData = await response.json().catch(() => ({ message: 'Failed to update cart. Server error.' }));
-             // --- Attempt to revert visual quantity on server error ---
-             // This is optional, requires storing the value *before* the request
-             // if (quantityInput && buttonElement.dataset.previousValue) {
-             //    quantityInput.value = buttonElement.dataset.previousValue;
-             // }
-             // --------------------------------------------------------
-            throw new Error(errorData.message || `Update failed (Status: ${response.status})`);
+            // --- Attempt to revert visual quantity on server error ---
+             if (quantityInput && previousValue !== null) {
+                quantityInput.value = previousValue;
+             }
+            // --------------------------------------------------------
+            throw new Error(data.message || `Update failed (Status: ${response.status})`);
         }
 
-         const data = await response.json();
-
+         // --- SUCCESS CASE (response.ok is true) ---
          if (data.success) {
             const cartItemDiv = document.querySelector(`.cart-item[data-product-id="${productId}"]`);
 
-             if (quantity === 0) {
+             if (quantity === 0) { // Handle item removal
                 if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease';
                     cartItemDiv.style.opacity = '0';
@@ -233,43 +258,46 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
                         updateCartTotalAndBadge(data.cartTotal); // Pass the total from response
                         handleEmptyCartDisplay(); // Check if cart became empty
                     }, 300);
+                     // No need to re-enable button/input as the row is removed
                      return; // Exit early as item is being removed
                 }
-             } else {
+             } else { // Handle quantity update (quantity > 0)
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = data.itemSubtotal.toFixed(2);
                 if(quantityInput) {
                      quantityInput.value = data.newQuantity; // Update input with confirmed quantity
-                     // Update the stored previous value (if using)
-                     // buttonElement.dataset.previousValue = data.newQuantity;
                  }
-
              }
              // Update total and badge for successful updates (non-zero quantity)
              updateCartTotalAndBadge(data.cartTotal);
 
          } else {
-             // Server responded with success: false
+             // Server responded with success: false (but response.ok was true - less common)
              alert(`Update failed: ${data.message}`);
-              // Revert visual quantity on server-reported failure (optional)
-             // if (quantityInput && buttonElement.dataset.previousValue) {
-             //    quantityInput.value = buttonElement.dataset.previousValue;
-             // }
+              // Revert visual quantity on server-reported failure
+             if (quantityInput && previousValue !== null) {
+                quantityInput.value = previousValue;
+             }
          }
 
     } catch (error) {
          // Network error or other exception during fetch/processing
          console.error('Error updating cart quantity:', error);
          alert(`Error: ${error.message}`);
-          // Revert visual quantity on exception (optional)
-         // if (quantityInput && buttonElement.dataset.previousValue) {
-         //    quantityInput.value = buttonElement.dataset.previousValue;
-         // }
+          // Revert visual quantity on exception
+         if (quantityInput && previousValue !== null) {
+            quantityInput.value = previousValue;
+         }
     } finally {
          // Always re-enable button and input, restore original text
-         buttonElement.disabled = false;
-         buttonElement.innerHTML = originalButtonText;
-         if(quantityInput) quantityInput.readOnly = false;
+         // This runs even if the item was removed, but the elements might be gone
+         if (buttonElement) {
+             buttonElement.disabled = false;
+             buttonElement.innerHTML = originalButtonText;
+         }
+         if(quantityInput) {
+             quantityInput.readOnly = false;
+         }
      }
 }
 
@@ -298,7 +326,8 @@ function updateCartTotalAndBadge(newCartTotal) {
 
 // --- Helper function: Calculate cart count from input fields ---
 function calculateNewCartCount() {
-    const quantityInputs = document.querySelectorAll('.cart-item .quantity-input');
+    // Select only quantity inputs *currently present* in the cart items container
+    const quantityInputs = document.querySelectorAll('.cart-items .cart-item .quantity-input');
     let count = 0;
     quantityInputs.forEach(input => {
         const value = parseInt(input.value, 10);
@@ -316,9 +345,27 @@ function handleEmptyCartDisplay() {
     const cartItemsContainer = document.querySelector('.cart-items');
      const cartContainer = document.querySelector('.cart-container'); // Get the parent
      // Check count AFTER potential removal animation finishes
-     if (calculateNewCartCount() === 0 && cartContainer && cartItemsContainer) {
+     // Also check if cartItemsContainer still exists (it might be removed if cart becomes empty)
+     if (calculateNewCartCount() === 0 && cartContainer) {
          // Replace entire cart content if empty
          cartContainer.innerHTML = '<h1>Your Shopping Cart</h1><p>Your cart is empty. <a href="/">Continue Shopping</a></p>';
          // No need to hide summary as it's removed
      }
+}
+
+// --- Rating Bar Animation (Product Detail Page) ---
+function animateRatingBars() {
+    document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
+        var width = el.getAttribute('data-width');
+        if (width) {
+            // Apply width after a short delay for visual effect
+            setTimeout(() => {
+                el.style.width = width + '%';
+            }, 100); // 100ms delay
+        }
+    });
+}
+// Check if on product detail page (or any page with rating bars) and run
+if (document.querySelector('.rating-bars')) {
+    animateRatingBars();
 }

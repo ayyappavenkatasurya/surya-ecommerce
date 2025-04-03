@@ -1,0 +1,94 @@
+<%# views/user/profile.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="profile-container">
+    <h1>My Profile</h1>
+    <p class="text-muted mb-3">Welcome, <%= user.name %> (<%= user.email %>)</p>
+
+    <%# --- Conditional Dashboards --- %>
+    <div class="profile-section dashboards-section">
+        <h2>Dashboards</h2>
+        <% if (user.role === 'admin') { %>
+            <p><a href="/admin/dashboard" class="btn btn-info"><i class="fas fa-user-shield"></i> Go to Admin Dashboard</a></p>
+        <% } %>
+        <% if (user.role === 'delivery_admin') { %>
+            <p><a href="/delivery/dashboard" class="btn btn-warning"><i class="fas fa-truck"></i> Go to Delivery Dashboard</a></p>
+            <p><a href="/delivery/contact" class="btn btn-secondary"><i class="fas fa-phone-alt"></i> Update Delivery Contact</a></p> <%# Link to contact page %>
+        <% } %>
+        <% if (user.role === 'user') { %>
+            <p>You have standard user access.</p>
+        <% } %>
+    </div>
+
+    <%# --- Address Management --- %>
+    <div class="profile-section address-section">
+        <h2>My Address</h2>
+        <%# Display saved address if it exists %>
+        <div id="saved-address-display" class="<%= (!user.address || !user.address.name) ? 'hidden' : '' %>">
+            <% if (user.address && user.address.name) { %>
+                <p><strong><%= user.address.name %></strong></p>
+                <p><%= user.address.phone %></p>
+                <p><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %></p>
+                <p>Pincode: <%= user.address.pincode %></p>
+                <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+            <% } %>
+        </div>
+
+        <%# Address form (hidden initially if address exists) %>
+        <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner">
+            <h3><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
+            <input type="hidden" name="source" value="profile"> <%# IMPORTANT: Tells backend where save request came from %>
+            <div class="form-group">
+                <label for="name">Full Name:</label>
+                <input type="text" id="name" name="name" value="<%= user.address?.name || '' %>" required autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="phone">Phone Number:</label>
+                <input type="tel"
+                       id="phone"
+                       name="phone"
+                       value="<%= user.address?.phone || '' %>"
+                       required
+                       pattern="\d{10,15}"
+                       minlength="10"
+                       maxlength="15"
+                       title="Enter 10 to 15 digit phone number (numbers only)"
+                       autocomplete="tel">
+            </div>
+            <div class="form-group">
+                <label for="pincode">Pincode:</label>
+                <input type="text"
+                       id="pincode"
+                       name="pincode"
+                       value="<%= user.address?.pincode || '' %>"
+                       required
+                       pattern="\d{6}"
+                       maxlength="6"
+                       inputmode="numeric"
+                       title="Enter 6-digit Pincode"
+                       autocomplete="postal-code">
+            </div>
+            <div class="form-group">
+                <label for="cityVillage">City / Village:</label>
+                <input type="text" id="cityVillage" name="cityVillage" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
+            </div>
+            <div class="form-group">
+                <label for="landmarkNearby">Landmark / Nearby (Optional):</label>
+                <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= user.address?.landmarkNearby || '' %>">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Address</button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel</button> <%# Hide cancel if adding new %>
+        </form>
+    </div>
+
+    <%# --- Logout Section --- %>
+    <div class="profile-section logout-section">
+        <h2>Account Actions</h2>
+        <form action="/auth/logout" method="POST" class="form-submit-spinner">
+            <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </form>
+    </div>
+
+</div>
+
+<%- include('../partials/footer') %>

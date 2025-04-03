@@ -4,13 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | miniapp</title> <%# Simple Name Change Example %>
+    <title><%= title %> | miniapp</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
     <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/css/style.css"> <%# Link the stylesheet %>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <header class="app-header">
@@ -18,15 +18,13 @@
             <div class="nav-left">
                 <a href="/" class="app-logo">
                    <i class="fas fa-shopping-bag"></i>
-                   <span class="app-name">miniapp</span> <%# Text name hidden on mobile by CSS %>
+                   <span class="app-name">miniapp</span>
                 </a>
-                 <%# Add search icon toggle button here if needed %>
             </div>
-            <%# <div class="nav-center"> Optional: Mobile search could expand here </div> %>
             <div class="nav-right">
                 <% if (currentUser) { %>
                     <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home">
-                        <i class="fas fa-home"></i> <span>Home</span> <%# Span hidden mobile %>
+                        <i class="fas fa-home"></i> <span>Home</span>
                     </a>
                      <a href="/user/cart" class="nav-link nav-link-cart <%= currentUrl === '/user/cart' ? 'active' : '' %>" title="Cart">
                          <i class="fas fa-shopping-cart"></i>
@@ -35,40 +33,17 @@
                          <% } else { %>
                              <span class="cart-badge" style="display: none;">0</span>
                          <% } %>
-                          <span>Cart</span> <%# Span hidden mobile %>
+                          <span>Cart</span>
                      </a>
                     <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders">
-                        <i class="fas fa-box"></i> <span>Orders</span> <%# Span hidden mobile %>
+                        <i class="fas fa-box"></i> <span>Orders</span>
                     </a>
 
-                    <%# --- START: Profile Avatar & Dropdown --- %>
-                    <div class="profile-section">
-                        <button id="profile-avatar-btn" class="profile-avatar-trigger" title="Profile Menu" aria-haspopup="true" aria-expanded="false">
-                             <%= userInitials %>
-                        </button>
-                        <div id="profile-menu" class="profile-dropdown" role="menu">
-                            <% if (currentUser.role === 'admin') { %>
-                                <a href="/admin/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/admin') ? 'active' : '' %>">
-                                    <i class="fas fa-user-shield"></i> Admin Dashboard
-                                </a>
-                            <% } %>
-                            <% if (currentUser.role === 'delivery_admin') { %>
-                                <a href="/delivery/dashboard" role="menuitem" class="dropdown-item <%= currentUrl.startsWith('/delivery') && !currentUrl.endsWith('/contact') ? 'active' : '' %>">
-                                    <i class="fas fa-truck"></i> Delivery Dashboard
-                                </a>
-                                <a href="/delivery/contact" role="menuitem" class="dropdown-item <%= currentUrl === '/delivery/contact' ? 'active' : '' %>">
-                                    <i class="fas fa-phone-alt"></i> Contact Info
-                                </a>
-                            <% } %>
-                             <hr class="dropdown-divider">
-                             <form action="/auth/logout" method="POST" class="form-logout-dropdown">
-                                <button type="submit" class="dropdown-item-button" role="menuitem">
-                                    <i class="fas fa-sign-out-alt"></i> Logout
-                                </button>
-                             </form>
-                         </div>
-                     </div>
-                     <%# --- END: Profile Avatar & Dropdown --- %>
+                    <%# --- START: Profile Avatar Link --- %>
+                    <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile">
+                         <span class="profile-avatar-initials"><%= userInitials %></span>
+                    </a>
+                    <%# --- END: Profile Avatar Link --- %>
 
                 <% } else { %>
                     <a href="/auth/login" class="btn btn-login-register">
@@ -77,9 +52,8 @@
                 <% } %>
             </div>
         </nav>
-         <%# Mobile search bar could be placed outside nav, revealed by JS %>
     </header>
 
-     <%- include('messages') %> <%# Keep messages below header %>
+     <%- include('messages') %>
 
-    <main class="container"> <%# Keep main container %>
+    <main class="container">
