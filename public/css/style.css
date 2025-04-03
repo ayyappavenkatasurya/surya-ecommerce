@@ -14,17 +14,17 @@
   --primary-hover: #0056b3;
   --secondary-color: #6c757d;
   --secondary-hover: #5a6268;
-  --success-color: #9affb1;
-  --success-hover: #87ffa1;
-  --danger-color: #ff8e99;
+  --success-color: #00a827;
+  --success-hover: #00cc2c;
+  --danger-color: #ff9ba5;
   --danger-hover: #ff9da7;
-  --warning-color: #ffe38e;
-  --warning-hover: #ffe69b;
-  --info-color: #92f1ff;
-  --info-hover: #96f1ff;
+  --warning-color: #ffe8a5;
+  --warning-hover: #ffeebb;
+  --info-color: #00a6c0;
+  --info-hover: #00c3e1;
   --light-color: #f8f9fa;
-  --dark-color: #343a40;
-  --text-color: #333;
+  --dark-color: #000000;
+  --text-color: #000000;
   --link-color: var(--primary-color);
   --bg-color: #fff;
   --border-color: #dee2e6;
@@ -89,7 +89,7 @@ ul, ol {
   text-align: center;
 }
 .text-danger {
-  color: var(--danger-color) !important;
+  color:rgb(0, 0, 0)!important;
 }
 .text-success {
   color: var(--success-color) !important;
@@ -1249,11 +1249,11 @@ select:focus {
   transition: width 0.3s ease-in-out; /* Smooth animation */
 }
 /* Optional: Different colors per rating */
-.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: hsl(134, 100%, 59%); } /* 5 stars */
+.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; } /* 5 stars */
 .rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; } /* 4 stars */
-.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffe69a; } /* 3 stars */
-.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #ffb375; } /* 2 stars */
-.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #ff818e; } /* 1 star */
+.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; } /* 3 stars */
+.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; } /* 2 stars */
+.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; } /* 1 star */
 
 
 .rating-bar-count {
