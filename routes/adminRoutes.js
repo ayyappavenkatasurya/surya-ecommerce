@@ -26,12 +26,13 @@ router.get('/manage-orders', adminController.getManageOrdersPage);
 // Direct delivery by Admin actions
 router.post('/orders/:orderId/send-direct-delivery-otp', adminController.sendDirectDeliveryOtpByAdmin);
 router.post('/orders/:orderId/confirm-direct-delivery', adminController.confirmDirectDeliveryByAdmin);
-// Assign/Unassign/Cancel actions
+// Individual Assign/Unassign/Cancel actions
 router.post('/orders/:orderId/assign', adminController.assignOrder);
-// --- ADDED Unassign Route ---
 router.post('/orders/:orderId/unassign', adminController.unassignOrderFromAdmin);
-// --- END ---
 router.post('/orders/:orderId/cancel', adminController.cancelOrderByAdmin);
+// --- ADDED Bulk Assign Route ---
+router.post('/orders/bulk-assign', adminController.bulkAssignOrders);
+// --- END ---
 
 
 // Users
@@ -42,9 +43,7 @@ router.post('/users/:id/remove', adminController.removeUser);
 
 // Assigned Orders / Delivery Admins
 router.get('/manage-assigned-orders', adminController.getManageAssignedOrdersPage);
-// View details of orders assigned to a specific delivery admin (by type: total, pending, delivered)
 router.get('/manage-assigned-orders/details/:deliveryAdminId/:type', adminController.getAssignedOrdersDetailForAdmin);
-// Remove delivery admin (and unassign their orders) - linked from manage-assigned-orders page
 router.post('/manage-assigned-orders/remove/:id', adminController.removeDeliveryAdminAssignment);
 
 

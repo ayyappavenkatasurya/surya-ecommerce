@@ -1562,3 +1562,50 @@ select:focus {
   .admin-actions-grid { grid-template-columns: repeat(5, 1fr); } /* Adjust grid for admin dash */
 
 } /* End 1024px */
+/* public/css/style.css */
+
+/* ... existing styles ... */
+
+.data-table tbody tr.selected-row {
+  background-color: #e7f3ff; /* Light blue background for selected rows */
+}
+.data-table td {
+  /* Add transition for smoother background change */
+  transition: background-color 0.2s ease-in-out;
+}
+
+/* Bulk Actions Container specific styles */
+.bulk-actions-container {
+  background-color: #f8f9fa; /* Light background */
+  border: 1px solid #dee2e6;
+  border-radius: .25rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+}
+
+.bulk-actions-container h4 {
+  margin-bottom: 0.75rem;
+  font-size: 1.1rem;
+}
+
+/* Better alignment for inline form elements in bulk actions */
+.bulk-actions-container .form-inline {
+  display: flex;
+  align-items: center; /* Align items vertically */
+  gap: 0.5rem; /* Add some space between elements */
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.bulk-actions-container .form-inline label {
+  margin-bottom: 0; /* Remove default bottom margin for labels */
+}
+
+.bulk-actions-container .form-inline select,
+.bulk-actions-container .form-inline button {
+  flex-shrink: 0; /* Prevent button/select from shrinking too much */
+}
+
+.bulk-actions-container .form-inline select {
+  min-width: 200px; /* Give the select some minimum width */
+}
+/* ... rest of the styles ... */

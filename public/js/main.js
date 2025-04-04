@@ -1,4 +1,3 @@
-// public/js/main.js
 console.log("Main JS loaded.");
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -13,8 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isNaN(newQuantity) || newQuantity < 0) {
                  alert('Invalid quantity');
-                // Revert input if possible? Or just return.
-                // quantityInput.value = button.dataset.previousValue || 1; // Needs previous value storage
+                 // Revert input if possible? Or just return.
+                 // quantityInput.value = button.dataset.previousValue || 1; // Needs previous value storage
                 return;
              }
             const maxStock = parseInt(quantityInput.max, 10);
@@ -40,8 +39,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Basic client-side validation check before showing spinner
                 if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
                     // Let browser handle HTML5 validation messages, don't show spinner
-                    // Need to explicitly trigger the browser's validation UI if needed
-                    form.reportValidity();
                     return;
                 }
 
@@ -70,8 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, index) => {
-                    // Ensure header exists for the index and cell doesn't already have the attribute
-                    if (headers[index] !== undefined && !cell.hasAttribute('data-label')) {
+                    // Ensure we don't overwrite data-label if already set or if header is empty
+                    if (!cell.hasAttribute('data-label') && headers[index] !== undefined && headers[index] !== '') {
                          cell.setAttribute('data-label', headers[index]);
                     }
                 });
@@ -113,96 +110,165 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Checkout Address Form Toggle (Keep Existing for Checkout Page) ---
-    const checkoutEditBtn = document.querySelector('.checkout-container #edit-address-btn');
-    const checkoutCancelBtn = document.querySelector('.checkout-container #cancel-edit-btn');
-    const checkoutAddressForm = document.querySelector('.checkout-container #address-form');
-    const checkoutSavedAddressDiv = document.querySelector('.checkout-container .saved-address');
-    const checkoutPlaceOrderBtn = document.querySelector('.checkout-container .btn-place-order');
-    const checkoutHasInitialAddress = checkoutSavedAddressDiv && !checkoutSavedAddressDiv.classList.contains('hidden');
+    // --- Checkout Address Form Toggle ---
+    const editBtn = document.getElementById('edit-address-btn');
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const addressForm = document.getElementById('address-form');
+    const savedAddressDiv = document.querySelector('.saved-address'); // Should be #saved-address-display? Check profile.ejs if issues
+    const profileSavedAddressDiv = document.getElementById('saved-address-display'); // Specific ID for profile page
+    const placeOrderBtn = document.querySelector('.btn-place-order');
+    const formTitle = addressForm?.querySelector('h3');
+    const addressSourceInput = addressForm?.querySelector('input[name="source"]');
+    let isProfilePage = addressSourceInput?.value === 'profile'; // Check if on profile page
 
-    if (checkoutEditBtn && checkoutAddressForm && checkoutSavedAddressDiv && checkoutPlaceOrderBtn) {
-        checkoutEditBtn.addEventListener('click', () => {
-            checkoutAddressForm.classList.remove('hidden');
-            checkoutSavedAddressDiv.classList.add('hidden');
-            checkoutPlaceOrderBtn.disabled = true;
-            const formTitle = checkoutAddressForm.querySelector('h3');
+    let initialAddressDiv = isProfilePage ? profileSavedAddressDiv : savedAddressDiv;
+    const hasInitialAddress = initialAddressDiv && !initialAddressDiv.classList.contains('hidden');
+
+    if (editBtn && addressForm && initialAddressDiv) {
+        editBtn.addEventListener('click', () => {
+            addressForm.classList.remove('hidden');
+            initialAddressDiv.classList.add('hidden');
+            if(placeOrderBtn) placeOrderBtn.disabled = true; // Disable place order while editing checkout address
             if(formTitle) formTitle.textContent = 'Edit Address';
         });
     }
-     if (checkoutCancelBtn && checkoutAddressForm && checkoutSavedAddressDiv && checkoutPlaceOrderBtn) {
-        checkoutCancelBtn.addEventListener('click', () => {
-            checkoutAddressForm.classList.add('hidden');
-            if (checkoutHasInitialAddress) {
-                 checkoutSavedAddressDiv.classList.remove('hidden');
-                 checkoutPlaceOrderBtn.disabled = false;
+
+    if (cancelBtn && addressForm && initialAddressDiv) {
+        cancelBtn.addEventListener('click', () => {
+            addressForm.classList.add('hidden');
+            if (hasInitialAddress) {
+                initialAddressDiv.classList.remove('hidden');
+                 // Only re-enable place order button if NOT on profile page and address existed
+                if(placeOrderBtn && !isProfilePage) placeOrderBtn.disabled = false;
             } else {
-                 // If no initial address, cancelling edit means button should remain disabled
-                 checkoutPlaceOrderBtn.disabled = true;
+                 if(placeOrderBtn && !isProfilePage) placeOrderBtn.disabled = true; // Keep disabled if there was no initial address on checkout
             }
+            // Reset form fields? Optional, but good practice
+            // addressForm.reset();
         });
     }
-    // Initial state check for checkout: If no initial address, show form, ensure button is disabled
-    if (!checkoutHasInitialAddress && checkoutAddressForm && checkoutPlaceOrderBtn) {
-         checkoutAddressForm.classList.remove('hidden');
-         checkoutPlaceOrderBtn.disabled = true;
-         const formTitle = checkoutAddressForm.querySelector('h3');
+
+     // Initial state check:
+     // On Checkout: If no initial address, show form, ensure button is disabled
+     if (!isProfilePage && !hasInitialAddress && addressForm && placeOrderBtn) {
+         addressForm.classList.remove('hidden');
+         placeOrderBtn.disabled = true;
          if (formTitle) formTitle.textContent = 'Add Address';
-         // Hide cancel button if adding new on checkout
-         if(checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
-     } else if (checkoutHasInitialAddress && checkoutPlaceOrderBtn) {
-         // Ensure form hidden and button enabled if address exists initially
-         if(checkoutAddressForm) checkoutAddressForm.classList.add('hidden');
-         checkoutPlaceOrderBtn.disabled = false;
-         // Ensure cancel button is visible for editing on checkout
-         if(checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden');
+     } else if (!isProfilePage && hasInitialAddress && placeOrderBtn) {
+         placeOrderBtn.disabled = false; // Ensure enabled if address exists initially on checkout
+     }
+     // On Profile: If no address, show form (cancel button might be hidden by EJS)
+      if (isProfilePage && !hasInitialAddress && addressForm) {
+         addressForm.classList.remove('hidden');
+         if (formTitle) formTitle.textContent = 'Add Address';
      }
 
 
-    // --- NEW: Profile Page Address Form Toggle ---
-    const profileEditBtn = document.querySelector('.profile-container #edit-address-btn');
-    const profileCancelBtn = document.querySelector('.profile-container #cancel-edit-btn');
-    const profileAddressForm = document.querySelector('.profile-container #address-form');
-    const profileSavedAddressDiv = document.querySelector('.profile-container #saved-address-display');
-    // Check if address display div is VISIBLE on load
-    const profileHasInitialAddress = profileSavedAddressDiv && !profileSavedAddressDiv.classList.contains('hidden');
+    // --- START: Bulk Order Assignment Logic ---
+    const selectAllCheckbox = document.getElementById('select-all-orders');
+    const orderCheckboxes = document.querySelectorAll('.order-checkbox');
+    const bulkActionControls = document.getElementById('bulk-action-controls');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const bulkAssignForm = document.getElementById('bulk-assign-form'); // Get the form
+    const bulkAssignButton = bulkActionControls?.querySelector('button[type="submit"]');
+    const bulkDeliveryAdminSelect = document.getElementById('bulkDeliveryAdminId');
 
-    if (profileEditBtn && profileAddressForm && profileSavedAddressDiv) {
-        profileEditBtn.addEventListener('click', () => {
-            profileAddressForm.classList.remove('hidden');
-            profileSavedAddressDiv.classList.add('hidden');
-            const formTitle = profileAddressForm.querySelector('h3');
-            if(formTitle) formTitle.textContent = 'Edit Address';
-            // Ensure cancel button is visible when editing
-            if(profileCancelBtn) profileCancelBtn.classList.remove('hidden');
+
+    function updateBulkActionVisibility() {
+        const selectedCheckboxes = document.querySelectorAll('.order-checkbox:checked');
+        const count = selectedCheckboxes.length;
+
+        if (selectedCountSpan) {
+            selectedCountSpan.textContent = count;
+        }
+
+        if (bulkActionControls) {
+            bulkActionControls.style.display = count > 0 ? 'block' : 'none';
+        }
+
+        // Enable/disable bulk assign button based on selection and admin choice
+        if(bulkAssignButton && bulkDeliveryAdminSelect){
+            bulkAssignButton.disabled = count === 0 || bulkDeliveryAdminSelect.value === '';
+        }
+    }
+
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            orderCheckboxes.forEach(checkbox => {
+                checkbox.checked = isChecked;
+                // Optional: Add/remove a highlight class to the row
+                checkbox.closest('tr')?.classList.toggle('selected-row', isChecked);
+            });
+            updateBulkActionVisibility();
         });
     }
 
-    if (profileCancelBtn && profileAddressForm && profileSavedAddressDiv) {
-        profileCancelBtn.addEventListener('click', () => {
-            profileAddressForm.classList.add('hidden');
-            // Only show the saved address div if it actually existed initially
-            if (profileHasInitialAddress) {
-                profileSavedAddressDiv.classList.remove('hidden');
+    orderCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            // Optional: Add/remove a highlight class to the row
+             e.target.closest('tr')?.classList.toggle('selected-row', e.target.checked);
+
+            // Check if *all* enabled checkboxes are now checked
+            const allChecked = [...orderCheckboxes].every(cb => cb.checked);
+             // Check if *any* checkbox is checked
+            const anyChecked = [...orderCheckboxes].some(cb => cb.checked);
+
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = allChecked;
+                 // Handle indeterminate state (visual sugar)
+                 // If some but not all are checked, set indeterminate
+                 selectAllCheckbox.indeterminate = anyChecked && !allChecked;
             }
-            // If there was no initial address, clicking cancel just hides the form
+            updateBulkActionVisibility();
         });
+    });
+
+     // Add listener to the delivery admin dropdown in the bulk section
+    if(bulkDeliveryAdminSelect){
+        bulkDeliveryAdminSelect.addEventListener('change', () => {
+            updateBulkActionVisibility(); // Re-check if button should be enabled
+        });
+     }
+
+
+    // Initial check in case the page loads with some state or errors
+    if (orderCheckboxes.length > 0) {
+        updateBulkActionVisibility();
+        // Disable select all if no orders are assignable
+        const assignableCount = [...orderCheckboxes].length;
+        if(selectAllCheckbox) selectAllCheckbox.disabled = assignableCount === 0;
+
+    } else if (selectAllCheckbox) {
+        selectAllCheckbox.disabled = true; // Disable if there are no checkboxes at all
     }
 
-     // Initial state for profile page: If no address displayed, ensure form is shown
-     if (!profileHasInitialAddress && profileAddressForm) {
-         profileAddressForm.classList.remove('hidden');
-          const formTitle = profileAddressForm.querySelector('h3');
-         if (formTitle) formTitle.textContent = 'Add Address';
-          // Hide cancel button if we are adding address for the first time
-          if(profileCancelBtn) profileCancelBtn.classList.add('hidden');
-     } else if (profileHasInitialAddress && profileAddressForm){
-          // Ensure form is hidden if address exists initially
-          profileAddressForm.classList.add('hidden');
-          // Ensure cancel button is visible if editing existing address (and it exists)
-          if(profileCancelBtn) profileCancelBtn.classList.remove('hidden');
-     }
-     // --- END NEW PROFILE ADDRESS TOGGLE ---
+     // Optional: Add confirmation before bulk submitting
+     if (bulkAssignForm) {
+        bulkAssignForm.addEventListener('submit', (e) => {
+             const selectedCheckboxes = document.querySelectorAll('.order-checkbox:checked');
+             const count = selectedCheckboxes.length;
+             const adminSelected = bulkDeliveryAdminSelect && bulkDeliveryAdminSelect.value !== '';
+
+             if (count === 0) {
+                 alert('Please select at least one order to assign.');
+                 e.preventDefault();
+                 return;
+             }
+             if (!adminSelected) {
+                 alert('Please select a Delivery Admin to assign the orders to.');
+                 e.preventDefault();
+                 return;
+             }
+
+             if (!confirm(`Are you sure you want to assign ${count} order(s) to the selected Delivery Admin?`)) {
+                 e.preventDefault(); // Stop submission if user cancels
+             }
+             // Spinner is handled by the generic form spinner logic already attached via class
+         });
+    }
+
+    // --- END: Bulk Order Assignment Logic ---
 
 
 }); // End DOMContentLoaded
@@ -211,11 +277,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- Cart AJAX Update Function (Revised Spinner/Button Handling) ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
      const originalButtonText = 'Update'; // Define original text
-     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>'; // Just spinner for small btn
+     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>'; // Just spinner for small button
      const quantityInput = document.getElementById(`quantity-${productId}`); // Get input
-
-     // Store previous value *before* making the request
-     const previousValue = quantityInput ? quantityInput.value : null;
 
      buttonElement.disabled = true;
      buttonElement.innerHTML = loadingButtonText;
@@ -228,27 +291,21 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
             headers: {
                 'Content-Type': 'application/json',
                 // Include CSRF token header if you implement CSRF protection
-                // 'CSRF-Token': csrfToken // Example
             },
             body: JSON.stringify({ productId, quantity })
          });
 
-        const data = await response.json(); // Try to parse JSON regardless of status
-
         if (!response.ok) {
-            // --- Attempt to revert visual quantity on server error ---
-             if (quantityInput && previousValue !== null) {
-                quantityInput.value = previousValue;
-             }
-            // --------------------------------------------------------
-            throw new Error(data.message || `Update failed (Status: ${response.status})`);
+             const errorData = await response.json().catch(() => ({ message: 'Failed to update cart. Server error.' }));
+            throw new Error(errorData.message || `Update failed (Status: ${response.status})`);
         }
 
-         // --- SUCCESS CASE (response.ok is true) ---
-         if (data.success) {
-            const cartItemDiv = document.querySelector(`.cart-item[data-product-id="${productId}"]`);
+         const data = await response.json();
 
-             if (quantity === 0) { // Handle item removal
+         if (data.success) {
+            const cartItemDiv = buttonElement.closest('.cart-item'); // Find parent cart item
+
+             if (quantity === 0) {
                 if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease';
                     cartItemDiv.style.opacity = '0';
@@ -258,46 +315,33 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
                         updateCartTotalAndBadge(data.cartTotal); // Pass the total from response
                         handleEmptyCartDisplay(); // Check if cart became empty
                     }, 300);
-                     // No need to re-enable button/input as the row is removed
                      return; // Exit early as item is being removed
                 }
-             } else { // Handle quantity update (quantity > 0)
+             } else {
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = data.itemSubtotal.toFixed(2);
                 if(quantityInput) {
                      quantityInput.value = data.newQuantity; // Update input with confirmed quantity
                  }
+
              }
              // Update total and badge for successful updates (non-zero quantity)
              updateCartTotalAndBadge(data.cartTotal);
 
          } else {
-             // Server responded with success: false (but response.ok was true - less common)
+             // Server responded with success: false
              alert(`Update failed: ${data.message}`);
-              // Revert visual quantity on server-reported failure
-             if (quantityInput && previousValue !== null) {
-                quantityInput.value = previousValue;
-             }
          }
 
     } catch (error) {
          // Network error or other exception during fetch/processing
          console.error('Error updating cart quantity:', error);
          alert(`Error: ${error.message}`);
-          // Revert visual quantity on exception
-         if (quantityInput && previousValue !== null) {
-            quantityInput.value = previousValue;
-         }
     } finally {
          // Always re-enable button and input, restore original text
-         // This runs even if the item was removed, but the elements might be gone
-         if (buttonElement) {
-             buttonElement.disabled = false;
-             buttonElement.innerHTML = originalButtonText;
-         }
-         if(quantityInput) {
-             quantityInput.readOnly = false;
-         }
+         buttonElement.disabled = false;
+         buttonElement.innerHTML = originalButtonText;
+         if(quantityInput) quantityInput.readOnly = false;
      }
 }
 
@@ -326,8 +370,7 @@ function updateCartTotalAndBadge(newCartTotal) {
 
 // --- Helper function: Calculate cart count from input fields ---
 function calculateNewCartCount() {
-    // Select only quantity inputs *currently present* in the cart items container
-    const quantityInputs = document.querySelectorAll('.cart-items .cart-item .quantity-input');
+    const quantityInputs = document.querySelectorAll('.cart-item .quantity-input');
     let count = 0;
     quantityInputs.forEach(input => {
         const value = parseInt(input.value, 10);
@@ -345,27 +388,9 @@ function handleEmptyCartDisplay() {
     const cartItemsContainer = document.querySelector('.cart-items');
      const cartContainer = document.querySelector('.cart-container'); // Get the parent
      // Check count AFTER potential removal animation finishes
-     // Also check if cartItemsContainer still exists (it might be removed if cart becomes empty)
-     if (calculateNewCartCount() === 0 && cartContainer) {
+     if (calculateNewCartCount() === 0 && cartContainer && cartItemsContainer) {
          // Replace entire cart content if empty
          cartContainer.innerHTML = '<h1>Your Shopping Cart</h1><p>Your cart is empty. <a href="/">Continue Shopping</a></p>';
          // No need to hide summary as it's removed
      }
-}
-
-// --- Rating Bar Animation (Product Detail Page) ---
-function animateRatingBars() {
-    document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
-        var width = el.getAttribute('data-width');
-        if (width) {
-            // Apply width after a short delay for visual effect
-            setTimeout(() => {
-                el.style.width = width + '%';
-            }, 100); // 100ms delay
-        }
-    });
-}
-// Check if on product detail page (or any page with rating bars) and run
-if (document.querySelector('.rating-bars')) {
-    animateRatingBars();
 }

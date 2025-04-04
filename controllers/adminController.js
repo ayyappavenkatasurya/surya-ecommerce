@@ -6,9 +6,8 @@ const { sendEmail } = require('../config/mailer');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-    generateAndSendDeliveryOTP,
-    verifyDeliveryOTP
-} = require('./orderController'); // Assuming these are correctly imported from orderController
+    // Note: generateAndSendDeliveryOTP, verifyDeliveryOTP are typically called from deliveryController, not directly here
+} = require('./orderController'); // Assuming these are correctly imported
 
 // --- Keep cancellationReasons array ---
 const cancellationReasons = [
@@ -23,9 +22,8 @@ const cancellationReasons = [
 
 // =======================
 // Dashboard & Page Getters
-// ... (getAdminDashboard, getUploadProductPage, etc. remain the same) ...
+// =======================
 exports.getAdminDashboard = (req, res) => {
-    // Implement dashboard logic if needed, or render simply
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
 
@@ -65,35 +63,42 @@ exports.getEditProductPage = async (req, res, next) => {
      }
  };
 
-// --- UPDATED getManageOrdersPage function ---
+// --- UPDATED getManageOrdersPage function (includes logic for bulk assign checks) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   // Ensure productId is populated with _id, name, imageUrl
-                                   // priceAtOrder is already in the OrderProductSchema
-                                   .populate('products.productId', 'name imageUrl _id')
-                                   .lean(); // Use lean for performance
+                                   .populate('products.productId', 'name imageUrl _id price') // Ensure necessary fields are populated
+                                   .lean();
 
         orders.forEach(order => {
             order.formattedOrderDate = new Date(order.orderDate).toLocaleString();
             order.formattedReceivedDate = order.receivedByDate ? new Date(order.receivedByDate).toLocaleString() : 'N/A';
+            // Determine capabilities for each order
             order.canBeCancelledByAdmin = ['Pending', 'Out for Delivery'].includes(order.status);
-            order.canBeAssignedByAdmin = order.status === 'Pending';
+            order.canBeAssignedByAdmin = order.status === 'Pending'; // Check for individual and bulk assignment eligibility
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
             order.canBeUnassignedByAdmin = order.status === 'Out for Delivery';
-            // No primaryImageUrl needed here, handled in view
+
+            // Pre-calculate item details string for display (optional improvement)
+            if (order.products && order.products.length > 0) {
+                order.itemsSummary = order.products.map(p =>
+                    `${p.name || '[Product Name Missing]'} (Qty: ${p.quantity}) @ ₹${(p.priceAtOrder || 0).toFixed(2)}`
+                ).join('<br>');
+            } else {
+                order.itemsSummary = 'No items found';
+            }
         });
 
          const deliveryAdmins = await User.find({ role: 'delivery_admin' })
-                                          .select('email _id address.phone') // Ensure phone is selected
+                                          .select('email _id address.phone name') // Added name
                                           .lean();
 
         res.render('admin/manage-orders', {
             title: 'Manage Orders',
             orders: orders,
             deliveryAdmins: deliveryAdmins,
-            cancellationReasons: cancellationReasons // Pass reasons to the view
+            cancellationReasons: cancellationReasons
         });
     } catch (error) {
         next(error);
@@ -200,7 +205,7 @@ exports.getAssignedOrdersDetailForAdmin = async(req, res, next) => {
 
 // =======================
 // Product Actions
-// ... (uploadProduct, updateProduct, removeProduct remain the same) ...
+// =======================
 exports.uploadProduct = async (req, res, next) => {
     const { name, category, price, stock, imageUrl, specifications } = req.body;
     // Assuming sellerEmail comes from the logged-in admin session
@@ -384,7 +389,7 @@ exports.assignOrder = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
          }
         // Find the selected delivery admin
-        const deliveryAdmin = await User.findOne({ _id: deliveryAdminId, role: 'delivery_admin' }).select('email name address.phone'); // Select phone
+        const deliveryAdmin = await User.findOne({ _id: deliveryAdminId, role: 'delivery_admin' }).select('email name address.phone'); // Select name & phone
          if (!deliveryAdmin) {
             req.flash('error_msg', 'Selected Delivery Admin not found or is not a valid delivery admin.');
             return res.status(400).redirect('/admin/manage-orders');
@@ -433,13 +438,149 @@ exports.assignOrder = async (req, res, next) => {
         }
         // Log unexpected errors
          console.error(`Error assigning order ${orderId} to ${deliveryAdminId}:`, error);
-        // Pass to generic error handler
+        req.flash('error_msg', 'An unexpected error occurred while assigning the order.');
+        // Pass to generic error handler only if truly unexpected
         next(error);
     }
  };
 
 
-// --- NEW: Unassign Order by Admin ---
+// --- NEW: Bulk Assign Orders by Admin ---
+exports.bulkAssignOrders = async (req, res, next) => {
+    let { orderIds, deliveryAdminId } = req.body; // Use let as orderIds might be reassigned
+
+    // Ensure orderIds is always an array, even if only one checkbox is submitted
+    if (orderIds && !Array.isArray(orderIds)) {
+        orderIds = [orderIds];
+    }
+
+    // 1. Initial Validation
+    if (!orderIds || orderIds.length === 0) {
+        req.flash('error_msg', 'No orders selected for bulk assignment.');
+        return res.redirect('/admin/manage-orders');
+    }
+    if (!deliveryAdminId) {
+        req.flash('error_msg', 'Please select a Delivery Admin to assign the orders to.');
+        return res.redirect('/admin/manage-orders');
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    const failures = []; // To store { orderId, reason }
+
+    try {
+        // 2. Validate Delivery Admin
+        const deliveryAdmin = await User.findOne({ _id: deliveryAdminId, role: 'delivery_admin' })
+                                        .select('email name address.phone'); // Select name & phone
+        if (!deliveryAdmin) {
+            req.flash('error_msg', 'Selected Delivery Admin not found or is not valid.');
+            return res.redirect('/admin/manage-orders');
+        }
+        const assignedAdminEmailString = deliveryAdmin.address?.phone
+            ? `${deliveryAdmin.email} (${deliveryAdmin.address.phone})`
+            : deliveryAdmin.email;
+
+        // 3. Process Orders Iteratively (Best Effort)
+        // Using Promise.allSettled allows all assignments to attempt even if some fail
+        const assignmentPromises = orderIds.map(async (orderId) => {
+            try {
+                const order = await Order.findById(orderId);
+
+                if (!order) {
+                    throw new Error('Not found.');
+                }
+                if (order.status !== 'Pending') {
+                    throw new Error(`Invalid status ('${order.status}'). Must be 'Pending'.`);
+                }
+
+                // Assign and update status
+                order.assignedTo = deliveryAdmin._id;
+                order.assignedAdminEmail = assignedAdminEmailString;
+                order.status = 'Out for Delivery';
+                await order.save();
+
+                // --- Send Notifications (Best effort per order) ---
+                const notifyPromises = [];
+                // Notify Delivery Admin
+                notifyPromises.push(
+                    sendEmail(
+                        deliveryAdmin.email,
+                        `New Order Assigned: ${order._id}`,
+                        `New order ${order._id} assigned for delivery.`,
+                        `<p>You have been assigned order ${order._id} for delivery.</p><p>Customer: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><p>Please check your Delivery Dashboard for details.</p>`
+                    ).catch(emailError => console.error(`Failed sending assignment email to delivery admin ${deliveryAdmin.email} for order ${order._id}:`, emailError))
+                );
+                // Notify Customer
+                const assignedPersonInfo = deliveryAdmin.name || assignedAdminEmailString;
+                notifyPromises.push(
+                    sendEmail(
+                        order.userEmail,
+                        `Your Order is Out for Delivery!`,
+                        `Your order ${order._id} is out for delivery.`,
+                        `<p>Your order (${order._id}) is now out for delivery with ${assignedPersonInfo}.</p><p>You can track its progress in the 'My Orders' section of your account.</p>`
+                    ).catch(emailError => console.error(`Failed sending out-for-delivery email to customer for order ${order._id}:`, emailError))
+                );
+                // Wait for notifications to attempt sending, but don't let them block assignment success
+                await Promise.allSettled(notifyPromises);
+
+                return { status: 'fulfilled', orderId: orderId }; // Indicate success for this order
+
+            } catch (orderError) {
+                // Log the specific error for this order
+                console.error(`Failed to assign order ${orderId} in bulk:`, orderError);
+                return { status: 'rejected', orderId: orderId, reason: orderError.message || 'Unknown error' }; // Indicate failure
+            }
+        });
+
+        // Wait for all assignment attempts to complete
+        const results = await Promise.allSettled(assignmentPromises);
+
+        // Process results
+        results.forEach(result => {
+            if (result.status === 'fulfilled') {
+                successCount++;
+            } else {
+                // result.status === 'rejected'
+                failCount++;
+                // The reason is already captured from the inner catch block if available
+                // Store the detailed reason if provided by the promise rejection
+                failures.push({ orderId: result.reason?.orderId || 'Unknown', reason: result.reason?.reason || result.reason || 'Processing failed' });
+            }
+        });
+
+
+        // 4. Provide Feedback
+        if (successCount > 0) {
+            req.flash('success_msg', `${successCount} order(s) successfully assigned to ${deliveryAdmin.email}.`);
+        }
+        if (failCount > 0) {
+            const failureDetails = failures.map(f => `Order ${f.orderId}: ${f.reason}`).join('; ');
+            req.flash('error_msg', `${failCount} order(s) failed to assign. Details: ${failureDetails}`);
+        }
+        if (successCount === 0 && failCount === 0 && orderIds.length > 0) {
+             // This case might happen if all selected orders were already processed or invalid IDs
+             req.flash('error_msg', 'No valid orders were processed during bulk assignment. Please check the order statuses.');
+        } else if (successCount === 0 && failCount === 0 && orderIds.length === 0) {
+             // This case is handled by initial validation, but included for completeness
+            req.flash('error_msg', 'No orders were selected.');
+        }
+
+        res.redirect('/admin/manage-orders');
+
+    } catch (error) { // Catch errors like deliveryAdmin validation or major issues before the loop
+        if (error.name === 'CastError') {
+            req.flash('error_msg', 'Invalid Delivery Admin ID format.');
+        } else {
+            console.error(`General error during bulk order assignment setup:`, error);
+            req.flash('error_msg', 'An unexpected error occurred during bulk assignment initiation.');
+        }
+        res.redirect('/admin/manage-orders');
+    }
+};
+// --- END: Bulk Assign Orders by Admin ---
+
+
+// --- Unassign Order by Admin ---
 exports.unassignOrderFromAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     const adminUserId = req.session.user._id; // For logging purposes
@@ -604,7 +745,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
 // =======================
 // User Management Actions
-// ... (updateUserRole, removeUser remain the same) ...
+// =======================
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;

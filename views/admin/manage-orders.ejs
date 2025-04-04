@@ -4,172 +4,185 @@
 <div class="admin-manage-container">
     <h1>Manage Orders</h1>
 
-    <% if (orders.length > 0) { %>
-        <div class="table-container card"> <%# Optional: Wrap table for better styling/scrolling %>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Images</th> <%# Changed header text %>
-                        <th>Order ID</th>
-                        <th>Date</th>
-                        <th>Customer</th>
-                        <th>Address & Phone</th>
-                        <th>Items & Prices</th> <%# Changed header text %>
-                        <th>Total</th>
-                        <th>Status & Assignment</th>
-                        <th class="actions-cell" style="text-align: right;">Actions</th> <%# Align header right %>
-                    </tr>
-                </thead>
-                <tbody>
-                    <% orders.forEach(order => { %>
-                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
-                            <td data-label="Images"> <%# Updated data-label %>
-                                <%# --- MODIFICATION START: Loop through products for images --- %>
-                                <% if (order.products && order.products.length > 0) { %>
-                                    <% order.products.slice(0, 3).forEach(item => { %> <%# Limit to first 3 images shown %>
-                                        <%# Check if productId was populated and has an _id %>
-                                        <% if (item.productId && item.productId._id && item.imageUrl) { %>
-                                            <a href="/products/<%= item.productId._id %>" title="View Product: <%= item.name %>">
-                                                <img src="<%= item.imageUrl %>" alt="<%= item.name %>" class="table-img"> <%# Keep table-img class for potential styling %>
-                                            </a>
-                                        <% } else { %>
-                                            <%# Fallback if product or image is missing %>
-                                            <span class="text-muted" style="font-size: 0.8em;">[?]</span>
-                                        <% } %>
-                                    <% }) %>
-                                    <% if (order.products.length > 3) { %>
-                                        <br><small class="text-muted" style="white-space: nowrap;">+ <%= order.products.length - 3 %> more</small>
+    <%# --- START: Bulk Assign Form --- %>
+    <form action="/admin/orders/bulk-assign" method="POST" id="bulk-assign-form" class="form-submit-spinner">
+        <%# --- Bulk Action Controls (Initially Hidden) --- %>
+        <div id="bulk-action-controls" class="bulk-actions-container card mb-3 p-2" style="display: none;">
+             <h4>Bulk Assign Selected Orders (<span id="selected-count">0</span> selected)</h4>
+             <% if (deliveryAdmins && deliveryAdmins.length > 0) { %>
+                <div class="form-inline"> <%# Use form-inline for better layout on desktop %>
+                     <label for="bulkDeliveryAdminId" class="mr-2">Assign to:</label>
+                     <select name="deliveryAdminId" id="bulkDeliveryAdminId" required class="form-control form-control-sm mr-2" style="width: auto; display: inline-block;">
+                         <option value="" disabled selected>Select Delivery Admin...</option>
+                         <% deliveryAdmins.forEach(admin => { %>
+                             <option value="<%= admin._id %>">
+                                <%= admin.email %> <% if (admin.address && admin.address.phone) { %>(<%= admin.address.phone %>)<% } %>
+                             </option>
+                         <% }) %>
+                     </select>
+                     <button type="submit" class="btn btn-info btn-sm">Assign Selected</button>
+                </div>
+             <% } else { %>
+                 <p class="text-danger">No delivery admins available for bulk assignment.</p>
+             <% } %>
+        </div>
+        <%# --- End Bulk Action Controls --- %>
+
+        <% if (orders.length > 0) { %>
+            <div class="table-container card">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <%# --- Add Checkbox Header --- %>
+                            <th style="width: 30px;">
+                                <input type="checkbox" id="select-all-orders" title="Select all assignable orders">
+                            </th>
+                            <th>Images</th>
+                            <th>Order ID</th>
+                            <th>Date</th>
+                            <th>Customer</th>
+                            <th>Address & Phone</th>
+                            <th>Items & Prices</th>
+                            <th>Total</th>
+                            <th>Status & Assignment</th>
+                            <th class="actions-cell" style="text-align: right;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% orders.forEach(order => { %>
+                            <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
+                                <%# --- Add Checkbox Cell --- %>
+                                <td>
+                                    <% if (order.canBeAssignedByAdmin) { %>
+                                        <input type="checkbox" name="orderIds[]" value="<%= order._id %>" class="order-checkbox" aria-label="Select order <%= order._id %> for bulk action">
                                     <% } %>
-                                <% } else { %>
-                                    <span class="text-muted">N/A</span>
-                                <% } %>
-                                <%# --- MODIFICATION END --- %>
-                            </td>
-                            <td data-label="Order ID"><%= order._id %></td>
-                            <td data-label="Date"><%= order.formattedOrderDate %></td>
-                            <td data-label="Customer"><%= order.userEmail %></td>
-                            <td data-label="Address & Phone">
-                                <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
-                                <br><strong>Ph: <%= order.shippingAddress.phone %></strong>
-                            </td>
-                            <td data-label="Items & Prices"> <%# Updated data-label %>
-                                <%# --- MODIFICATION START: Loop through products for details --- %>
-                                <% if (order.products && order.products.length > 0) { %>
-                                    <% order.products.forEach((item, index) => { %>
-                                        <%# Check if productId was populated %>
-                                        <% if (item.productId) { %>
-                                            <%= item.name %> (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %>
-                                        <% } else { %>
-                                            [Removed Product] (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %> 
-                                        <% } %>
-                                        <% if (index < order.products.length - 1) { %><br><% } %> <%# Add line break between items %>
-                                    <% }) %>
-                                <% } else { %>
-                                    No items found
-                                <% } %>
-                                <%# --- MODIFICATION END --- %>
-                            </td>
-                            <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td> <%# Make Total bold %>
-                            <td data-label="Status & Assignment">
-                                <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <% if(order.assignedAdminEmail) { %>
-                                    <br><small>(Assigned: <%= order.assignedAdminEmail %>)</small>
-                                <% } %>
-                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.formattedReceivedDate) { %><br><small class="text-success">Delivered: <%= order.formattedReceivedDate %></small><% } %>
-                            </td>
-                            <td data-label="Actions" class="actions-cell">
+                                </td>
+                                <td data-label="Images">
+                                    <% if (order.products && order.products.length > 0) { %>
+                                        <% order.products.slice(0, 3).forEach(item => { %>
+                                            <% if (item.productId && item.productId._id && item.imageUrl) { %>
+                                                <a href="/products/<%= item.productId._id %>" title="View Product: <%= item.name %>">
+                                                    <img src="<%= item.imageUrl %>" alt="<%= item.name %>" class="table-img">
+                                                </a>
+                                            <% } else { %><span class="text-muted" style="font-size: 0.8em;">[?]</span><% } %>
+                                        <% }) %>
+                                        <% if (order.products.length > 3) { %><br><small class="text-muted" style="white-space: nowrap;">+ <%= order.products.length - 3 %> more</small><% } %>
+                                    <% } else { %><span class="text-muted">N/A</span><% } %>
+                                </td>
+                                <td data-label="Order ID"><%= order._id %></td>
+                                <td data-label="Date"><%= order.formattedOrderDate %></td>
+                                <td data-label="Customer"><%= order.userEmail %></td>
+                                <td data-label="Address & Phone">
+                                    <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
+                                    <br><strong>Ph: <%= order.shippingAddress.phone %></strong>
+                                </td>
+                                <td data-label="Items & Prices">
+                                    <% if (order.products && order.products.length > 0) { %>
+                                        <% order.products.forEach((item, index) => { %>
+                                            <% if (item.productId) { %>
+                                                <%= item.name %> (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %>
+                                            <% } else { %>
+                                                [Removed Product] (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %>
+                                            <% } %>
+                                            <% if (index < order.products.length - 1) { %><br><% } %>
+                                        <% }) %>
+                                    <% } else { %>No items found<% } %>
+                                </td>
+                                <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
+                                <td data-label="Status & Assignment">
+                                    <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
+                                    <% if(order.assignedAdminEmail) { %><br><small>(Assigned: <%= order.assignedAdminEmail %>)</small><% } %>
+                                    <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
+                                    <% if(order.status === 'Delivered' && order.formattedReceivedDate) { %><br><small class="text-success">Delivered: <%= order.formattedReceivedDate %></small><% } %>
+                                </td>
+                                <td data-label="Actions" class="actions-cell">
+                                    <%# --- Keep existing Individual Actions --- %>
 
-                                <%# --- Direct Delivery Confirmation by Admin (Pending orders) --- %>
-                                <% if (order.canBeDirectlyDeliveredByAdmin) { %>
-                                    <div class="action-group">
-                                        <p class="action-group-title">Admin Direct Delivery:</p>
-                                        <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner">
-                                            <button type="submit" class="btn btn-warning btn-sm" title="Send delivery confirmation OTP to customer for direct delivery">
-                                                <i class="fas fa-mobile-alt"></i> Send OTP
-                                            </button>
-                                        </form>
-                                        <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
-                                            <input type="text" name="otp" placeholder="6-Digit OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter the 6-digit OTP from customer">
-                                            <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
-                                                <i class="fas fa-check-double"></i> Confirm
-                                            </button>
-                                        </form>
-                                    </div>
-                                <% } %>
-
-                                <%# --- Assign Order to Delivery Admin (Pending orders) --- %>
-                                <% if (order.canBeAssignedByAdmin) { %>
-                                    <div class="action-group">
-                                        <p class="action-group-title">Assign for Delivery:</p>
-                                        <% if (deliveryAdmins && deliveryAdmins.length > 0) { %>
-                                            <form action="/admin/orders/<%= order._id %>/assign" method="POST" class="inline-form assign-order-form form-submit-spinner">
-                                                <select name="deliveryAdminId" required class="form-control form-control-sm">
-                                                    <option value="" disabled selected>Assign to...</option>
-                                                    <% deliveryAdmins.forEach(admin => { %>
-                                                        <option value="<%= admin._id %>">
-                                                            <%= admin.email %> <% if (admin.address && admin.address.phone) { %>(<%= admin.address.phone %>)<% } %>
-                                                        </option>
-                                                    <% }) %>
-                                                </select>
-                                                <button type="submit" class="btn btn-info btn-sm">
-                                                    <i class="fas fa-shipping-fast"></i> Assign
+                                    <%# Direct Delivery Confirmation by Admin (Pending orders) %>
+                                    <% if (order.canBeDirectlyDeliveredByAdmin) { %>
+                                        <div class="action-group">
+                                            <p class="action-group-title">Admin Direct Delivery:</p>
+                                            <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner">
+                                                <button type="submit" class="btn btn-warning btn-sm" title="Send delivery confirmation OTP to customer for direct delivery">
+                                                    <i class="fas fa-mobile-alt"></i> Send OTP
                                                 </button>
                                             </form>
-                                        <% } else { %>
-                                            <small class="text-danger d-block">No delivery admins available.</small>
-                                        <% } %>
-                                    </div>
-                                <% } %>
-
-                                <%# --- Unassign Order from Delivery Admin (Out for Delivery orders) --- %>
-                                <% if (order.canBeUnassignedByAdmin) { %>
-                                    <div class="action-group">
-                                        <p class="action-group-title">Unassign Delivery:</p>
-                                        <form action="/admin/orders/<%= order._id %>/unassign" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to unassign this order from <%= order.assignedAdminEmail %>? It will return to Pending status.');">
-                                            <button type="submit" class="btn btn-secondary btn-sm" title="Return order to Pending queue">
-                                                <i class="fas fa-undo"></i> Unassign
-                                            </button>
-                                        </form>
-                                    </div>
-                                <% } %>
-
-                                <%# --- Cancel Order (Admin: Pending or Out for Delivery) --- %>
-                                <% if (order.canBeCancelledByAdmin) { %>
-                                    <div class="action-group">
-                                        <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order? This cannot be undone.');">
-                                            <label for="reason-<%= order._id %>" class="action-group-title">Cancel Order:</label>
-                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm">
-                                                <option value="" disabled selected>Select Reason...</option>
-                                                <% cancellationReasons.forEach(reason => { %>
-                                                    <option value="<%= reason %>"><%= reason %></option>
-                                                <% }) %>
-                                            </select>
-                                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-ban"></i> Cancel Order</button>
-                                        </form>
-                                    </div>
-                                <% } %>
-
-                                <%# Fallback for Completed/Cancelled states where no other actions apply %>
-                                <% if (!order.canBeDirectlyDeliveredByAdmin && !order.canBeAssignedByAdmin && !order.canBeUnassignedByAdmin && !order.canBeCancelledByAdmin) { %>
-                                    <% if (order.status === 'Delivered') { %>
-                                        <small class="text-success">Completed.</small>
-                                    <% } else if (order.status === 'Cancelled') { %>
-                                        <small class="text-danger">Cancelled.</small>
-                                    <% } else { %>
-                                        <small class="text-muted">No actions available.</small>
+                                            <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
+                                                <input type="text" name="otp" placeholder="6-Digit OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter the 6-digit OTP from customer">
+                                                <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
+                                                    <i class="fas fa-check-double"></i> Confirm
+                                                </button>
+                                            </form>
+                                        </div>
                                     <% } %>
-                                <% } %>
 
-                            </td>
-                        </tr>
-                    <% }) %>
-                </tbody>
-            </table>
-        </div> <%# End optional wrapper %>
-    <% } else { %>
-        <p>No orders received yet.</p>
-    <% } %>
+                                    <%# Assign Order to Delivery Admin (Pending orders) - INDIVIDUAL %>
+                                    <% if (order.canBeAssignedByAdmin) { %>
+                                        <div class="action-group">
+                                            <p class="action-group-title">Assign (Individually):</p>
+                                            <% if (deliveryAdmins && deliveryAdmins.length > 0) { %>
+                                                <form action="/admin/orders/<%= order._id %>/assign" method="POST" class="inline-form assign-order-form form-submit-spinner">
+                                                    <select name="deliveryAdminId" required class="form-control form-control-sm">
+                                                        <option value="" disabled selected>Assign to...</option>
+                                                        <% deliveryAdmins.forEach(admin => { %>
+                                                            <option value="<%= admin._id %>">
+                                                                <%= admin.email %> <% if (admin.address && admin.address.phone) { %>(<%= admin.address.phone %>)<% } %>
+                                                            </option>
+                                                        <% }) %>
+                                                    </select>
+                                                    <button type="submit" class="btn btn-info btn-sm">
+                                                        <i class="fas fa-shipping-fast"></i> Assign
+                                                    </button>
+                                                </form>
+                                            <% } else { %>
+                                                <small class="text-danger d-block">No delivery admins.</small>
+                                            <% } %>
+                                        </div>
+                                    <% } %>
+
+                                    <%# Unassign Order from Delivery Admin (Out for Delivery orders) %>
+                                    <% if (order.canBeUnassignedByAdmin) { %>
+                                        <div class="action-group">
+                                            <p class="action-group-title">Unassign Delivery:</p>
+                                            <form action="/admin/orders/<%= order._id %>/unassign" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to unassign this order from <%= order.assignedAdminEmail %>? It will return to Pending status.');">
+                                                <button type="submit" class="btn btn-secondary btn-sm" title="Return order to Pending queue">
+                                                    <i class="fas fa-undo"></i> Unassign
+                                                </button>
+                                            </form>
+                                        </div>
+                                    <% } %>
+
+                                    <%# Cancel Order (Admin: Pending or Out for Delivery) %>
+                                    <% if (order.canBeCancelledByAdmin) { %>
+                                        <div class="action-group">
+                                            <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order? This cannot be undone.');">
+                                                <label for="reason-<%= order._id %>" class="action-group-title">Cancel Order:</label>
+                                                <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm">
+                                                    <option value="" disabled selected>Select Reason...</option>
+                                                    <% cancellationReasons.forEach(reason => { %>
+                                                        <option value="<%= reason %>"><%= reason %></option>
+                                                    <% }) %>
+                                                </select>
+                                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-ban"></i> Cancel Order</button>
+                                            </form>
+                                        </div>
+                                    <% } %>
+
+                                    <%# Fallback %>
+                                    <% if (!order.canBeDirectlyDeliveredByAdmin && !order.canBeAssignedByAdmin && !order.canBeUnassignedByAdmin && !order.canBeCancelledByAdmin) { %>
+                                        <% if (order.status === 'Delivered') { %><small class="text-success">Completed.</small><% } else if (order.status === 'Cancelled') { %><small class="text-danger">Cancelled.</small><% } else { %><small class="text-muted">No actions available.</small><% } %>
+                                    <% } %>
+                                    <%# --- End Individual Actions --- %>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <p>No orders received yet.</p>
+        <% } %>
+    </form> <%# --- END: Bulk Assign Form --- %>
 </div>
 
 <%- include('../partials/footer') %>
