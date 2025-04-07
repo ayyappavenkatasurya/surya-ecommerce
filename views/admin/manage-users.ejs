@@ -1,3 +1,4 @@
+<%# views/admin/manage-users.ejs %>
 <%- include('../partials/header', { title: 'Manage Users' }) %>
 
 <div class="admin-manage-container">
@@ -8,7 +9,7 @@
              <thead>
                 <tr>
                      <th>Name</th>
-                    <th>Email / Phone</th> <%# Updated Header %>
+                    <th>Email / Phone</th>
                      <th>Role</th>
                      <th>Registered On</th>
                      <th>Verified</th>
@@ -18,28 +19,26 @@
             <tbody>
                 <% users.forEach(user => { %>
                     <tr>
-                         <td><%= user.name %></td>
-                         <%# --- MODIFIED: Display email and phone --- %>
-                         <td>
+                         <td data-label="Name"><%= user.name %></td>
+                         <td data-label="Email / Phone">
                             <%= user.email %>
                             <% if (user.address && user.address.phone) { %>
                                 <br><small>(<%= user.address.phone %>)</small>
                             <% } %>
                          </td>
-                         <%# --- END MODIFICATION --- %>
-                        <td>
-                            <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form">
-                                 <select name="role" onchange="this.form.submit()">
-                                     <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
-                                    <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
-                                     <option value="delivery_admin" <%= user.role === 'delivery_admin' ? 'selected' : '' %>>Delivery Admin</option>
-                                 </select>
-                                 <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
-                            </form>
-                        </td>
-                         <td><%= new Date(user.createdAt).toLocaleDateString() %></td>
-                         <td><%= user.isVerified ? 'Yes' : 'No' %></td>
-                         <td class="actions-cell">
+                         <td data-label="Role">
+                             <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form">
+                                  <select name="role" onchange="this.form.submit()">
+                                      <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                                     <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                     <%# --- REMOVED 'delivery_admin' option --- %>
+                                  </select>
+                                  <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
+                             </form>
+                         </td>
+                         <td data-label="Registered On"><%= new Date(user.createdAt).toLocaleDateString() %></td>
+                         <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
+                         <td data-label="Actions" class="actions-cell">
                              <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');">
                                 <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
                             </form>

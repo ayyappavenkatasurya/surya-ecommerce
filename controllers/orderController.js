@@ -6,7 +6,7 @@ const { sendEmail } = require('../config/mailer');
 const mongoose = require('mongoose');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 
-// --- Place Order Function (No Transaction Wrapper) ---
+// --- UPDATED placeOrder ---
 exports.placeOrder = async (req, res, next) => {
     try {
         const userId = req.session.user._id;
@@ -84,7 +84,7 @@ exports.placeOrder = async (req, res, next) => {
             return res.redirect('/user/cart');
         }
 
-        // --- 2. Perform Operations (No Transaction Wrapper) ---
+        // --- 2. Perform Operations (No Transaction Wrapper - CONSIDER adding transactions later) ---
         try {
             for (const update of productUpdates) {
                 const updateResult = await Product.updateOne(
@@ -106,7 +106,7 @@ exports.placeOrder = async (req, res, next) => {
                 totalAmount: totalAmount,
                 shippingAddress: user.address,
                 paymentMethod: 'COD',
-                status: 'Pending', // Initial status is always Pending now
+                status: 'Pending', // Initial status is always Pending
             });
             await order.save();
 
@@ -130,9 +130,10 @@ exports.placeOrder = async (req, res, next) => {
 
         } catch (error) {
             console.error("Error during critical order processing block:", error);
+            // Consider rollback logic here if using transactions
             console.error("Order placement failed AFTER potentially decrementing some stock. Manual stock check might be required.");
             req.flash('error_msg', `Order placement failed due to an unexpected issue: ${error.message}. Please check 'My Orders' or contact support.`);
-            res.redirect('/orders/my-orders');
+            res.redirect('/orders/my-orders'); // Redirect to orders even on failure
         }
 
     } catch (error) {
@@ -140,9 +141,9 @@ exports.placeOrder = async (req, res, next) => {
         next(error);
     }
 };
+// --- END UPDATED placeOrder ---
 
-// --- Cancel Order Function (BY USER) ---
-// Logic remains the same, only cancels 'Pending' orders within window
+// --- cancelOrder (User) remains largely the same, as users only cancel 'Pending' ---
 exports.cancelOrder = async (req, res, next) => {
     try {
         const orderId = req.params.id;
@@ -151,7 +152,7 @@ exports.cancelOrder = async (req, res, next) => {
         const order = await Order.findOne({
              _id: orderId,
             userId: userId,
-            status: 'Pending', // Still correct, user can only cancel pending
+            status: 'Pending', // User can only cancel pending
              cancellationAllowedUntil: { $gt: Date.now() }
         });
 
@@ -206,7 +207,7 @@ exports.cancelOrder = async (req, res, next) => {
 exports.getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ userId: req.session.user._id })
-                                   .select('+cancellationReason')
+                                   .select('+cancellationReason') // Keep reason
                                    .sort({ orderDate: -1 })
                                    .lean();
 
@@ -215,6 +216,7 @@ exports.getMyOrders = async (req, res, next) => {
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
             order.formattedOrderDate = new Date(order.orderDate).toLocaleString();
             order.formattedReceivedDate = order.receivedByDate ? new Date(order.receivedByDate).toLocaleString() : 'N/A';
+            // Removed assignedAdminEmail display logic here, handle in EJS if needed elsewhere
          });
 
         res.render('user/my-orders', {
@@ -227,13 +229,8 @@ exports.getMyOrders = async (req, res, next) => {
     }
 };
 
-// --- REMOVED Admin Verification Helpers ---
-// exports.verifyOrderWithOTP = ...
-// exports.generateAndSendOrderVerificationOTP = ...
-
-
-// --- NEW: Generate OTP for ADMIN Direct Delivery ---
-// Sends OTP to customer, intended for admin to use for immediate delivery confirmation
+// --- Admin Direct Delivery OTP ---
+// (Logic remains mostly the same, just needs to be called correctly by admin controller)
 exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
      try {
          const order = await Order.findById(orderId);
@@ -275,8 +272,7 @@ exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
      }
  };
 
-// --- NEW: Verify OTP and Confirm Delivery Directly By Admin ---
-// Used when an admin confirms delivery using OTP from customer for a 'Pending' order
+// --- UPDATED: Verify OTP and Confirm Delivery Directly By Admin ---
 exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp) => {
      try {
          const order = await Order.findOne({
@@ -298,8 +294,9 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp)
         // --- OTP Valid: Update Order ---
         order.status = 'Delivered';
         order.receivedByDate = new Date();
-        order.assignedTo = adminUserId; // Record the admin who delivered it
-        order.assignedAdminEmail = `AdminDirect: ${adminUserId}`; // Indicate admin direct delivery maybe? Or use the admin's email if fetched. Let's use adminUserId for now.
+        // Remove assignment fields
+        // order.assignedTo = adminUserId; // NO LONGER NEEDED
+        // order.assignedAdminEmail = `AdminDirect: ${adminUserId}`; // NO LONGER NEEDED
 
         // The pre-save hook will clear the OTP fields upon save
         await order.save();
@@ -318,74 +315,7 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp)
         throw error; // Re-throw
     }
 };
+// --- END UPDATED confirmDirectDeliveryByAdmin ---
 
-
-// --- DELIVERY PARTNER OTP Verification Helpers (No change needed in core logic) ---
-exports.generateAndSendDeliveryOTP = async (orderId, deliveryAdminId) => {
-    try {
-        const order = await Order.findById(orderId);
-        if (!order) throw new Error('Order not found.');
-        if (!order.assignedTo || order.assignedTo.toString() !== deliveryAdminId.toString()) throw new Error('Order is not assigned to you.');
-        // Correct: Only allow for 'Out for Delivery' status for delivery partner flow
-        if (order.status !== 'Out for Delivery') throw new Error(`Cannot send delivery OTP for order with status '${order.status}'. Must be 'Out for Delivery'.`);
-
-        const otp = generateOTP();
-        const otpExpires = setOTPExpiration(5);
-        order.orderOTP = otp;
-        order.orderOTPExpires = otpExpires;
-        await order.save();
-
-        const subject = 'Delivery Confirmation OTP';
-        const text = `Your delivery driver is ready to complete your order (${order._id}).\nPlease provide them with the following OTP to confirm delivery: ${otp}\nIt will expire in 5 minutes.\nDo not share if you haven't received your items.`;
-        const html = `<p>Your delivery driver is ready to complete your order (${order._id}).</p><p>Please provide the driver with the following OTP to confirm you have received your items: <strong>${otp}</strong></p><p>The OTP will expire in 5 minutes.</p><p><strong>Only share this OTP once you have received your items.</strong></p>`;
-
-        const emailSent = await sendEmail(order.userEmail, subject, text, html);
-        if (!emailSent) {
-            order.orderOTP = undefined;
-            order.orderOTPExpires = undefined;
-            await order.save();
-            throw new Error('Failed to send delivery confirmation OTP email to the customer.');
-        }
-        return { success: true, message: `Delivery confirmation OTP sent to customer ${order.userEmail}.` };
-    } catch (error) {
-        console.error(`Error sending DELIVERY PARTNER OTP for order ${orderId}:`, error);
-        throw error; // Re-throw
-    }
-};
-
-exports.verifyDeliveryOTP = async (orderId, deliveryAdminId, providedOtp) => {
-    try {
-        const order = await Order.findOne({
-           _id: orderId,
-           assignedTo: deliveryAdminId,
-           // Correct: Only verify for 'Out for Delivery' status in this function
-           status: 'Out for Delivery',
-            orderOTP: providedOtp,
-            orderOTPExpires: { $gt: Date.now() }
-       });
-
-        if (!order) {
-           const checkOrder = await Order.findById(orderId);
-           if (!checkOrder) throw new Error('Order not found.');
-           if (!checkOrder.assignedTo || checkOrder.assignedTo.toString() !== deliveryAdminId.toString()) throw new Error('Order not assigned to you.');
-           if (checkOrder.status !== 'Out for Delivery') throw new Error(`Order status is '${checkOrder.status}', cannot mark as delivered via this method.`);
-            throw new Error('Invalid or expired OTP.');
-       }
-
-       order.status = 'Delivered';
-       order.receivedByDate = new Date();
-       await order.save(); // pre-save hook clears OTP
-
-       try{
-            const subject = `Your Order Has Been Delivered!`;
-            const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed.</p><p>Received Date: ${order.receivedByDate.toLocaleString()}</p><p>Thank you for shopping with us!</p>`;
-           await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
-        } catch (emailError){
-            console.error(`Failed to send delivery confirmation email for order ${order._id}:`, emailError);
-        }
-       return { success: true, order: order };
-    } catch (error) {
-        console.error(`Error verifying DELIVERY PARTNER OTP for order ${orderId}:`, error);
-       throw error; // Re-throw
-   }
-};
+// --- REMOVED generateAndSendDeliveryOTP (Delivery Partner) ---
+// --- REMOVED verifyDeliveryOTP (Delivery Partner) ---

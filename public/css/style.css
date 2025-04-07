@@ -975,30 +975,26 @@ select:focus {
     font-weight: bold;
     padding: 0.2em 0.5em;
     border-radius: var(--border-radius);
-    color: white;
-    background-color: var(--secondary-color); /* Default */
+    color: #333; /* Default text color for badges */
+    background-color: var(--secondary-color); /* Default background */
     font-size: 0.85em;
     display: inline-block;
     vertical-align: middle;
 }
-.status-pending, .status-badge.status-pending { background-color: rgb(255, 255, 230); color: #000000;}
-.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: rgb(198, 198, 255); }
-.status-delivered, .status-badge.status-delivered { background-color: rgb(216, 255, 216); }
-.status-cancelled, .status-badge.status-cancelled { background-color: rgb(255, 218, 218); }
+/* Use slightly lighter backgrounds for better readability */
+.status-pending, .status-badge.status-pending { background-color: #fff3cd; color: #856404; } /* Warning-like */
+.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: #d1ecf1; color: #0c5460; } /* Info-like - REMOVED status*/
+.status-delivered, .status-badge.status-delivered { background-color: #d4edda; color: #155724; } /* Success-like */
+.status-cancelled, .status-badge.status-cancelled { background-color: #f8d7da; color: #721c24; } /* Danger-like */
+
 .order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; /* Slightly fade cancelled */ }
 
 
-/* --- Admin & Delivery Common Styles --- */
-.admin-manage-container,
-.delivery-dashboard-container,
-.delivery-orders-detail-container,
-.delivery-contact-container {
+/* --- Admin & Common Styles --- */
+.admin-manage-container {
     padding: var(--spacing-unit);
 }
-.admin-manage-container h1,
-.delivery-dashboard-container h1,
-.delivery-orders-detail-container h1,
-.delivery-contact-container h1 {
+.admin-manage-container h1 {
     font-size: 1.5rem;
     margin-bottom: var(--spacing-unit);
     border-bottom: 1px solid var(--border-color);
@@ -1051,6 +1047,8 @@ select:focus {
   padding: calc(var(--spacing-unit) * 0.5) 0;
   position: relative;
   border-bottom: 1px dashed #eee;
+  /* Add transition for smoother background change */
+  transition: background-color 0.2s ease-in-out;
 }
 .data-table td:last-child {
     border-bottom: none;
@@ -1107,7 +1105,7 @@ select:focus {
 }
 
 
-/* Specific styles for assign/cancel selects */
+/* Specific styles for assign/cancel selects (Keep for cancel) */
 .actions-cell select.form-control-sm {
     margin-bottom: 5px;
     font-size: 0.9rem;
@@ -1122,7 +1120,7 @@ select:focus {
     margin-left: 45%;
 }
 
-/* Input sizes in table forms */
+/* Input sizes in table forms (Keep for OTP verify) */
 .verify-otp-form { display: flex; align-items: center; gap: 5px; }
 .verify-otp-form input[name="otp"] {
     flex-grow: 1;
@@ -1136,17 +1134,17 @@ select:focus {
     width: auto;
     padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
 }
-.cancel-delivery-form select { width: 100%; }
+.cancel-delivery-form select { width: 100%; } /* Keep for admin cancel */
 
 
 /* Admin Dashboard Grid */
-.admin-actions-grid, .delivery-stats-grid {
+.admin-actions-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr); /* 2 columns on mobile */
     gap: var(--spacing-unit);
     margin-top: var(--spacing-unit);
 }
-.admin-action-card, .stat-card {
+.admin-action-card { /* Removed .stat-card */
     background-color: var(--card-bg);
     padding: var(--spacing-unit);
     border-radius: var(--border-radius);
@@ -1157,43 +1155,27 @@ select:focus {
     color: var(--text-color);
     text-decoration: none;
 }
-.admin-action-card:hover, .stat-card:hover {
+.admin-action-card:hover { /* Removed .stat-card */
     transform: translateY(-3px);
     box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     text-decoration: none;
 }
-.admin-action-card i, .stat-card i {
+.admin-action-card i { /* Removed .stat-card */
     font-size: 2rem;
     color: var(--primary-color);
     margin-bottom: 0.5rem;
 }
-.admin-action-card h3, .stat-card h2 {
+.admin-action-card h3 { /* Removed .stat-card */
     font-size: 1.1rem;
     margin-bottom: 0.3rem;
     color: var(--text-color);
 }
-.admin-action-card p {
+.admin-action-card p { /* Removed .stat-card */
     font-size: 0.85rem;
     color: var(--secondary-color);
     margin-bottom: 0.5rem;
 }
-.stat-card h2 { /* Make stat number bigger */
-    font-size: 1.8rem;
-    font-weight: bold;
-    color: var(--primary-color);
-}
-.stat-card p {
-    font-size: 0.9rem;
-    color: var(--secondary-color);
-    margin-bottom: 0.75rem;
-}
 
-/* Delivery Specific */
-.stat-card a.btn {
-    width: 80%;
-    margin: 0 auto;
-    display: block;
-}
 
 /* --- Error Page --- */
 .error-container { text-align: center; padding-top: 2rem; }
@@ -1520,7 +1502,6 @@ select:focus {
 
     /* Dashboard grids */
     .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
-    .delivery-stats-grid { grid-template-columns: repeat(3, 1fr); }
 
     /* Rating stats responsiveness */
     .rating-stats-container {
@@ -1557,55 +1538,11 @@ select:focus {
   .product-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns desktop */
 
   /* Increase gaps slightly maybe */
-  .product-grid, .admin-actions-grid, .delivery-stats-grid { gap: calc(var(--spacing-unit) * 1); }
+  .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); }
 
-  .admin-actions-grid { grid-template-columns: repeat(5, 1fr); } /* Adjust grid for admin dash */
+  .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* Adjust grid for admin dash (4 fits better now) */
 
 } /* End 1024px */
-/* public/css/style.css */
 
-/* ... existing styles ... */
-
-.data-table tbody tr.selected-row {
-  background-color: #e7f3ff; /* Light blue background for selected rows */
-}
-.data-table td {
-  /* Add transition for smoother background change */
-  transition: background-color 0.2s ease-in-out;
-}
-
-/* Bulk Actions Container specific styles */
-.bulk-actions-container {
-  background-color: #f8f9fa; /* Light background */
-  border: 1px solid #dee2e6;
-  border-radius: .25rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
-}
-
-.bulk-actions-container h4 {
-  margin-bottom: 0.75rem;
-  font-size: 1.1rem;
-}
-
-/* Better alignment for inline form elements in bulk actions */
-.bulk-actions-container .form-inline {
-  display: flex;
-  align-items: center; /* Align items vertically */
-  gap: 0.5rem; /* Add some space between elements */
-  flex-wrap: wrap; /* Allow wrapping on smaller screens */
-}
-
-.bulk-actions-container .form-inline label {
-  margin-bottom: 0; /* Remove default bottom margin for labels */
-}
-
-.bulk-actions-container .form-inline select,
-.bulk-actions-container .form-inline button {
-  flex-shrink: 0; /* Prevent button/select from shrinking too much */
-}
-
-.bulk-actions-container .form-inline select {
-  min-width: 200px; /* Give the select some minimum width */
-}
-/* ... rest of the styles ... */
+/* REMOVED bulk-actions-container styles */
+/* REMOVED selected-row styles */

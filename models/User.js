@@ -1,3 +1,4 @@
+// models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -48,7 +49,9 @@ const UserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin', 'delivery_admin'],
+        // --- REMOVED 'delivery_admin' ---
+        enum: ['user', 'admin'],
+        // -------------------------------
         default: 'user',
     },
     isVerified: {

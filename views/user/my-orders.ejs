@@ -7,19 +7,18 @@
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
+                <%# Simplified status class, removed assignment check %>
                 <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                      <div class="order-header">
                          <div><strong>Order ID:</strong> <%= order._id %></div>
                         <div><strong>Placed on:</strong> <%= order.formattedOrderDate %></div>
-                         <%# --- CURRENCY UPDATE --- %>
-                        <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
-                         <%# --- END CURRENCY UPDATE --- %>
+                         <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
                          <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
                          <div class="order-items-preview">
                              <% order.products.slice(0, 3).forEach(item => { %>
-                                <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)"> <%# Added title %>
+                                <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
                                     <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
                                 </a>
                              <% }) %>
@@ -28,7 +27,7 @@
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
                              <p><strong>Delivered On:</strong> <%= order.formattedReceivedDate %></p>
-                              <p><strong>Assigned:</strong> <%= order.assignedAdminEmail || 'Not Assigned Yet' %></p>
+                              <%# --- REMOVED Assigned Admin display --- %>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
@@ -36,14 +35,11 @@
                     </div>
                      <div class="order-actions">
                         <% if (order.isCancellable) { %>
-                             <%# --- Spinner Class Added --- %>
                             <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner">
                                 <button type="submit" class="btn btn-danger btn-sm">Cancel Order</button>
                              </form>
                          <% } else if (order.status === 'Pending') { %>
                              <small class="text-muted">Cancellation window closed or processing.</small>
-                         <% } else if (order.status === 'Out for Delivery') { %>
-                             <small class="text-info">Order is out for delivery.</small>
                          <% } else if (order.status === 'Delivered') { %>
                               <small class="text-success">Order delivered.</small>
                          <% } else if (order.status === 'Cancelled') { %>

@@ -1,3 +1,5 @@
+// middleware/roleMiddleware.js
+
 const isAdmin = (req, res, next) => {
   if (req.session.user && req.session.user.role === 'admin') {
     next();
@@ -7,22 +9,7 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-const isDeliveryAdmin = (req, res, next) => {
-  if (req.session.user && req.session.user.role === 'delivery_admin') {
-    next();
-  } else {
-    req.flash('error_msg', 'Access Denied: Delivery Admin privileges required.');
-    res.status(403).redirect('/');
-  }
-};
+// --- REMOVED isDeliveryAdmin ---
+// --- REMOVED isAdminOrDeliveryAdmin ---
 
-const isAdminOrDeliveryAdmin = (req, res, next) => {
-    if (req.session.user && (req.session.user.role === 'admin' || req.session.user.role === 'delivery_admin')) {
-      next();
-    } else {
-      req.flash('error_msg', 'Access Denied: Admin or Delivery Admin privileges required.');
-      res.status(403).redirect('/');
-    }
-}
-
-module.exports = { isAdmin, isDeliveryAdmin, isAdminOrDeliveryAdmin };
+module.exports = { isAdmin }; // Only export isAdmin now

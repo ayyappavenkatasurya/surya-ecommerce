@@ -8,7 +8,7 @@ const flash = require('connect-flash');
 const methodOverride = require('method-override');
 
 const connectDB = require('./config/database');
-const mainRouter = require('./routes/index');
+const mainRouter = require('./routes/index'); // This now correctly includes the updated routes
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
@@ -50,7 +50,7 @@ app.use((req, res, next) => {
   res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
   res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + item.quantity, 0) || 0;
 
-  // --- NEW: Calculate User Initials ---
+  // --- Calculate User Initials ---
   let userInitials = '??'; // Default fallback
   if (req.session.user && req.session.user.email) {
     try {
