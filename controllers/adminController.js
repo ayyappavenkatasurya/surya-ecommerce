@@ -69,9 +69,8 @@ exports.getManageOrdersPage = async (req, res, next) => {
                                    .lean(); // Use lean for potentially better performance if not modifying
 
         orders.forEach(order => {
-            // NO LONGER NEEDED - formatting handled by EJS helper
-            // order.formattedOrderDate = res.locals.formatDateIST(order.orderDate);
-            // order.formattedReceivedDate = res.locals.formatDateIST(order.receivedByDate);
+            // Removed manual formatting (formattedOrderDate, formattedReceivedDate)
+            // We will use the formatDateIST helper in the EJS template
 
             // Determine capabilities for each order
             order.canBeCancelledByAdmin = order.status === 'Pending';
@@ -105,12 +104,6 @@ exports.getManageUsersPage = async (req, res, next) => {
                                   .select('name email role createdAt isVerified address.phone') // Select necessary fields including phone
                                   .sort({ createdAt: -1 })
                                   .lean(); // Use lean if not modifying
-
-        // NO LONGER NEEDED - formatting handled by EJS helper
-        // users.forEach(user => {
-        //     user.formattedCreatedAt = res.locals.formatDateIST(user.createdAt);
-        // });
-
         res.render('admin/manage-users', {
             title: 'Manage Registered Users',
             users: users // Pass users with raw createdAt date
@@ -251,9 +244,7 @@ exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
     }
 
     try {
-        // Pass res to the function IF it needs access to res.locals.formatDateIST
-        // Alternatively, format the date after receiving the result here.
-        const { order } = await confirmDirectDeliveryByAdmin(orderId, adminUserId, otp, res);
+        const { order } = await confirmDirectDeliveryByAdmin(orderId, adminUserId, otp);
         req.flash('success_msg', `Order ${orderId} confirmed delivered successfully (Directly by Admin).`);
     } catch (error) {
         req.flash('error_msg', `Direct delivery confirmation failed: ${error.message}`);
