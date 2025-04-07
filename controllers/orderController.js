@@ -113,8 +113,8 @@ exports.placeOrder = async (req, res, next) => {
             try {
                 const subject = 'Your Order Has Been Placed!';
                 let productListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
-                // Use formatDateIST for confirmation email as well
-                const formattedOrderDate = res.locals.formatDateIST(order.orderDate); // Access helper via res.locals
+                // Use formatDateIST for confirmation email as well (accessible via res.locals)
+                const formattedOrderDate = res.locals.formatDateIST(order.orderDate);
                 const html = `<h2>Thank you for your order!</h2><p>Your Order ID: ${order._id}</p><p>Order Placed: ${formattedOrderDate}</p><p>Total Amount: ₹${order.totalAmount.toFixed(2)}</p><p>Shipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><h3>Items:</h3><ul>${productListHTML}</ul><p>You can track your order status in the 'My Orders' section.</p>`;
                 await sendEmail(user.email, subject, `Your order ${order._id} has been placed. Total: ₹${totalAmount.toFixed(2)}`, html);
             } catch (emailError) {
@@ -127,7 +127,9 @@ exports.placeOrder = async (req, res, next) => {
         } catch (error) {
             console.error("Error during critical order processing block:", error);
             req.flash('error_msg', `Order placement failed due to an unexpected issue: ${error.message}. Please check 'My Orders' or contact support.`);
-            res.redirect('/orders/my-orders');
+            // Redirecting to my-orders might show the failed order if it partially saved,
+            // or just show existing orders if it failed before save. Consider redirecting to cart?
+            res.redirect('/user/cart'); // Redirect back to cart might be safer
         }
 
     } catch (error) {
@@ -211,8 +213,9 @@ exports.getMyOrders = async (req, res, next) => {
          const now = Date.now();
         orders.forEach(order => {
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
-            // Removed manual date formatting (formattedOrderDate, formattedReceivedDate)
-            // We will use formatDateIST helper in the EJS template
+            // NO LONGER NEEDED - EJS helper handles formatting
+            // order.formattedOrderDate = res.locals.formatDateIST(order.orderDate);
+            // order.formattedReceivedDate = res.locals.formatDateIST(order.receivedByDate);
          });
 
         res.render('user/my-orders', {
@@ -262,7 +265,8 @@ exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
  };
 
 // --- Verify OTP and Confirm Delivery Directly By Admin ---
-exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp) => {
+// Added 'res' parameter to access the date formatter for the email
+exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, res) => {
      try {
          const order = await Order.findOne({
             _id: orderId,
@@ -287,8 +291,8 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp)
         // Send Delivery Confirmation Email (Best Effort)
         try {
              const subject = `Your Order Has Been Delivered!`;
-             // Use formatDateIST in email as well
-             const formattedDeliveryDate = res.locals.formatDateIST(order.receivedByDate); // Assuming res is accessible or pass helper
+             // Use formatDateIST in email (passed via 'res')
+             const formattedDeliveryDate = res.locals.formatDateIST(order.receivedByDate);
              const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by administration.</p><p>Received Date: ${formattedDeliveryDate}</p><p>Thank you for shopping with us!</p>`;
             await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
          } catch (emailError){

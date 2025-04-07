@@ -1,12 +1,14 @@
 <%# views/admin/assigned-orders-detail.ejs %>
+<%# This file seems related to the removed delivery feature, but updating for completeness %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
     <h1><%= title %></h1>
-    <p><a href="/admin/manage-assigned-orders">« Back to Delivery Admin Overview</a></p>
+    <%# Link might need updating if the source page changed %>
+    <p><a href="/admin/manage-orders">« Back to Manage Orders</a></p>
 
     <% if (orders.length > 0) { %>
-        <div class="table-container card"> <%# Added wrapper %>
+        <div class="table-container card">
             <table class="data-table">
                 <thead>
                     <tr>
@@ -24,7 +26,7 @@
                 <tbody>
                     <% orders.forEach(order => { %>
                         <tr>
-                            <td data-label="Image"> <%# Added data-label %>
+                            <td data-label="Image">
                                 <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
                                     <a href="/products/<%= order.products[0].productId %>">
                                         <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
@@ -61,7 +63,7 @@
             </table>
         </div>
     <% } else { %>
-        <p>No orders found matching this criteria for <%= deliveryAdminEmail %>.</p>
+        <p>No orders found matching this criteria.</p> <%# Updated placeholder text %>
     <% } %>
 </div>
 

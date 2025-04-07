@@ -8,7 +8,7 @@ const flash = require('connect-flash');
 const methodOverride = require('method-override');
 
 const connectDB = require('./config/database');
-const mainRouter = require('./routes/index'); // This now correctly includes the updated routes
+const mainRouter = require('./routes/index');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
@@ -76,10 +76,10 @@ app.use((req, res, next) => {
 
   // --- NEW: Date Formatting Helper for IST ---
   res.locals.formatDateIST = (dateInput) => {
-      if (!dateInput) return 'N/A';
+      if (!dateInput) return 'N/A'; // Handle null or undefined dates
       try {
           const date = new Date(dateInput);
-          // Check if the date is valid
+          // Check if the date is valid after conversion
           if (isNaN(date.getTime())) {
               console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
               return 'Invalid Date';

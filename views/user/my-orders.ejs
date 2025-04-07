@@ -28,7 +28,7 @@
                         </div>
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <%# Use formatDateIST helper %>
+                             <%# Use formatDateIST helper for delivery date %>
                              <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
