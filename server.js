@@ -1,3 +1,4 @@
+// server.js
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -8,7 +9,7 @@ const flash = require('connect-flash');
 const methodOverride = require('method-override');
 
 const connectDB = require('./config/database');
-const mainRouter = require('./routes/index'); // This now correctly includes the updated routes
+const mainRouter = require('./routes/index');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
 connectDB();
@@ -41,6 +42,37 @@ app.use(
 
 app.use(flash());
 
+// --- Helper Function: Format Date to IST ---
+const formatDateIST = (dateInput) => {
+    if (!dateInput) return 'N/A'; // Handle null or undefined dates gracefully
+    try {
+        const date = new Date(dateInput);
+        // Check if the date is valid after parsing
+        if (isNaN(date.getTime())) {
+            console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
+            return 'Invalid Date';
+        }
+
+        const options = {
+            timeZone: 'Asia/Kolkata', // Target timezone IST
+            year: 'numeric',
+            month: 'short', // e.g., 'Jan', 'Feb'
+            day: 'numeric',
+            hour: 'numeric', // e.g., '1', '2'... '12'
+            minute: '2-digit', // e.g., '05', '15'
+            // second: '2-digit', // Optional: include seconds if needed
+            hour12: true // Use AM/PM
+        };
+        // Use 'en-IN' locale for formatting conventions common in India
+        return date.toLocaleString('en-IN', options);
+    } catch (error) {
+        console.error("Error formatting date to IST:", error, "Input:", dateInput);
+        return 'Date Error'; // Fallback error message
+    }
+};
+// --- End Helper Function ---
+
+
 // Middleware to set local variables for views
 app.use((req, res, next) => {
   res.locals.success_msg = req.flash('success_msg');
@@ -51,8 +83,8 @@ app.use((req, res, next) => {
   res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
   res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + item.quantity, 0) || 0;
 
-  // --- Calculate User Initials ---
-  let userInitials = '??'; // Default fallback
+  // Calculate User Initials (existing logic)
+  let userInitials = '??';
   if (req.session.user && req.session.user.email) {
     try {
       const nameParts = req.session.user.name?.split(' ');
@@ -74,41 +106,17 @@ app.use((req, res, next) => {
   }
   res.locals.userInitials = userInitials;
 
-  // --- NEW: Date Formatting Helper for IST ---
-  res.locals.formatDateIST = (dateInput) => {
-      if (!dateInput) return 'N/A';
-      try {
-          const date = new Date(dateInput);
-          // Check if the date is valid
-          if (isNaN(date.getTime())) {
-              console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
-              return 'Invalid Date';
-          }
+  // --- ADD Date Formatting Helper to res.locals ---
+  res.locals.formatDateIST = formatDateIST;
+  // --- END Date Formatting Helper ---
 
-          const options = {
-              timeZone: 'Asia/Kolkata', // Target timezone IST
-              year: 'numeric',
-              month: 'short', // e.g., 'Jan', 'Feb'
-              day: 'numeric',
-              hour: 'numeric', // e.g., '1', '2'... '12'
-              minute: '2-digit', // e.g., '05', '15'
-              second: '2-digit', // e.g., '08', '59'
-              hour12: true // Use AM/PM
-          };
-          // Use 'en-IN' locale for formatting conventions common in India (though options override most)
-          return date.toLocaleString('en-IN', options);
-      } catch (error) {
-          console.error("Error formatting date to IST:", error, "Input:", dateInput);
-          return 'Date Error'; // Fallback error message
-      }
-  };
-  // --- END: Date Formatting Helper ---
+  // Add NODE_ENV to locals for conditional rendering (like error stack trace)
+  res.locals.NODE_ENV = process.env.NODE_ENV || 'development';
 
   next();
 });
 
 app.use('/', mainRouter);
-
 
 app.use(notFound);
 app.use(errorHandler);

@@ -10,7 +10,7 @@
                 <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                      <div class="order-header">
                          <div><strong>Order ID:</strong> <%= order._id %></div>
-                         <%# Use formatDateIST helper %>
+                         <%# --- USE HELPER --- %>
                         <div><strong>Placed on:</strong> <%= formatDateIST(order.orderDate) %></div>
                          <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
                          <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
@@ -28,7 +28,7 @@
                         </div>
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <%# Use formatDateIST helper %>
+                             <%# --- USE HELPER --- %>
                              <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>

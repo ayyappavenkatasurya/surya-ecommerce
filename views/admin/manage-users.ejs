@@ -32,11 +32,12 @@
                                     <select name="role" onchange="this.form.submit()">
                                         <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
                                         <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                        <%# Removed delivery_admin option %>
                                     </select>
                                     <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
                                 </form>
                             </td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Registered On"><%= formatDateIST(user.createdAt) %></td>
                             <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
                             <td data-label="Actions" class="actions-cell">

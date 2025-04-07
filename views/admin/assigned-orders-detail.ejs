@@ -3,6 +3,7 @@
 
 <div class="admin-manage-container">
     <h1><%= title %></h1>
+    <%# Link might be invalid now if /admin/manage-assigned-orders was removed %>
     <p><a href="/admin/manage-assigned-orders">« Back to Delivery Admin Overview</a></p>
 
     <% if (orders.length > 0) { %>
@@ -26,15 +27,20 @@
                         <tr>
                             <td data-label="Image"> <%# Added data-label %>
                                 <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
-                                    <a href="/products/<%= order.products[0].productId %>">
+                                    <%# Ensure productId exists before creating link %>
+                                    <% if (order.products[0].productId) { %>
+                                        <a href="/products/<%= order.products[0].productId %>">
+                                            <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
+                                        </a>
+                                    <% } else { %>
                                         <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
-                                    </a>
+                                    <% } %>
                                 <% } else { %>
                                     <span class="text-muted">N/A</span>
                                 <% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Placed Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer Email"><%= order.userEmail %></td>
                             <td data-label="Address">
@@ -53,7 +59,7 @@
                             </td>
                             <td data-label="Total">₹<%= order.totalAmount.toFixed(2) %></td>
                             <td data-label="Status"><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
-                             <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Delivered Date"><%= formatDateIST(order.receivedByDate) %></td>
                         </tr>
                     <% }) %>

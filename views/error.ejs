@@ -4,7 +4,8 @@
     <h1>Error <%= typeof statusCode !== 'undefined' ? statusCode : '' %></h1>
     <p class="lead text-danger"><%= message %></p>
 
-    <% if (process.env.NODE_ENV === 'development' && stack) { %>
+    <%# Use NODE_ENV from res.locals now %>
+    <% if (NODE_ENV === 'development' && typeof stack !== 'undefined' && stack) { %>
         <details style="white-space: pre-wrap; margin-top: 20px; background: #f1f1f1; padding: 10px; border-radius: 5px; font-size: 0.8em;">
             <summary>Stack Trace (Development Mode)</summary>
             <code><%= stack %></code>

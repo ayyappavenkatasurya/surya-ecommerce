@@ -36,7 +36,7 @@
                                 <% } else { %><span class="text-muted">N/A</span><% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer"><%= order.userEmail %></td>
                             <td data-label="Address & Phone">
@@ -59,11 +59,10 @@
                             <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <%# Use formatDateIST helper for delivery date %>
+                                <%# --- USE HELPER --- %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
                             <td data-label="Actions" class="actions-cell">
-
                                 <%# Direct Delivery Confirmation by Admin (Pending orders) %>
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
                                     <div class="action-group">
