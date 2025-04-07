@@ -1542,7 +1542,4 @@ select:focus {
 
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* Adjust grid for admin dash (4 fits better now) */
 
-} /* End 1024px */
-
-/* REMOVED bulk-actions-container styles */
-/* REMOVED selected-row styles */
+} 
