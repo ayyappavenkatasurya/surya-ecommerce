@@ -64,9 +64,11 @@ const { sendEmail } = require('../config/mailer');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-} = require('./orderController'); // Removed unused delivery partner functions
+} = require('./orderController'); // Make sure path is correct
+const mongoose = require('mongoose'); // Needed for transactions
 
-// Keep cancellationReasons array
+
+// Keep cancellationReasons array (ensure it matches your needs)
 const cancellationReasons = [
     "📞 Unable to contact the customer",
     "❗ Out of stock/unavailable item",
@@ -79,16 +81,19 @@ const cancellationReasons = [
 // Dashboard & Page Getters
 // =======================
 exports.getAdminDashboard = (req, res) => {
+    // Simple render, no date formatting needed here
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
 
 exports.getUploadProductPage = (req, res) => {
+    // Simple render
     res.render('admin/upload-product', { title: 'Upload New Product' });
 };
 
 exports.getManageProductsPage = async (req, res, next) => {
     try {
-        const products = await Product.find({}).sort({ createdAt: -1 });
+        // Fetch products, dates formatted in EJS view
+        const products = await Product.find({}).sort({ createdAt: -1 }).lean();
         res.render('admin/manage-products', {
             title: 'Manage Products',
             products: products
@@ -105,6 +110,7 @@ exports.getEditProductPage = async (req, res, next) => {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
+        // Render edit page, no date formatting needed here
         res.render('admin/edit-product', {
             title: `Edit Product: ${product.name}`,
             product: product
@@ -118,23 +124,22 @@ exports.getEditProductPage = async (req, res, next) => {
      }
  };
 
-// --- UPDATED getManageOrdersPage function ---
+// --- getManageOrdersPage ---
+// No changes needed here, date formatting happens in the EJS template
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price') // Ensure necessary fields are populated
-                                   .lean(); // Use lean for potentially better performance if not modifying
+                                   .populate('products.productId', 'name imageUrl _id price') // Populate necessary fields
+                                   .lean(); // Use lean for better performance
 
         orders.forEach(order => {
-            // Removed manual formatting (formattedOrderDate, formattedReceivedDate)
-            // We will use the formatDateIST helper in the EJS template
-
-            // Determine capabilities for each order
+            // No manual date formatting needed here
+            // Determine capabilities based on status
             order.canBeCancelledByAdmin = order.status === 'Pending';
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
 
-            // Pre-calculate item details string for display (optional improvement)
+            // Pre-calculate items summary (optional improvement)
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p =>
                     `${p.name || '[Product Name Missing]'} (Qty: ${p.quantity}) @ ₹${(p.priceAtOrder || 0).toFixed(2)}`
@@ -153,15 +158,16 @@ exports.getManageOrdersPage = async (req, res, next) => {
         next(error);
     }
 };
-// --- END UPDATED getManageOrdersPage function ---
+// --- END getManageOrdersPage function ---
 
+// --- getManageUsersPage ---
+// No changes needed here, date formatting happens in the EJS template
 exports.getManageUsersPage = async (req, res, next) => {
     try {
-        // Exclude the current admin from the list
-        const users = await User.find({ _id: { $ne: req.session.user._id } })
-                                  .select('name email role createdAt isVerified address.phone') // Select necessary fields including phone
+        const users = await User.find({ _id: { $ne: req.session.user._id } }) // Exclude current admin
+                                  .select('name email role createdAt isVerified address.phone') // Select fields needed
                                   .sort({ createdAt: -1 })
-                                  .lean(); // Use lean if not modifying
+                                  .lean();
         res.render('admin/manage-users', {
             title: 'Manage Registered Users',
             users: users // Pass users with raw createdAt date
@@ -176,14 +182,15 @@ exports.getManageUsersPage = async (req, res, next) => {
 // =======================
 exports.uploadProduct = async (req, res, next) => {
     const { name, category, price, stock, imageUrl, specifications } = req.body;
-    const sellerEmail = req.session.user.email;
+    const sellerEmail = req.session.user.email; // Assuming admin's email acts as seller
 
-    if (!name || !category || !price || !stock || !imageUrl) {
+    // Basic validation
+     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
         return res.redirect('/admin/upload-product');
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-        req.flash('error_msg', 'Price and Stock must be non-negative numbers.');
+        req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
         return res.redirect('/admin/upload-product');
      }
 
@@ -195,7 +202,7 @@ exports.uploadProduct = async (req, res, next) => {
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerEmail
+            sellerEmail // Store who uploaded it
         });
 
         await newProduct.save();
@@ -205,10 +212,10 @@ exports.uploadProduct = async (req, res, next) => {
     } catch (error) {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
-           req.flash('error_msg', errors.join(' '));
+           req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
            return res.redirect('/admin/upload-product');
        }
-        next(error);
+        next(error); // Pass other errors to the handler
     }
 };
 
@@ -216,12 +223,13 @@ exports.uploadProduct = async (req, res, next) => {
     const productId = req.params.id;
     const { name, category, price, stock, imageUrl, specifications } = req.body;
 
-     if (!name || !category || !price || !stock || !imageUrl) {
+     // Basic validation
+     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-         req.flash('error_msg', 'Price and Stock must be non-negative numbers.');
+         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
     }
 
@@ -232,47 +240,53 @@ exports.uploadProduct = async (req, res, next) => {
             return res.status(404).redirect('/admin/manage-products');
          }
 
+         // Update fields
          product.name = name.trim();
          product.category = category.trim();
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
          product.specifications = specifications ? specifications.trim() : '';
+         // sellerEmail likely shouldn't change on update unless intended
 
-         await product.save();
+         await product.save(); // Mongoose validation runs here
          req.flash('success_msg', `Product "${product.name}" updated successfully.`);
          res.redirect('/admin/manage-products');
 
     } catch (error) {
          if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
-             req.flash('error_msg', errors.join(' '));
+             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
              return res.redirect(`/admin/manage-products/edit/${productId}`);
          }
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid product ID format.');
-             return res.redirect('/admin/manage-products');
+             return res.status(400).redirect('/admin/manage-products');
          }
-        next(error);
+        next(error); // Pass other errors to the handler
      }
  };
 
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     try {
+         // Consider if product is in active orders before deleting? Maybe just mark as inactive?
+         // For now, direct deletion:
          const product = await Product.findByIdAndDelete(productId);
         if (!product) {
              req.flash('error_msg', 'Product not found.');
-            return res.redirect('/admin/manage-products');
+            return res.status(404).redirect('/admin/manage-products');
          }
+         // TODO: Consider implications if product is in someone's cart or an unfulfilled order.
+         // Maybe prevent deletion if orderCount > 0 and status isn't Delivered/Cancelled?
          req.flash('success_msg', `Product "${product.name}" removed successfully.`);
          res.redirect('/admin/manage-products');
     } catch (error) {
         if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid product ID format.');
-             return res.redirect('/admin/manage-products');
+             return res.status(400).redirect('/admin/manage-products');
          }
-        next(error);
+        next(error); // Pass other errors to the handler
     }
 };
 
@@ -283,30 +297,40 @@ exports.removeProduct = async (req, res, next) => {
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
+        // Call the logic from orderController
         const result = await generateAndSendDirectDeliveryOTPByAdmin(orderId);
+        // Flash the success message returned by the service function
         req.flash('success_msg', result.message + ' Ask customer for OTP to confirm delivery.');
     } catch (error) {
+        // Flash the error message from the service function
         req.flash('error_msg', `Failed to send direct delivery OTP: ${error.message}`);
     }
+    // Redirect back regardless of success/failure
     res.redirect('/admin/manage-orders');
 };
 
 exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     const { otp } = req.body;
-    const adminUserId = req.session.user._id;
+    const adminUserId = req.session.user._id; // Identify which admin confirmed
 
-    if (!otp || !/^\d{6}$/.test(otp)) {
+    // Validate OTP format
+    if (!otp || !/^\d{6}$/.test(otp.trim())) {
         req.flash('error_msg', 'Please enter the 6-digit OTP received by the customer.');
         return res.redirect('/admin/manage-orders');
     }
 
     try {
-        const { order } = await confirmDirectDeliveryByAdmin(orderId, adminUserId, otp);
+        // --- Pass 'res' object to the underlying function ---
+        // This allows the function in orderController to access res.locals.formatDateIST
+        const { order } = await confirmDirectDeliveryByAdmin(orderId, adminUserId, otp.trim(), res);
+        // --- End Passing 'res' ---
         req.flash('success_msg', `Order ${orderId} confirmed delivered successfully (Directly by Admin).`);
     } catch (error) {
+        // Flash the specific error message from the service function
         req.flash('error_msg', `Direct delivery confirmation failed: ${error.message}`);
     }
+    // Redirect back regardless of success/failure
     res.redirect('/admin/manage-orders');
 };
 
@@ -314,40 +338,52 @@ exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
 exports.cancelOrderByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
-    const adminUserId = req.session.user._id;
+    const adminUserId = req.session.user._id; // Log which admin cancelled
 
+    // Validate reason
     if (!reason || !cancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid reason for cancellation.');
         return res.redirect('/admin/manage-orders');
     }
 
+    const sessionDB = await mongoose.startSession(); // Use transaction
+    sessionDB.startTransaction();
     try {
-        const order = await Order.findById(orderId).populate('products.productId', 'name _id'); // Need _id for stock restore
+        const order = await Order.findById(orderId)
+                                .populate('products.productId', 'name _id') // Need _id for stock restore
+                                .session(sessionDB); // Add session to find
+
         if (!order) {
             req.flash('error_msg', 'Order not found.');
+            await sessionDB.abortTransaction(); sessionDB.endSession();
             return res.status(404).redirect('/admin/manage-orders');
         }
+        // Only allow cancellation if order is 'Pending'
         if (order.status !== 'Pending') {
             req.flash('error_msg', `Order cannot be cancelled by admin in its current status ('${order.status}'). Must be 'Pending'.`);
+            await sessionDB.abortTransaction(); sessionDB.endSession();
             return res.redirect('/admin/manage-orders');
         }
 
-        // Stock Restoration Logic
-        console.log(`Admin Cancellation: Attempting to restore stock for cancelled order ${orderId}.`);
+        // Stock Restoration Logic (within transaction)
+        console.log(`Admin Cancellation (${adminUserId}): Attempting to restore stock for cancelled order ${orderId}.`);
         const productStockRestorePromises = order.products.map(item => {
               const quantityToRestore = Number(item.quantity);
              if (isNaN(quantityToRestore) || quantityToRestore <= 0) {
-                console.error(`Admin Cancel: Invalid quantity ${item.quantity} for product ${item.productId?._id || 'Unknown ID'} in order ${orderId}, skipping stock restore.`);
-                return Promise.resolve();
+                console.warn(`Admin Cancel: Invalid quantity ${item.quantity} for product ${item.productId?._id || 'Unknown ID'} in order ${orderId}, skipping stock restore.`);
+                return Promise.resolve(); // Resolve successfully, don't block
             }
             if (!item.productId?._id) { // Check populated ID
-                console.error(`Admin Cancel: Missing or invalid productId for an item in order ${orderId}, skipping stock restore.`);
-                return Promise.resolve();
+                console.warn(`Admin Cancel: Missing or invalid productId for an item in order ${orderId}, skipping stock restore.`);
+                return Promise.resolve(); // Resolve successfully
             }
+             // Add session to stock update
              return Product.updateOne(
                 { _id: item.productId._id },
-                { $inc: { stock: quantityToRestore, orderCount: -1 } }
+                { $inc: { stock: quantityToRestore, orderCount: -1 } },
+                { session: sessionDB }
             ).catch(err => {
+               // Log error but allow transaction to proceed
                console.error(`Admin Cancel: Failed restore stock/orderCount for product ${item.productId._id} (${item.productId.name}) on order ${orderId}: ${err.message}`);
             });
         });
@@ -357,11 +393,15 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         // Update order status and reason
         order.status = 'Cancelled';
         order.cancellationReason = reason;
-        await order.save();
+        // Pre-save hook should clear OTP, delivery date, cancellation window
+        await order.save({ session: sessionDB }); // Save order within transaction
 
-        // Notifications (Best Effort) - Customer
+        await sessionDB.commitTransaction(); // Commit cancellation and stock restore
+
+        // Notifications (Best Effort - outside transaction) - Customer
         try {
             const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
+            // Email does not need date formatting for cancellation
             const htmlCust = `<p>Your order (${order._id}) has been cancelled by administration.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>Please contact support if you have questions regarding this cancellation.</p>`;
             await sendEmail(order.userEmail, subjectCust, `Your order ${order._id} has been cancelled. Reason: ${order.cancellationReason}`, htmlCust);
         } catch (emailError) {
@@ -372,6 +412,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         res.redirect('/admin/manage-orders');
 
     } catch (error) {
+        await sessionDB.abortTransaction(); // Abort transaction on error
         if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid Order ID format.');
         } else {
@@ -379,6 +420,8 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             req.flash('error_msg', 'Failed to cancel the order due to an internal error.');
         }
         res.redirect('/admin/manage-orders');
+    } finally {
+        sessionDB.endSession(); // Always end session
     }
 };
 // --- END UPDATED cancelOrderByAdmin ---
@@ -389,49 +432,62 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;
-     const allowedRoles = ['user', 'admin'];
+     const allowedRoles = ['user', 'admin']; // Define allowed roles explicitly
+
+     // Validate input role
      if (!role || !allowedRoles.includes(role)) {
         req.flash('error_msg', 'Invalid role selected.');
-         return res.redirect('/admin/manage-users');
+         return res.status(400).redirect('/admin/manage-users');
      }
 
     try {
+        // Prevent admin from changing their own role
         if (req.params.id === req.session.user._id.toString()) {
              req.flash('error_msg', 'You cannot change your own role.');
              return res.redirect('/admin/manage-users');
          }
+
         const user = await User.findById(userId);
          if (!user) {
             req.flash('error_msg', 'User not found.');
              return res.status(404).redirect('/admin/manage-users');
          }
+
+         // Change role and save
          user.role = role;
-        await user.save();
+        await user.save(); // Mongoose validation runs here
+
         req.flash('success_msg', `User ${user.email}'s role updated to ${role}.`);
         res.redirect('/admin/manage-users');
+
     } catch (error) {
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid user ID format.');
+             return res.status(400).redirect('/admin/manage-users');
          } else {
              console.error(`Error updating role for user ${userId}:`, error);
             req.flash('error_msg', 'Error updating user role.');
+            res.redirect('/admin/manage-users');
          }
-         res.redirect('/admin/manage-users');
     }
 };
 
 exports.removeUser = async (req, res, next) => {
     const userId = req.params.id;
     try {
+        // Prevent admin from removing themselves
         if (req.params.id === req.session.user._id.toString()) {
             req.flash('error_msg', 'You cannot remove yourself.');
             return res.redirect('/admin/manage-users');
         }
+
          const user = await User.findById(userId);
          if (!user) {
             req.flash('error_msg', 'User not found.');
-             return res.redirect('/admin/manage-users');
+             return res.status(404).redirect('/admin/manage-users');
          }
+
+         // Prevent removal of the last admin
          if (user.role === 'admin') {
              const adminCount = await User.countDocuments({ role: 'admin' });
              if (adminCount <= 1) {
@@ -439,21 +495,29 @@ exports.removeUser = async (req, res, next) => {
                 return res.redirect('/admin/manage-users');
              }
          }
+
+         // TODO: Consider implications if user has pending/active orders.
+         // Maybe prevent deletion or anonymize orders first?
+         // For now, direct deletion:
         await User.deleteOne({ _id: userId });
+
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
+
     } catch (error) {
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid user ID format.');
+             return res.status(400).redirect('/admin/manage-users');
          } else {
              console.error(`Error removing user ${userId}:`, error);
             req.flash('error_msg', 'Error removing user.');
+            res.redirect('/admin/manage-users');
          }
-        res.redirect('/admin/manage-users');
      }
  };
 
 controllers/authController.js:
+// controllers/authController.js
 const User = require('../models/User');
 const Product = require('../models/Product');
 const bcrypt = require('bcryptjs');
@@ -461,33 +525,41 @@ const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 const { sendEmail } = require('../config/mailer');
 
+// --- Login/Register Page Getters ---
 exports.getLoginPage = (req, res) => {
     if (req.session.user) {
-         return res.redirect('/');
+         return res.redirect('/'); // Redirect if already logged in
     }
     res.render('auth/login', { title: 'Login' });
 };
 
 exports.getRegisterPage = (req, res) => {
     if (req.session.user) {
-        return res.redirect('/');
+        return res.redirect('/'); // Redirect if already logged in
    }
     res.render('auth/register', { title: 'Register' });
 };
 
+// --- OTP Page Getters ---
 exports.getVerifyOtpPage = (req, res) => {
     const email = req.query.email;
     if (!email) {
         req.flash('error_msg', 'Email required for OTP verification.');
-        return res.redirect('/auth/register');
+        return res.redirect('/auth/register'); // Or login? Register makes more sense if they lack email.
     }
      if (req.session.user) {
+        // Already logged in, shouldn't be verifying OTP typically
         return res.redirect('/');
    }
     res.render('auth/verify-otp', { title: 'Verify Email', email });
 };
 
+// --- Password Reset Page Getters ---
 exports.getForgotPasswordPage = (req, res) => {
+     if (req.session.user) {
+         // Don't show forgot password if logged in
+         return res.redirect('/');
+    }
     res.render('auth/forgot-password', { title: 'Forgot Password' });
 };
 
@@ -502,30 +574,48 @@ exports.getResetPasswordPage = async (req, res, next) => {
             req.flash('error_msg', 'Password reset token is invalid or has expired.');
             return res.redirect('/auth/forgot-password');
         }
+        // Token is valid, render the reset page
         res.render('auth/reset-password', { title: 'Reset Password', token: req.params.token });
     } catch (error) {
-        next(error);
+        next(error); // Pass errors to the handler
     }
 };
 
+// --- Registration Logic ---
 exports.registerUser = async (req, res, next) => {
     const { name, email, password, confirmPassword } = req.body;
 
+    // --- Input Validation ---
+    let errors = [];
     if (!name || !email || !password || !confirmPassword) {
-        req.flash('error_msg', 'Please fill in all fields.');
-        return res.redirect('/auth/register');
+        errors.push('Please fill in all fields.');
     }
     if (password !== confirmPassword) {
-        req.flash('error_msg', 'Passwords do not match.');
-        return res.redirect('/auth/register');
+        errors.push('Passwords do not match.');
     }
-    if (password.length < 6) {
-        req.flash('error_msg', 'Password must be at least 6 characters.');
-        return res.redirect('/auth/register');
+    if (password && password.length < 6) {
+        errors.push('Password must be at least 6 characters.');
+    }
+    // Basic email format check (more robust check in schema)
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+        errors.push('Please enter a valid email address.');
     }
 
+    if (errors.length > 0) {
+        req.flash('error_msg', errors.join(' '));
+        // Persist input values (except passwords) back to the form
+        return res.render('auth/register', {
+            title: 'Register',
+            name: name,
+            email: email,
+            // Don't send back passwords
+        });
+    }
+    // --- End Validation ---
+
     try {
-        let user = await User.findOne({ email: email.toLowerCase() });
+        const lowerCaseEmail = email.toLowerCase();
+        let user = await User.findOne({ email: lowerCaseEmail });
 
         if (user && user.isVerified) {
             req.flash('error_msg', 'Email is already registered and verified.');
@@ -533,62 +623,72 @@ exports.registerUser = async (req, res, next) => {
         }
 
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10);
+        const otpExpires = setOTPExpiration(10); // OTP expires in 10 minutes
 
         if (user && !user.isVerified) {
-            // Found unverified user - update details and OTP
+            // Found unverified user - update details and resend OTP
             user.name = name;
-            user.password = password; // Will be re-hashed by pre-save hook
+            // Re-hash password if provided (pre-save hook handles hashing)
+            if (password) { user.password = password; }
             user.otp = otp;
             user.otpExpires = otpExpires;
             user.isVerified = false;
-             // We need to save without full validation if only updating OTP/password on unverified doc
-             await user.save({ validateBeforeSave: false });
+            // Save without full validation if only updating OTP/password on unverified doc
+            await user.save({ validateBeforeSave: false });
         } else {
-            // Create brand new user
+            // Create a brand new user instance
             user = new User({
                 name,
-                email: email.toLowerCase(),
+                email: lowerCaseEmail,
                 password, // Will be hashed by pre-save hook
                 otp,
                 otpExpires,
-                isVerified: false,
+                isVerified: false, // Start as unverified
             });
             await user.save(); // Full validation runs here
         }
 
+        // Send Verification Email
         const subject = 'Verify Your Email Address';
         const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
-        const html = `<p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+        const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
 
         const emailSent = await sendEmail(user.email, subject, text, html);
 
         if (emailSent) {
-            req.flash('success_msg', `An OTP has been sent to ${user.email}. Please verify.`);
+            req.flash('success_msg', `An OTP has been sent to ${user.email}. Please check your inbox and verify.`);
             res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
         } else {
-             // Clean up user if email failed ONLY IF IT WAS A NEW USER attempt
-             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 2000) { // Heuristic: If created within last 2s
-                await User.deleteOne({ _id: user._id, isVerified: false });
+            // Optional: Clean up newly created unverified user if email fails
+            // This check is heuristic: if created within the last few seconds.
+             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) {
+                try {
+                    await User.deleteOne({ _id: user._id, isVerified: false });
+                    console.log(`Cleaned up unverified user ${user.email} due to failed email send.`);
+                } catch (deleteError) {
+                    console.error(`Error cleaning up user ${user.email}:`, deleteError);
+                }
              }
             req.flash('error_msg', 'Could not send OTP email. Please try registering again or contact support.');
             res.redirect('/auth/register');
         }
 
     } catch (error) {
-        if (error.code === 11000) { // Handle duplicate key error specifically
-            req.flash('error_msg', 'Email already exists.');
-             return res.redirect('/auth/register');
+        if (error.code === 11000) { // Handle MongoDB duplicate key error (email unique)
+            req.flash('error_msg', 'Email already exists. Please login or use a different email.');
+            return res.render('auth/register', { title: 'Register', name: name, email: email });
         }
         if (error.name === 'ValidationError') {
-           let errors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', errors.join(' '));
-            return res.redirect('/auth/register');
+           let validationErrors = Object.values(error.errors).map(el => el.message);
+            req.flash('error_msg', validationErrors.join(' '));
+            return res.render('auth/register', { title: 'Register', name: name, email: email });
        }
-        next(error); // Pass other errors to the error handler
+        // Pass other unexpected errors to the global error handler
+        next(error);
     }
 };
 
+// --- OTP Verification Logic ---
 exports.verifyOtp = async (req, res, next) => {
     const { email, otp } = req.body;
 
@@ -599,171 +699,202 @@ exports.verifyOtp = async (req, res, next) => {
     }
 
     try {
+        const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({
-            email: email.toLowerCase(),
+            email: lowerCaseEmail,
             otp: otp,
-            otpExpires: { $gt: Date.now() },
-        }).select('+password'); // Include password if needed later (e.g., for immediate login)
+            otpExpires: { $gt: Date.now() }, // Check if OTP is still valid
+        }).select('+password'); // Include password for potential immediate login
 
         if (!user) {
-            req.flash('error_msg', 'Invalid or expired OTP.');
+            // Check if user exists but OTP is wrong/expired
+            const existingUser = await User.findOne({ email: lowerCaseEmail });
+            if (existingUser && !existingUser.isVerified) {
+                req.flash('error_msg', 'Invalid or expired OTP. Please try again or resend.');
+            } else if (existingUser && existingUser.isVerified) {
+                 req.flash('error_msg', 'This account is already verified. Please login.');
+                 return res.redirect('/auth/login');
+            } else {
+                 // Should not happen if register flow is correct, but handle defensively
+                 req.flash('error_msg', 'Verification failed. Please try registering again.');
+                 return res.redirect('/auth/register');
+            }
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
         }
 
-         // Check if this OTP verification is part of a password reset flow
-         let wasPasswordReset = user.resetPasswordToken && user.resetPasswordExpires > Date.now();
+         // OTP is valid. Determine if it's for registration or password reset.
+         const isPasswordReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
 
-         // Mark user as verified and clear OTP fields
+         // Mark user as verified (if not already) and clear OTP fields in both cases
          user.isVerified = true;
          user.otp = undefined;
          user.otpExpires = undefined;
 
-         if(wasPasswordReset){
-             // OTP was for password reset verification, proceed to reset page
+         if(isPasswordReset){
+             // OTP was for password reset verification. Proceed to reset page.
+             // Don't clear the reset token yet, it's needed for the next step.
+             await user.save({ validateBeforeSave: false }); // Save quickly without full validation if needed
+
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
-             // Don't clear reset token yet, needed for next step
-             await user.save({ validateBeforeSave: false }); // Save without full validation if needed
              res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          } else {
-            // OTP was for registration verification, log the user in
-            await user.save(); // Save changes (isVerified, cleared OTP)
+            // OTP was for registration verification. Log the user in.
+            await user.save(); // Save changes (isVerified=true, cleared OTP)
 
-            // Log the user in by setting up the session
-            req.session.user = {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                address: user.address,
-                cart: user.cart // Make sure cart is loaded or initialized if needed
-             };
+            // --- Login User Immediately ---
+            // Regenerate session ID for security
+             req.session.regenerate(err => {
+                if (err) {
+                     console.error("Session regeneration error after OTP verify:", err);
+                     return next(err); // Pass error to handler
+                 }
 
-            // Save the session before redirecting
-            req.session.save(err => {
-               if (err) {
-                    console.error("Session save error after OTP verify:", err);
-                    return next(err); // Pass error to handler
-                }
-                // Successful login after verification
-                req.flash('success_msg', 'Email verified successfully! You are now logged in.');
-                const returnTo = req.session.returnTo || '/';
-                delete req.session.returnTo; // Clean up returnTo URL
-                res.redirect(returnTo);
+                // Store essential user data in the new session
+                req.session.user = {
+                    _id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    address: user.address, // Include address if available
+                    cart: user.cart || [] // Initialize cart if necessary
+                 };
+
+                // Save the session before redirecting
+                req.session.save(err => {
+                   if (err) {
+                        console.error("Session save error after OTP verify login:", err);
+                        return next(err); // Pass error to handler
+                    }
+                    // Successful login after verification
+                    req.flash('success_msg', 'Email verified successfully! You are now logged in.');
+                    const returnTo = req.session.returnTo || '/'; // Redirect to intended page or home
+                    delete req.session.returnTo; // Clean up returnTo URL
+                    res.redirect(returnTo);
+                 });
              });
+            // --- End Immediate Login ---
          }
 
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        next(error); // Pass errors to the global error handler
     }
 };
 
+// --- Resend OTP Logic ---
 exports.resendOtp = async (req, res, next) => {
     const { email } = req.body;
 
     if (!email) {
         req.flash('error_msg', 'Email is required to resend OTP.');
-         // Try to get email from query if available for redirect
+         // Try to get email from query if available for redirect back to verify page
          return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(req.query.email || '')}`);
     }
 
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const lowerCaseEmail = email.toLowerCase();
+        const user = await User.findOne({ email: lowerCaseEmail });
 
         if (!user) {
-            // Don't reveal if user exists, redirect to register for consistency
-            req.flash('error_msg', 'If your email is registered but not verified, an OTP will be sent.');
+            // Don't reveal if user exists or not for security.
+            // Redirect to register page as a neutral action.
+            req.flash('error_msg', 'If your email is registered, an OTP will be sent. Please check your inbox.');
             return res.redirect('/auth/register');
         }
 
-        // Determine if OTP resend is for registration or password reset
-        const isForReset = user.resetPasswordToken && user.resetPasswordExpires > Date.now();
+        // Determine context: is it for registration verification or password reset?
+        const isForReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
 
+        // If already verified AND it's not a password reset request, redirect to login
         if(user.isVerified && !isForReset) {
-             // Already verified, not a password reset case
-             req.flash('error_msg', 'This account is already verified.');
+             req.flash('error_msg', 'This account is already verified. Please login.');
             return res.redirect('/auth/login');
         }
+        // If not verified OR it IS for a password reset, proceed to send new OTP
 
-        // Generate new OTP and expiry
+        // Generate new OTP and expiry time
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10); // 10 minutes
+        const otpExpires = setOTPExpiration(10); // New OTP valid for 10 minutes
 
         user.otp = otp;
         user.otpExpires = otpExpires;
-        await user.save(); // Save the new OTP
+        // We don't need validateBeforeSave: false here usually, unless hitting issues
+        await user.save(); // Save the new OTP details
 
-        // Prepare email content
-        let subject = isForReset ? 'Your New Password Reset OTP' : 'Your New Verification OTP';
-         let text = `Your new OTP is: ${otp}\nIt will expire in 10 minutes.`;
-        let html = `<p>Your new OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+        // Prepare email content based on context
+        let subject, text, html;
         if (isForReset) {
-            text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
+            subject = 'Your New Password Reset OTP';
+             text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
             html = `<p>Your new password reset OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
+        } else {
+             subject = 'Your New Verification OTP';
+             text = `Your new verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
+            html = `<p>Your new verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
         }
 
-
-        // Send the email
+        // Send the email with the new OTP
         const emailSent = await sendEmail(user.email, subject, text, html);
 
+        // Redirect back to the verify OTP page
+        const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
+
         if (emailSent) {
-            req.flash('success_msg', `A new OTP has been sent to ${user.email}.`);
-            // Redirect back to OTP entry page, indicating purpose if reset
-            const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
-            res.redirect(redirectUrl);
+            req.flash('success_msg', `A new OTP has been sent to ${user.email}. Please check your inbox.`);
         } else {
-            req.flash('error_msg', 'Could not resend OTP email. Please try again.');
-             // Redirect back to OTP entry page even on failure
-             res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`);
+            req.flash('error_msg', 'Could not resend OTP email. Please try again or contact support.');
         }
+        res.redirect(redirectUrl);
+
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        next(error); // Pass errors to the global error handler
     }
 };
 
-
+// --- Login Logic ---
 exports.loginUser = async (req, res, next) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-        req.flash('error_msg', 'Please provide email and password.');
-        return res.redirect('/auth/login');
+        req.flash('error_msg', 'Please provide both email and password.');
+        return res.render('auth/login', { title: 'Login', email: email }); // Render with email filled
     }
 
     try {
-        // Find user and include password field for comparison
-        const user = await User.findOne({ email: email.toLowerCase() })
-                             .select('+password')
-                             .populate('cart.productId'); // Populate cart details for session
+        const lowerCaseEmail = email.toLowerCase();
+        // Find user, ensure password field is selected, and populate cart details
+        const user = await User.findOne({ email: lowerCaseEmail })
+                             .select('+password') // Explicitly request the password field
+                             .populate('cart.productId'); // Populate cart for session
 
         if (!user) {
-            req.flash('error_msg', 'Invalid credentials.');
-            return res.redirect('/auth/login');
+            req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
+            return res.render('auth/login', { title: 'Login', email: email });
         }
 
          // Check if user's email is verified
          if (!user.isVerified) {
-            req.flash('error_msg', 'Please verify your email first. Check your inbox for the OTP.');
+            req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
             // Redirect to OTP page, passing email
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
 
-        // Compare submitted password with stored hash
+        // Compare submitted password with the stored hash using the method on the user model
         const isMatch = await user.matchPassword(password);
 
         if (!isMatch) {
-            req.flash('error_msg', 'Invalid credentials.');
-            return res.redirect('/auth/login');
+            req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
+            return res.render('auth/login', { title: 'Login', email: email });
         }
 
-        // Password matched, setup session
-        // Regenerate session ID to prevent fixation attacks
+        // Password matched, credentials valid, proceed with session setup
+        // Regenerate session ID to prevent session fixation attacks
          req.session.regenerate(err => {
             if (err) {
-                 console.error("Session regeneration error:", err);
+                 console.error("Session regeneration error during login:", err);
                  return next(err); // Pass error to handler
              }
 
-            // Store essential, non-sensitive user data in session
+            // Store essential, non-sensitive user data in the new session
             req.session.user = {
                 _id: user._id,
                 name: user.name,
@@ -780,7 +911,7 @@ exports.loginUser = async (req, res, next) => {
                      return next(err); // Pass error to handler
                  }
                  // Successful login
-                 req.flash('success_msg', 'You are now logged in.');
+                 req.flash('success_msg', 'You are now logged in successfully.');
                  const returnTo = req.session.returnTo || '/'; // Redirect to intended page or home
                  delete req.session.returnTo; // Clean up returnTo URL
                  res.redirect(returnTo);
@@ -788,29 +919,33 @@ exports.loginUser = async (req, res, next) => {
         });
 
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        next(error); // Pass errors to the global error handler
     }
 };
 
+// --- Logout Logic ---
 exports.logoutUser = (req, res, next) => {
-    // Set the flash message *BEFORE* destroying the session
-    req.flash('success_msg', 'You have been logged out.');
+    // Set the flash message *before* destroying the session
+    req.flash('success_msg', 'You have been logged out successfully.');
 
     req.session.destroy(err => {
         if (err) {
             console.error('Session destruction error:', err);
-            // Pass the error to the main error handler instead of trying to flash again
-            return next(err);
+            // Attempt to redirect even if destroy fails, but log the error
+            req.flash('error_msg', 'Could not fully logout. Please clear your browser cookies.'); // Inform user
+            return res.redirect('/auth/login');
+            // Alternatively, pass to error handler: return next(err);
         }
-        // Clear the session cookie after successful destruction
-        res.clearCookie('connect.sid'); // Use the default cookie name or your configured name
+        // Clear the session cookie on the client side
+        // Use the default 'connect.sid' or your configured cookie name
+        res.clearCookie('connect.sid');
 
-        // Redirect to login page
+        // Redirect to login page after successful destruction and cookie clearing
         res.redirect('/auth/login');
     });
 };
 
-
+// --- Forgot Password Logic ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -819,29 +954,26 @@ exports.forgotPassword = async (req, res, next) => {
     }
 
     try {
-        const user = await User.findOne({ email: email.toLowerCase() });
+        const lowerCaseEmail = email.toLowerCase();
+        const user = await User.findOne({ email: lowerCaseEmail });
 
-        // Security: Always show a generic success message regardless of whether the user exists
-        // This prevents attackers from enumerating registered emails.
-        const genericSuccessMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent.';
+        // Security: Always show a generic success message regardless of whether the user exists or is verified.
+        // This prevents attackers from enumerating registered/verified emails.
+        const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
+        req.flash('success_msg', genericMessage); // Flash the message immediately
 
-        if (!user) {
-            req.flash('success_msg', genericSuccessMessage);
-            return res.redirect('/auth/forgot-password');
+        if (!user || !user.isVerified) {
+            // If user doesn't exist, or exists but isn't verified, we still show the generic message.
+            // Log internally for debugging if needed, but don't reveal status to the client.
+            console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
+            return res.redirect('/auth/forgot-password'); // Redirect back
         }
 
-        // Check if the found user is verified
-        if (!user.isVerified) {
-            req.flash('error_msg', 'This account is not verified. Please complete registration verification first.');
-             // Redirect to OTP verification page for registration
-             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
-         }
-
-         // Generate OTP and reset token with expiry dates
+         // User exists and is verified, proceed with OTP generation
          const otp = generateOTP();
-         const resetToken = crypto.randomBytes(20).toString('hex');
+         const resetToken = crypto.randomBytes(20).toString('hex'); // Token for the reset link itself (after OTP verify)
         const otpExpires = setOTPExpiration(10); // OTP valid for 10 mins
-        const resetExpires = setOTPExpiration(60); // Reset token valid for 60 mins
+        const resetExpires = setOTPExpiration(60); // Link valid for 60 mins after OTP verification
 
         // Store OTP, token, and expiry times on the user document
         user.otp = otp;
@@ -850,82 +982,97 @@ exports.forgotPassword = async (req, res, next) => {
         user.resetPasswordExpires = resetExpires;
         await user.save();
 
-        // Prepare email content
+        // Prepare email content for OTP verification step
         const subject = 'Password Reset Request - Verify OTP';
-         const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nIt will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
-         const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
+        const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
+        const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
 
          // Send the email containing the OTP
          const emailSent = await sendEmail(user.email, subject, text, html);
 
         if (emailSent) {
-            req.flash('success_msg', `An OTP has been sent to ${user.email} to verify your password reset request.`);
+            // The generic success message is already flashed. Redirect to OTP page.
+             console.log(`Password reset OTP sent to verified user: ${user.email}`);
              // Redirect to OTP verification page, indicating it's for reset
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
             // If email fails, clear the OTP/token fields to prevent misuse
             user.otp = undefined;
             user.otpExpires = undefined;
-             user.resetPasswordToken = undefined;
+            user.resetPasswordToken = undefined;
             user.resetPasswordExpires = undefined;
-             await user.save(); // Save the cleared fields
-            req.flash('error_msg', 'Could not send password reset OTP. Please try again.');
-            res.redirect('/auth/forgot-password');
+            await user.save(); // Save the cleared fields
+
+            console.error(`Failed to send password reset OTP email to ${user.email}`);
+            // Keep the generic success message flashed earlier, but maybe add an error log or specific admin alert.
+            // Don't flash an error_msg here as it contradicts the generic success message.
+            res.redirect('/auth/forgot-password'); // Redirect back
         }
 
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        console.error("Error in forgotPassword:", error);
+        // Show a generic error message in case of unexpected issues
+        req.flash('error_msg', 'An error occurred while processing your request. Please try again later.');
+        res.redirect('/auth/forgot-password');
+        // Or pass to global handler: next(error);
     }
 };
 
-
+// --- Reset Password Logic ---
 exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
 
-    // Validation checks
+    // --- Input Validation ---
+    let errors = [];
     if (!password || !confirmPassword) {
-        req.flash('error_msg', 'Please enter and confirm your new password.');
-         return res.redirect(`/auth/reset-password/${token}`);
+        errors.push('Please enter and confirm your new password.');
     }
     if (password !== confirmPassword) {
-        req.flash('error_msg', 'Passwords do not match.');
-         return res.redirect(`/auth/reset-password/${token}`);
+        errors.push('Passwords do not match.');
     }
-     if (password.length < 6) {
-         req.flash('error_msg', 'Password must be at least 6 characters.');
-        return res.redirect(`/auth/reset-password/${token}`);
+     if (password && password.length < 6) {
+         errors.push('Password must be at least 6 characters.');
     }
+    if (errors.length > 0) {
+         req.flash('error_msg', errors.join(' '));
+         return res.redirect(`/auth/reset-password/${token}`); // Redirect back to the form
+    }
+    // --- End Validation ---
 
     try {
-        // Find user by valid reset token and expiry
+        // Find user by the valid reset token and ensure it hasn't expired
         const user = await User.findOne({
             resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() }, // Ensure token hasn't expired
+            resetPasswordExpires: { $gt: Date.now() }, // Check expiry
          });
 
-
         if (!user) {
-            req.flash('error_msg', 'Password reset token is invalid or has expired.');
-            return res.redirect('/auth/forgot-password');
+            // Token is invalid or expired
+            req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
+            return res.redirect('/auth/forgot-password'); // Send back to start of process
         }
 
-        // Update password (pre-save hook will hash it)
-        user.password = password;
+        // Token is valid, update the password
+        user.password = password; // Pre-save hook in User.js will hash it
         // Clear reset token and OTP fields after successful reset
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
-         user.otp = undefined; // Ensure OTP used for verification is cleared too
-         user.otpExpires = undefined;
+        user.otp = undefined; // Ensure OTP used for verification is also cleared
+        user.otpExpires = undefined;
 
         await user.save(); // Save the user with new password and cleared tokens
 
-        // Log the user in after successful password reset
+        // --- Log the user in automatically after successful password reset ---
         req.session.regenerate(err => {
              if (err) {
-                console.error("Session regeneration error after reset:", err);
-                return next(err);
+                console.error("Session regeneration error after password reset:", err);
+                // Try to proceed even if regeneration fails, but flash a message?
+                req.flash('error_msg', 'Password reset but failed to log you in automatically. Please log in with your new password.');
+                return res.redirect('/auth/login');
+                // Or pass to handler: return next(err);
              }
+            // Store essential user data in the new session
              req.session.user = {
                 _id: user._id,
                 name: user.name,
@@ -934,54 +1081,70 @@ exports.resetPassword = async (req, res, next) => {
                 address: user.address,
                 cart: user.cart // Assuming cart might be needed immediately
             };
+            // Save the session
             req.session.save(err => {
                 if(err) {
-                    console.error("Session save error after reset:", err);
-                    return next(err);
+                    console.error("Session save error after password reset login:", err);
+                    req.flash('error_msg', 'Password reset but failed to log you in automatically. Please log in with your new password.');
+                    return res.redirect('/auth/login');
+                    // Or pass to handler: return next(err);
                  }
+                 // Success: Password reset and logged in
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                res.redirect('/'); // Redirect to homepage
+                res.redirect('/'); // Redirect to homepage or dashboard
              });
          });
-
+        // --- End Automatic Login ---
 
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        if (error.name === 'ValidationError') {
+           let validationErrors = Object.values(error.errors).map(el => el.message);
+            req.flash('error_msg', validationErrors.join(' '));
+            return res.redirect(`/auth/reset-password/${token}`);
+       }
+        next(error); // Pass other errors to the global error handler
     }
 };
 
-// Combined Controller Action for Home Page and Product Listing
+
+// ======================================
+// Home Page Controller Action
+// ======================================
 exports.getHomePage = async (req, res, next) => {
   try {
-    // This now handles both '/' and '/products' with potential search
     const searchTerm = req.query.search || '';
-    let query = { stock: { $gt: 0 } }; // Always filter for products in stock
+    // --- REMOVED STOCK FILTER ---
+    let query = {}; // Initialize query object - show ALL products by default
 
+    // Apply search filter if searchTerm exists
     if (searchTerm) {
-      // Build search query if searchTerm exists
-      const regex = new RegExp(searchTerm.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i'); // Escape special chars, case-insensitive
+      // Build search query using regex (case-insensitive)
+      // Escape special regex characters in the search term for safety
+      const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      const regex = new RegExp(escapedSearchTerm, 'i');
       query.$or = [
          { name: regex },
          { category: regex },
          { specifications: regex }
-         // Add more fields to search if needed (e.g., description)
+         // Add more fields to search if needed (e.g., description, sellerEmail)
       ];
     }
 
-    // Fetch products based on query, sort by newest first
-    const products = await Product.find(query).sort({ createdAt: -1 });
+    // Fetch products based on the query (either empty or with search terms)
+    // Sort by newest first
+    const products = await Product.find(query).sort({ createdAt: -1 }).lean(); // Use lean()
 
-    // Render the main product listing page
+    // Render the main product listing page (index.ejs)
     res.render('products/index', {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home', // Dynamic title
-      products: products,
-      searchTerm: searchTerm // Pass searchTerm back to view for input field
+      products: products, // Pass the fetched products (including out-of-stock)
+      searchTerm: searchTerm // Pass searchTerm back to view for the search input field
     });
   } catch (error) {
-    next(error); // Pass errors to the error handler
+    console.error("Error fetching products for home page:", error);
+    next(error); // Pass errors to the global error handler
   }
 };
-
 
 controllers/orderController.js:
 // controllers/orderController.js
@@ -1023,26 +1186,29 @@ exports.placeOrder = async (req, res, next) => {
                 console.error(`Invalid quantity found in cart for user ${userId}, product ID ${item.productId?._id || 'N/A'}: ${item.quantity}`);
                 req.flash('error_msg', `An item in your cart has an invalid quantity (${item.quantity || 'empty'}). Please remove or update it.`);
                 validationFailed = true;
-                break;
+                break; // Stop processing cart
             }
             if (!item.productId || typeof item.productId !== 'object') {
                 console.warn(`User ${userId} cart contains invalid item reference: ${item._id}. Removing.`);
+                // Attempt to remove the invalid item from the user's cart in the DB
                 await User.updateOne({ _id: userId }, { $pull: { cart: { _id: item._id } } });
                 req.flash('error_msg', `An invalid item was detected and removed from your cart. Please review your cart and checkout again.`);
                 validationFailed = true;
-                break;
+                break; // Stop processing cart
             }
+            // Fetch the product again to ensure the latest stock and details
             const currentProduct = await Product.findById(item.productId._id).select('stock name price imageUrl');
             if (!currentProduct) {
                 req.flash('error_msg', `Product "${item.productId.name || 'ID: '+item.productId._id}" is no longer available. Please remove it from your cart.`);
                 validationFailed = true;
+                 // Attempt to remove the now-missing product from the user's cart
                 await User.updateOne({ _id: userId }, { $pull: { cart: { productId: item.productId._id } } });
-                break;
+                break; // Stop processing cart
             }
             if (currentProduct.stock < itemQuantity) {
                 req.flash('error_msg', `Insufficient stock for "${currentProduct.name}". Available: ${currentProduct.stock}. Your cart has ${itemQuantity}. Please update your cart.`);
                 validationFailed = true;
-                break;
+                break; // Stop processing cart
             }
             orderProducts.push({
                 productId: currentProduct._id,
@@ -1058,73 +1224,99 @@ exports.placeOrder = async (req, res, next) => {
             });
         }
 
+        // If validation failed, reload cart (session will be updated) and redirect
         if (validationFailed) {
-            const updatedUser = await User.findById(userId).select('cart');
+            // Refresh session cart data after potential DB removals
+            const updatedUser = await User.findById(userId).select('cart').populate('cart.productId').lean();
             req.session.user.cart = updatedUser ? updatedUser.cart : [];
             await req.session.save();
             return res.redirect('/user/cart');
         }
 
-        // 2. Perform Operations
+        // 2. Perform Operations within a transaction for atomicity (Optional but recommended)
+        const sessionDB = await mongoose.startSession();
+        sessionDB.startTransaction();
         try {
+            // Decrement stock and increment orderCount
             for (const update of productUpdates) {
                 const updateResult = await Product.updateOne(
                     { _id: update.productId, stock: { $gte: update.quantityToDecrement } },
-                    { $inc: { stock: -update.quantityToDecrement, orderCount: 1 } }
+                    { $inc: { stock: -update.quantityToDecrement, orderCount: 1 } },
+                    { session: sessionDB } // Add session to operation
                 );
+                // Check if stock was sufficient *at the time of update*
                 if (updateResult.modifiedCount === 0 && updateResult.matchedCount === 1) {
                      throw new Error(`Stock level changed concurrently for a product (ID: ${update.productId}). Please try again.`);
                  }
                  if(updateResult.matchedCount === 0) {
-                      throw new Error(`A product (ID: ${update.productId}) was removed during checkout. Please review your cart.`);
+                      throw new Error(`A product (ID: ${update.productId}) was not found or removed during checkout. Please review your cart.`);
                  }
             }
+
+            // Create the order
             const order = new Order({
                 userId: userId,
                 userEmail: user.email,
                 products: orderProducts,
                 totalAmount: totalAmount,
                 shippingAddress: user.address,
-                paymentMethod: 'COD',
+                paymentMethod: 'COD', // Assuming COD only for now
                 status: 'Pending',
+                // orderDate and cancellationAllowedUntil are set by default/pre-save hook
             });
-            await order.save(); // This will trigger the pre-save hook to set cancellationAllowedUntil
+            await order.save({ session: sessionDB }); // Add session to save
 
+            // Clear user's cart
             user.cart = [];
-            await user.save();
+            await user.save({ session: sessionDB }); // Add session to save
+
+            // Commit the transaction
+            await sessionDB.commitTransaction();
+
+            // Update session cart *after* successful transaction
             req.session.user.cart = [];
             await req.session.save();
 
-            // Send Confirmation Email (Best Effort)
+            // Send Confirmation Email (Best Effort - outside transaction)
             try {
                 const subject = 'Your Order Has Been Placed!';
                 let productListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
-                // Use formatDateIST for confirmation email as well
+                // --- USE formatDateIST from res.locals ---
                 const formattedOrderDate = res.locals.formatDateIST(order.orderDate); // Access helper via res.locals
                 const html = `<h2>Thank you for your order!</h2><p>Your Order ID: ${order._id}</p><p>Order Placed: ${formattedOrderDate}</p><p>Total Amount: ₹${order.totalAmount.toFixed(2)}</p><p>Shipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><h3>Items:</h3><ul>${productListHTML}</ul><p>You can track your order status in the 'My Orders' section.</p>`;
                 await sendEmail(user.email, subject, `Your order ${order._id} has been placed. Total: ₹${totalAmount.toFixed(2)}`, html);
             } catch (emailError) {
                 console.error(`Failed to send order confirmation email for order ${order._id}:`, emailError);
+                // Don't fail the entire request if email fails, but log it.
             }
 
             req.flash('success_msg', 'Order placed successfully!');
             res.redirect('/orders/my-orders');
 
         } catch (error) {
-            console.error("Error during critical order processing block:", error);
-            req.flash('error_msg', `Order placement failed due to an unexpected issue: ${error.message}. Please check 'My Orders' or contact support.`);
-            res.redirect('/orders/my-orders');
+            // If any error occurs, abort the transaction
+            await sessionDB.abortTransaction();
+            console.error("Error during order transaction:", error);
+            req.flash('error_msg', `Order placement failed: ${error.message}. Your cart has not been modified. Please try again.`);
+            // Redirect back to cart as the order failed
+            res.redirect('/user/cart');
+        } finally {
+            // End the session
+            sessionDB.endSession();
         }
 
     } catch (error) {
+        // Handle errors outside the transaction block (e.g., initial user/cart fetch)
         console.error("Outer Order Placement Error:", error);
-        next(error);
+        next(error); // Pass to the main error handler
     }
 };
 // --- END UPDATED placeOrder ---
 
 // --- cancelOrder (User) ---
 exports.cancelOrder = async (req, res, next) => {
+    const sessionDB = await mongoose.startSession(); // Use transaction for stock restore + order update
+    sessionDB.startTransaction();
     try {
         const orderId = req.params.id;
         const userId = req.session.user._id;
@@ -1134,14 +1326,15 @@ exports.cancelOrder = async (req, res, next) => {
             userId: userId,
             status: 'Pending',
              cancellationAllowedUntil: { $gt: Date.now() }
-        }).populate('products.productId', '_id'); // Need _id for stock restore
+        }).populate('products.productId', '_id').session(sessionDB); // Add session
 
         if (!order) {
              req.flash('error_msg', 'Order not found, already processed, or cancellation period expired.');
+            await sessionDB.abortTransaction(); sessionDB.endSession();
             return res.redirect('/orders/my-orders');
         }
 
-        // Restore stock (best effort)
+        // Restore stock (best effort within transaction)
         console.log(`User Cancellation: Attempting to restore stock for order ${orderId}.`);
         const productStockRestorePromises = order.products.map(item => {
              const quantityToRestore = Number(item.quantity);
@@ -1150,10 +1343,14 @@ exports.cancelOrder = async (req, res, next) => {
                   console.error(`User Cancel: Missing or invalid productId for item in order ${orderId}`);
                   return Promise.resolve();
               }
+             // Add session to stock update
              return Product.updateOne(
                  { _id: item.productId._id },
-                 { $inc: { stock: quantityToRestore, orderCount: -1 } }
+                 { $inc: { stock: quantityToRestore, orderCount: -1 } },
+                 { session: sessionDB }
              ).catch(err => {
+                // Log error but don't necessarily fail transaction if one product fails? Depends on requirements.
+                // For now, we let it proceed, but log the failure.
                 console.error(`User Cancel: Failed to restore stock/orderCount for product ${item.productId._id} on cancelling order ${orderId}: ${err.message}`);
              });
         });
@@ -1162,8 +1359,11 @@ exports.cancelOrder = async (req, res, next) => {
 
         order.status = 'Cancelled';
         order.cancellationReason = "Cancelled by customer";
-        await order.save(); // pre-save hook clears fields
+        await order.save({ session: sessionDB }); // Save order within transaction
 
+        await sessionDB.commitTransaction(); // Commit successful cancellation and stock restore
+
+         // Send email (best effort, outside transaction)
          try{
              const subject = 'Your Order Has Been Cancelled';
              const html = `<p>Your order (${order._id}) has been successfully cancelled as requested.</p>`;
@@ -1176,6 +1376,7 @@ exports.cancelOrder = async (req, res, next) => {
         res.redirect('/orders/my-orders');
 
     } catch (error) {
+         await sessionDB.abortTransaction(); // Abort transaction on any error
          console.error("Order Cancellation Error:", error);
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid order ID format.');
@@ -1183,6 +1384,8 @@ exports.cancelOrder = async (req, res, next) => {
             req.flash('error_msg', 'Failed to cancel the order due to an internal error.');
          }
          res.redirect('/orders/my-orders');
+    } finally {
+        sessionDB.endSession(); // Always end session
     }
 };
 
@@ -1190,15 +1393,15 @@ exports.cancelOrder = async (req, res, next) => {
 exports.getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ userId: req.session.user._id })
-                                   .select('+cancellationReason') // Keep reason
+                                   .select('+cancellationReason') // Keep reason if needed
                                    .sort({ orderDate: -1 })
-                                   .lean(); // Use lean
+                                   .lean(); // Use lean for performance
 
          const now = Date.now();
         orders.forEach(order => {
+            // Determine if the order is cancellable by the user
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
-            // Removed manual date formatting (formattedOrderDate, formattedReceivedDate)
-            // We will use formatDateIST helper in the EJS template
+            // Dates will be formatted in the EJS template using the helper
          });
 
         res.render('user/my-orders', {
@@ -1207,81 +1410,95 @@ exports.getMyOrders = async (req, res, next) => {
         });
     } catch (error) {
         console.error("Error fetching user orders:", error);
-        next(error);
+        next(error); // Pass to global error handler
     }
 };
 
 // --- Admin Direct Delivery OTP ---
+// This function doesn't interact with `res`, so it remains unchanged regarding date helpers
 exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
      try {
          const order = await Order.findById(orderId);
          if (!order) throw new Error('Order not found.');
-         if (order.status !== 'Pending') throw new Error(`Cannot confirm direct delivery for order with status '${order.status}'. Must be 'Pending'.`);
+         if (order.status !== 'Pending') throw new Error(`Cannot send OTP for order with status '${order.status}'. Must be 'Pending'.`);
 
-        const otp = generateOTP();
-         const otpExpires = setOTPExpiration(5); // 5 mins
+         const otp = generateOTP();
+         const otpExpires = setOTPExpiration(5); // 5 mins expiry for delivery OTP
          order.orderOTP = otp;
          order.orderOTPExpires = otpExpires;
-         await order.save();
+         await order.save(); // Save OTP to order
 
          const user = await User.findById(order.userId).select('email');
          if (!user) {
+             // Clean up OTP if user not found
              order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
              throw new Error('Customer user account not found for sending OTP.');
          }
 
-         // Email to CUSTOMER
+         // Email to CUSTOMER containing the OTP
          const subject = 'Confirming Delivery - Action Required';
          const text = `An administrator is ready to complete the delivery for your order (${order._id}).\nPlease provide them with the following OTP to confirm you have received your items: ${otp}\nIt will expire in 5 minutes.\nDo not share if you haven't received your items.`;
          const html = `<p>An administrator is ready to complete the delivery for your order (${order._id}).</p><p>Please provide the administrator with the following OTP to confirm you have received your items: <strong>${otp}</strong></p><p>The OTP will expire in 5 minutes.</p><p><strong>Only share this OTP once you have received your items from the administrator.</strong></p>`;
 
         const emailSent = await sendEmail(user.email, subject, text, html);
         if (!emailSent) {
+            // Clean up OTP if email fails
             order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
             throw new Error('Failed to send direct delivery confirmation OTP email to the customer.');
          }
+        // Return success message to be flashed by the caller controller
         return { success: true, message: `Direct delivery confirmation OTP sent to customer ${user.email}.` };
     } catch (error) {
          console.error(`Error sending ADMIN Direct Delivery OTP for order ${orderId}:`, error);
+         // Re-throw the error to be caught by the caller controller
          throw error;
      }
  };
 
 // --- Verify OTP and Confirm Delivery Directly By Admin ---
-exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp) => {
+// Added 'resForHelper' parameter to access the date formatter
+exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper) => {
      try {
          const order = await Order.findOne({
             _id: orderId,
-            status: 'Pending',
+            status: 'Pending', // Can only confirm delivery if Pending
              orderOTP: providedOtp,
-             orderOTPExpires: { $gt: Date.now() }
+             orderOTPExpires: { $gt: Date.now() } // Check OTP expiry
          });
 
          if (!order) {
+            // Provide more specific feedback if OTP is wrong vs order status changed
             const checkOrder = await Order.findById(orderId);
             if (!checkOrder) throw new Error('Order not found.');
             if (checkOrder.status !== 'Pending') throw new Error(`Order status is '${checkOrder.status}', cannot confirm direct delivery from this state.`);
+            // If order exists and is Pending, the OTP must be wrong/expired
             throw new Error('Invalid or expired OTP.');
         }
 
-        // OTP Valid: Update Order
+        // OTP is valid: Update Order
         order.status = 'Delivered';
-        order.receivedByDate = new Date();
-        // OTP fields cleared by pre-save hook
+        order.receivedByDate = new Date(); // Set delivery time
+        // OTP fields should be cleared by the pre-save hook in Order.js when status changes
         await order.save();
 
         // Send Delivery Confirmation Email (Best Effort)
         try {
              const subject = `Your Order Has Been Delivered!`;
-             // Use formatDateIST in email as well
-             const formattedDeliveryDate = res.locals.formatDateIST(order.receivedByDate); // Assuming res is accessible or pass helper
+             // --- USE formatDateIST from resForHelper.locals (if available) ---
+             const formattedDeliveryDate = (resForHelper && resForHelper.locals && typeof resForHelper.locals.formatDateIST === 'function')
+                 ? resForHelper.locals.formatDateIST(order.receivedByDate)
+                 : new Date(order.receivedByDate).toLocaleString(); // Fallback to default locale string
+
              const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by administration.</p><p>Received Date: ${formattedDeliveryDate}</p><p>Thank you for shopping with us!</p>`;
             await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
          } catch (emailError){
+             // Log error but don't fail the confirmation
              console.error(`Failed sending direct delivery confirmation email for order ${order._id}:`, emailError);
          }
+        // Return the updated order object
         return { success: true, order: order };
      } catch (error) {
+         // Log the error and re-throw to be handled by the calling controller
          console.error(`Error verifying ADMIN Direct Delivery OTP for order ${orderId}:`, error);
         throw error;
     }
@@ -4192,6 +4409,7 @@ views/admin/assigned-orders-detail.ejs:
 
 <div class="admin-manage-container">
     <h1><%= title %></h1>
+    <%# Link might be invalid now if /admin/manage-assigned-orders was removed %>
     <p><a href="/admin/manage-assigned-orders">« Back to Delivery Admin Overview</a></p>
 
     <% if (orders.length > 0) { %>
@@ -4215,15 +4433,20 @@ views/admin/assigned-orders-detail.ejs:
                         <tr>
                             <td data-label="Image"> <%# Added data-label %>
                                 <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
-                                    <a href="/products/<%= order.products[0].productId %>">
+                                    <%# Ensure productId exists before creating link %>
+                                    <% if (order.products[0].productId) { %>
+                                        <a href="/products/<%= order.products[0].productId %>">
+                                            <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
+                                        </a>
+                                    <% } else { %>
                                         <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
-                                    </a>
+                                    <% } %>
                                 <% } else { %>
                                     <span class="text-muted">N/A</span>
                                 <% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Placed Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer Email"><%= order.userEmail %></td>
                             <td data-label="Address">
@@ -4242,7 +4465,7 @@ views/admin/assigned-orders-detail.ejs:
                             </td>
                             <td data-label="Total">₹<%= order.totalAmount.toFixed(2) %></td>
                             <td data-label="Status"><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
-                             <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Delivered Date"><%= formatDateIST(order.receivedByDate) %></td>
                         </tr>
                     <% }) %>
@@ -4408,7 +4631,7 @@ views/admin/manage-orders.ejs:
                                 <% } else { %><span class="text-muted">N/A</span><% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer"><%= order.userEmail %></td>
                             <td data-label="Address & Phone">
@@ -4431,11 +4654,10 @@ views/admin/manage-orders.ejs:
                             <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <%# Use formatDateIST helper for delivery date %>
+                                <%# --- USE HELPER --- %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
                             <td data-label="Actions" class="actions-cell">
-
                                 <%# Direct Delivery Confirmation by Admin (Pending orders) %>
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
                                     <div class="action-group">
@@ -4573,11 +4795,12 @@ views/admin/manage-users.ejs:
                                     <select name="role" onchange="this.form.submit()">
                                         <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
                                         <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                        <%# Removed delivery_admin option %>
                                     </select>
                                     <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
                                 </form>
                             </td>
-                            <%# Use formatDateIST helper %>
+                            <%# --- USE HELPER --- %>
                             <td data-label="Registered On"><%= formatDateIST(user.createdAt) %></td>
                             <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
                             <td data-label="Actions" class="actions-cell">
@@ -5277,7 +5500,7 @@ views/user/my-orders.ejs:
                 <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                      <div class="order-header">
                          <div><strong>Order ID:</strong> <%= order._id %></div>
-                         <%# Use formatDateIST helper %>
+                         <%# --- USE HELPER --- %>
                         <div><strong>Placed on:</strong> <%= formatDateIST(order.orderDate) %></div>
                          <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
                          <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
@@ -5295,7 +5518,7 @@ views/user/my-orders.ejs:
                         </div>
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <%# Use formatDateIST helper %>
+                             <%# --- USE HELPER --- %>
                              <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
@@ -5404,7 +5627,8 @@ views/error.ejs:
     <h1>Error <%= typeof statusCode !== 'undefined' ? statusCode : '' %></h1>
     <p class="lead text-danger"><%= message %></p>
 
-    <% if (process.env.NODE_ENV === 'development' && stack) { %>
+    <%# Use NODE_ENV from res.locals now %>
+    <% if (NODE_ENV === 'development' && typeof stack !== 'undefined' && stack) { %>
         <details style="white-space: pre-wrap; margin-top: 20px; background: #f1f1f1; padding: 10px; border-radius: 5px; font-size: 0.8em;">
             <summary>Stack Trace (Development Mode)</summary>
             <code><%= stack %></code>
