@@ -7,27 +7,29 @@
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
-                <%# Simplified status class, removed assignment check %>
                 <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                      <div class="order-header">
                          <div><strong>Order ID:</strong> <%= order._id %></div>
-                        <div><strong>Placed on:</strong> <%= order.formattedOrderDate %></div>
+                         <%# Use formatDateIST helper %>
+                        <div><strong>Placed on:</strong> <%= formatDateIST(order.orderDate) %></div>
                          <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
                          <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
                          <div class="order-items-preview">
                              <% order.products.slice(0, 3).forEach(item => { %>
-                                <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
-                                    <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
-                                </a>
+                                <% if (item.productId && item.imageUrl) { %>
+                                    <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
+                                        <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
+                                    </a>
+                                <% } %>
                              <% }) %>
                              <% if(order.products.length > 3) { %><span class="more-items">+ <%= order.products.length - 3 %> more</span><% } %>
                         </div>
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <p><strong>Delivered On:</strong> <%= order.formattedReceivedDate %></p>
-                              <%# --- REMOVED Assigned Admin display --- %>
+                             <%# Use formatDateIST helper %>
+                             <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>

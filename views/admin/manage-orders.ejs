@@ -4,14 +4,11 @@
 <div class="admin-manage-container">
     <h1>Manage Orders</h1>
 
-    <%# --- REMOVED Bulk Assign Form --- %>
-
     <% if (orders.length > 0) { %>
         <div class="table-container card">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <%# --- REMOVED Checkbox Header --- %>
                         <th>Images</th>
                         <th>Order ID</th>
                         <th>Date</th>
@@ -19,14 +16,13 @@
                         <th>Address & Phone</th>
                         <th>Items & Prices</th>
                         <th>Total</th>
-                        <th>Status</th> <%# Simplified Header %>
+                        <th>Status</th>
                         <th class="actions-cell" style="text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
                         <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
-                            <%# --- REMOVED Checkbox Cell --- %>
                             <td data-label="Images">
                                 <% if (order.products && order.products.length > 0) { %>
                                     <% order.products.slice(0, 3).forEach(item => { %>
@@ -40,7 +36,8 @@
                                 <% } else { %><span class="text-muted">N/A</span><% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <td data-label="Date"><%= order.formattedOrderDate %></td>
+                            <%# Use formatDateIST helper %>
+                            <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer"><%= order.userEmail %></td>
                             <td data-label="Address & Phone">
                                 <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
@@ -59,11 +56,11 @@
                                 <% } else { %>No items found<% } %>
                             </td>
                             <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
-                            <td data-label="Status"> <%# Simplified Cell %>
+                            <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <%# Removed assignedAdminEmail display %>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.formattedReceivedDate) { %><br><small class="text-success">Delivered: <%= order.formattedReceivedDate %></small><% } %>
+                                <%# Use formatDateIST helper for delivery date %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
                             <td data-label="Actions" class="actions-cell">
 
@@ -84,9 +81,6 @@
                                         </form>
                                     </div>
                                 <% } %>
-
-                                <%# --- REMOVED Assign Order Action Group --- %>
-                                <%# --- REMOVED Unassign Order Action Group --- %>
 
                                 <%# Cancel Order (Admin: Pending only now) %>
                                 <% if (order.canBeCancelledByAdmin) { %>

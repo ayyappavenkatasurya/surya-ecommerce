@@ -5,50 +5,52 @@
     <h1>Manage Users</h1>
 
     <% if (users.length > 0) { %>
-         <table class="data-table">
-             <thead>
-                <tr>
-                     <th>Name</th>
-                    <th>Email / Phone</th>
-                     <th>Role</th>
-                     <th>Registered On</th>
-                     <th>Verified</th>
-                    <th>Actions</th>
-                 </tr>
-             </thead>
-            <tbody>
-                <% users.forEach(user => { %>
+        <div class="table-container card"> <%# Added table wrapper %>
+            <table class="data-table">
+                <thead>
                     <tr>
-                         <td data-label="Name"><%= user.name %></td>
-                         <td data-label="Email / Phone">
-                            <%= user.email %>
-                            <% if (user.address && user.address.phone) { %>
-                                <br><small>(<%= user.address.phone %>)</small>
-                            <% } %>
-                         </td>
-                         <td data-label="Role">
-                             <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form">
-                                  <select name="role" onchange="this.form.submit()">
-                                      <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
-                                     <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
-                                     <%# --- REMOVED 'delivery_admin' option --- %>
-                                  </select>
-                                  <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
-                             </form>
-                         </td>
-                         <td data-label="Registered On"><%= new Date(user.createdAt).toLocaleDateString() %></td>
-                         <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
-                         <td data-label="Actions" class="actions-cell">
-                             <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');">
-                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
-                            </form>
-                         </td>
+                        <th>Name</th>
+                        <th>Email / Phone</th>
+                        <th>Role</th>
+                        <th>Registered On</th>
+                        <th>Verified</th>
+                        <th class="actions-cell" style="text-align: right;">Actions</th>
                     </tr>
-                 <% }) %>
-            </tbody>
-        </table>
-     <% } else { %>
-         <p>No other users registered.</p>
+                </thead>
+                <tbody>
+                    <% users.forEach(user => { %>
+                        <tr>
+                            <td data-label="Name"><%= user.name %></td>
+                            <td data-label="Email / Phone">
+                                <%= user.email %>
+                                <% if (user.address && user.address.phone) { %>
+                                    <br><small>(<%= user.address.phone %>)</small>
+                                <% } %>
+                            </td>
+                            <td data-label="Role">
+                                <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form form-submit-spinner"> <%# Added spinner class %>
+                                    <select name="role" onchange="this.form.submit()">
+                                        <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                                        <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                    </select>
+                                    <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
+                                </form>
+                            </td>
+                            <%# Use formatDateIST helper %>
+                            <td data-label="Registered On"><%= formatDateIST(user.createdAt) %></td>
+                            <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
+                            <td data-label="Actions" class="actions-cell">
+                                <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');"> <%# Added spinner class %>
+                                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <p class="text-muted mt-3">No other users registered.</p> <%# Added mt-3 for spacing %>
     <% } %>
 </div>
 

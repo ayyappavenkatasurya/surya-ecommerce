@@ -41,6 +41,7 @@ app.use(
 
 app.use(flash());
 
+// Middleware to set local variables for views
 app.use((req, res, next) => {
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
@@ -54,33 +55,57 @@ app.use((req, res, next) => {
   let userInitials = '??'; // Default fallback
   if (req.session.user && req.session.user.email) {
     try {
-      // Try splitting by space first (for names), then fallback to email
       const nameParts = req.session.user.name?.split(' ');
       if (nameParts && nameParts.length > 1) {
           userInitials = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
       } else if (nameParts && nameParts.length === 1 && nameParts[0].length >= 2) {
           userInitials = nameParts[0].substring(0, 2).toUpperCase();
-      }
-       else {
-        // Fallback to email if name didn't work well
+      } else {
         const emailPrefix = req.session.user.email.split('@')[0];
         if (emailPrefix.length >= 2) {
             userInitials = emailPrefix.substring(0, 2).toUpperCase();
         } else if (emailPrefix.length === 1) {
-            userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase(); // Double the single letter
+            userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase();
         }
       }
     } catch (e) {
       console.error("Error generating initials:", e);
-      // Keep default '??'
     }
   }
   res.locals.userInitials = userInitials;
-  // --- END: Calculate User Initials ---
+
+  // --- NEW: Date Formatting Helper for IST ---
+  res.locals.formatDateIST = (dateInput) => {
+      if (!dateInput) return 'N/A';
+      try {
+          const date = new Date(dateInput);
+          // Check if the date is valid
+          if (isNaN(date.getTime())) {
+              console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
+              return 'Invalid Date';
+          }
+
+          const options = {
+              timeZone: 'Asia/Kolkata', // Target timezone IST
+              year: 'numeric',
+              month: 'short', // e.g., 'Jan', 'Feb'
+              day: 'numeric',
+              hour: 'numeric', // e.g., '1', '2'... '12'
+              minute: '2-digit', // e.g., '05', '15'
+              second: '2-digit', // e.g., '08', '59'
+              hour12: true // Use AM/PM
+          };
+          // Use 'en-IN' locale for formatting conventions common in India (though options override most)
+          return date.toLocaleString('en-IN', options);
+      } catch (error) {
+          console.error("Error formatting date to IST:", error, "Input:", dateInput);
+          return 'Date Error'; // Fallback error message
+      }
+  };
+  // --- END: Date Formatting Helper ---
 
   next();
 });
-
 
 app.use('/', mainRouter);
 
