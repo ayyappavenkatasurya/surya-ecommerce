@@ -64,16 +64,15 @@ const { sendEmail } = require('../config/mailer');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-    // Delivery partner OTP functions removed from orderController
-} = require('./orderController');
+} = require('./orderController'); // Removed unused delivery partner functions
 
-// --- Keep cancellationReasons array (Admin Only Reasons Now) ---
+// Keep cancellationReasons array
 const cancellationReasons = [
     "📞 Unable to contact the customer",
-    "❗ Out of stock/unavailable item", // Simplified - timeframe exceeded less relevant without delivery step
+    "❗ Out of stock/unavailable item",
     "🗺️ Address incorrect/incomplete",
-    "🚫 Customer requested cancellation", // This might be set automatically by user, but good to have as admin override
-    "❓ Other (Admin)", // Simplified
+    "🚫 Customer requested cancellation",
+    "❓ Other (Admin)",
 ];
 
 // =======================
@@ -125,14 +124,15 @@ exports.getManageOrdersPage = async (req, res, next) => {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
                                    .populate('products.productId', 'name imageUrl _id price') // Ensure necessary fields are populated
-                                   .lean();
+                                   .lean(); // Use lean for potentially better performance if not modifying
 
         orders.forEach(order => {
-            order.formattedOrderDate = new Date(order.orderDate).toLocaleString();
-            order.formattedReceivedDate = order.receivedByDate ? new Date(order.receivedByDate).toLocaleString() : 'N/A';
+            // Removed manual formatting (formattedOrderDate, formattedReceivedDate)
+            // We will use the formatDateIST helper in the EJS template
+
             // Determine capabilities for each order
-            order.canBeCancelledByAdmin = order.status === 'Pending'; // Only Pending orders can be cancelled by admin now
-            order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending'; // Only Pending can be directly delivered
+            order.canBeCancelledByAdmin = order.status === 'Pending';
+            order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
 
             // Pre-calculate item details string for display (optional improvement)
             if (order.products && order.products.length > 0) {
@@ -144,12 +144,9 @@ exports.getManageOrdersPage = async (req, res, next) => {
             }
         });
 
-        // Removed deliveryAdmins query
-
         res.render('admin/manage-orders', {
             title: 'Manage Orders',
-            orders: orders,
-            // deliveryAdmins: deliveryAdmins, // Removed
+            orders: orders, // Pass orders with raw dates
             cancellationReasons: cancellationReasons
         });
     } catch (error) {
@@ -158,42 +155,33 @@ exports.getManageOrdersPage = async (req, res, next) => {
 };
 // --- END UPDATED getManageOrdersPage function ---
 
-
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         // Exclude the current admin from the list
         const users = await User.find({ _id: { $ne: req.session.user._id } })
                                   .select('name email role createdAt isVerified address.phone') // Select necessary fields including phone
-                                  .sort({ createdAt: -1 });
+                                  .sort({ createdAt: -1 })
+                                  .lean(); // Use lean if not modifying
         res.render('admin/manage-users', {
             title: 'Manage Registered Users',
-            users: users
+            users: users // Pass users with raw createdAt date
         });
     } catch (error) {
         next(error);
     }
 };
 
-// --- REMOVED getManageAssignedOrdersPage ---
-// --- REMOVED getAssignedOrdersDetailForAdmin ---
-
-
 // =======================
 // Product Actions
 // =======================
-// uploadProduct, updateProduct, removeProduct remain the same
-
 exports.uploadProduct = async (req, res, next) => {
     const { name, category, price, stock, imageUrl, specifications } = req.body;
-    // Assuming sellerEmail comes from the logged-in admin session
     const sellerEmail = req.session.user.email;
 
-    // Basic Validation
     if (!name || !category || !price || !stock || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
         return res.redirect('/admin/upload-product');
     }
-     // Number validation
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be non-negative numbers.');
         return res.redirect('/admin/upload-product');
@@ -207,22 +195,20 @@ exports.uploadProduct = async (req, res, next) => {
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerEmail // Assign seller email
+            sellerEmail
         });
 
         await newProduct.save();
         req.flash('success_msg', `Product "${newProduct.name}" uploaded successfully.`);
-        res.redirect('/admin/manage-products'); // Redirect to manage products page
+        res.redirect('/admin/manage-products');
 
     } catch (error) {
-        // Handle validation errors from Mongoose Schema
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', errors.join(' '));
            return res.redirect('/admin/upload-product');
        }
-        // Handle other errors (e.g., database connection issues)
-        next(error); // Pass to the global error handler
+        next(error);
     }
 };
 
@@ -230,13 +216,10 @@ exports.uploadProduct = async (req, res, next) => {
     const productId = req.params.id;
     const { name, category, price, stock, imageUrl, specifications } = req.body;
 
-    // Basic Validation
      if (!name || !category || !price || !stock || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        // Redirect back to the edit page for this specific product
         return res.redirect(`/admin/manage-products/edit/${productId}`);
     }
-    // Number validation
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
          req.flash('error_msg', 'Price and Stock must be non-negative numbers.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
@@ -246,63 +229,49 @@ exports.uploadProduct = async (req, res, next) => {
         const product = await Product.findById(productId);
         if (!product) {
             req.flash('error_msg', 'Product not found.');
-            // Use 404 status for resource not found
             return res.status(404).redirect('/admin/manage-products');
          }
 
-         // Update product fields
          product.name = name.trim();
          product.category = category.trim();
          product.price = Number(price);
-        product.stock = Number(stock);
+         product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
          product.specifications = specifications ? specifications.trim() : '';
-         // sellerEmail typically doesn't change on update, but could be added if needed
 
-         await product.save(); // Trigger validation and save
+         await product.save();
          req.flash('success_msg', `Product "${product.name}" updated successfully.`);
-         res.redirect('/admin/manage-products'); // Redirect to manage products page
+         res.redirect('/admin/manage-products');
 
     } catch (error) {
-         // Handle Mongoose validation errors
          if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', errors.join(' '));
              return res.redirect(`/admin/manage-products/edit/${productId}`);
          }
-         // Handle invalid ID format errors (CastError)
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid product ID format.');
-             // Redirect to manage products as the ID is likely wrong
              return res.redirect('/admin/manage-products');
          }
-        // Pass other errors to the global error handler
         next(error);
      }
  };
 
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
-
     try {
-         // Use findByIdAndDelete for atomicity
          const product = await Product.findByIdAndDelete(productId);
         if (!product) {
-             // Product already deleted or never existed
              req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
          }
-         // Success message using the deleted product's name
          req.flash('success_msg', `Product "${product.name}" removed successfully.`);
          res.redirect('/admin/manage-products');
-
     } catch (error) {
-        // Handle invalid ID format errors (CastError)
         if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid product ID format.');
              return res.redirect('/admin/manage-products');
          }
-        // Pass other errors to the global error handler
         next(error);
     }
 };
@@ -311,7 +280,6 @@ exports.removeProduct = async (req, res, next) => {
 // Order Actions
 // =======================
 
-// Direct Delivery OTP/Confirmation remain
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -328,14 +296,12 @@ exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
     const { otp } = req.body;
     const adminUserId = req.session.user._id;
 
-    // Basic OTP validation
     if (!otp || !/^\d{6}$/.test(otp)) {
         req.flash('error_msg', 'Please enter the 6-digit OTP received by the customer.');
         return res.redirect('/admin/manage-orders');
     }
 
     try {
-        // Delegate OTP verification and order update logic
         const { order } = await confirmDirectDeliveryByAdmin(orderId, adminUserId, otp);
         req.flash('success_msg', `Order ${orderId} confirmed delivered successfully (Directly by Admin).`);
     } catch (error) {
@@ -344,70 +310,56 @@ exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
     res.redirect('/admin/manage-orders');
 };
 
-// --- REMOVED assignOrder ---
-// --- REMOVED bulkAssignOrders ---
-// --- REMOVED unassignOrderFromAdmin ---
-
 // --- UPDATED cancelOrderByAdmin ---
 exports.cancelOrderByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
-    const adminUserId = req.session.user._id; // For logging
+    const adminUserId = req.session.user._id;
 
-    // Validate reason
     if (!reason || !cancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid reason for cancellation.');
         return res.redirect('/admin/manage-orders');
     }
 
     try {
-        const order = await Order.findById(orderId).populate('products.productId', 'name'); // Populate name for logging stock restore
+        const order = await Order.findById(orderId).populate('products.productId', 'name _id'); // Need _id for stock restore
         if (!order) {
             req.flash('error_msg', 'Order not found.');
             return res.status(404).redirect('/admin/manage-orders');
         }
-        // Check if cancellable by admin - ONLY 'Pending' now
         if (order.status !== 'Pending') {
             req.flash('error_msg', `Order cannot be cancelled by admin in its current status ('${order.status}'). Must be 'Pending'.`);
             return res.redirect('/admin/manage-orders');
         }
 
-        // --- Stock Restoration Logic ---
-        console.log(`Admin Cancellation: Attempting to restore stock for cancelled order ${orderId} (Status: Pending).`);
+        // Stock Restoration Logic
+        console.log(`Admin Cancellation: Attempting to restore stock for cancelled order ${orderId}.`);
         const productStockRestorePromises = order.products.map(item => {
-              // Validate quantity before restoring
               const quantityToRestore = Number(item.quantity);
              if (isNaN(quantityToRestore) || quantityToRestore <= 0) {
                 console.error(`Admin Cancel: Invalid quantity ${item.quantity} for product ${item.productId?._id || 'Unknown ID'} in order ${orderId}, skipping stock restore.`);
-                return Promise.resolve(); // Skip this item
+                return Promise.resolve();
             }
-            // Check if productId exists (it should, but check defensively)
-            if (!item.productId) {
-                console.error(`Admin Cancel: Missing productId for an item in order ${orderId}, skipping stock restore for this item.`);
-                return Promise.resolve(); // Skip this item
+            if (!item.productId?._id) { // Check populated ID
+                console.error(`Admin Cancel: Missing or invalid productId for an item in order ${orderId}, skipping stock restore.`);
+                return Promise.resolve();
             }
-             // Update stock and decrement orderCount using $inc
              return Product.updateOne(
-                { _id: item.productId._id }, // Use populated ID
+                { _id: item.productId._id },
                 { $inc: { stock: quantityToRestore, orderCount: -1 } }
             ).catch(err => {
-               // Log error but continue with cancellation (best effort stock restore)
                console.error(`Admin Cancel: Failed restore stock/orderCount for product ${item.productId._id} (${item.productId.name}) on order ${orderId}: ${err.message}`);
             });
         });
-        // Wait for all stock updates to attempt completion
         await Promise.all(productStockRestorePromises);
-        console.log(`Admin Cancel: Stock restoration attempted for order ${orderId}. Check logs for details.`);
-        // --- End Stock Restoration ---
+        console.log(`Admin Cancel: Stock restoration attempted for order ${orderId}.`);
 
         // Update order status and reason
         order.status = 'Cancelled';
         order.cancellationReason = reason;
-        // Note: The pre-save hook in Order.js should clear OTPs etc. based on 'Cancelled' status
         await order.save();
 
-        // --- Notifications (Best Effort) ---
-        // Notify Customer
+        // Notifications (Best Effort) - Customer
         try {
             const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
             const htmlCust = `<p>Your order (${order._id}) has been cancelled by administration.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>Please contact support if you have questions regarding this cancellation.</p>`;
@@ -415,7 +367,6 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         } catch (emailError) {
             console.error(`Failed sending cancellation email to customer for order ${order._id}:`, emailError);
         }
-        // Remove notification to delivery admin as assignment is removed
 
         req.flash('success_msg', `Order ${orderId} cancelled successfully with reason: ${reason}.`);
         res.redirect('/admin/manage-orders');
@@ -424,11 +375,9 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid Order ID format.');
         } else {
-            // Log unexpected errors
             console.error(`Error cancelling order ${orderId} by admin ${adminUserId}:`, error);
             req.flash('error_msg', 'Failed to cancel the order due to an internal error.');
         }
-        // Redirect back even on error
         res.redirect('/admin/manage-orders');
     }
 };
@@ -437,12 +386,9 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 // =======================
 // User Management Actions
 // =======================
-// --- UPDATED updateUserRole ---
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;
-
-    // Validate role - REMOVED 'delivery_admin'
      const allowedRoles = ['user', 'admin'];
      if (!role || !allowedRoles.includes(role)) {
         req.flash('error_msg', 'Invalid role selected.');
@@ -450,56 +396,42 @@ exports.updateUserRole = async (req, res, next) => {
      }
 
     try {
-        // Prevent admin from changing their own role
         if (req.params.id === req.session.user._id.toString()) {
              req.flash('error_msg', 'You cannot change your own role.');
              return res.redirect('/admin/manage-users');
          }
-
         const user = await User.findById(userId);
          if (!user) {
             req.flash('error_msg', 'User not found.');
              return res.status(404).redirect('/admin/manage-users');
          }
-
-         // Update the role and save
          user.role = role;
         await user.save();
-
         req.flash('success_msg', `User ${user.email}'s role updated to ${role}.`);
         res.redirect('/admin/manage-users');
-
     } catch (error) {
-         // Handle CastError for invalid ID
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid user ID format.');
          } else {
-             // Log unexpected errors
              console.error(`Error updating role for user ${userId}:`, error);
             req.flash('error_msg', 'Error updating user role.');
          }
-         res.redirect('/admin/manage-users'); // Redirect back on error
+         res.redirect('/admin/manage-users');
     }
 };
-// --- END UPDATED updateUserRole ---
 
-// --- UPDATED removeUser ---
 exports.removeUser = async (req, res, next) => {
     const userId = req.params.id;
     try {
-        // Prevent admin from removing themselves
         if (req.params.id === req.session.user._id.toString()) {
             req.flash('error_msg', 'You cannot remove yourself.');
             return res.redirect('/admin/manage-users');
         }
-
          const user = await User.findById(userId);
          if (!user) {
             req.flash('error_msg', 'User not found.');
              return res.redirect('/admin/manage-users');
          }
-
-         // Prevent removing the last admin
          if (user.role === 'admin') {
              const adminCount = await User.countDocuments({ role: 'admin' });
              if (adminCount <= 1) {
@@ -507,31 +439,19 @@ exports.removeUser = async (req, res, next) => {
                 return res.redirect('/admin/manage-users');
              }
          }
-
-        // Remove the user
         await User.deleteOne({ _id: userId });
-        let message = `User ${user.email} removed successfully.`;
-
-        // REMOVED logic to unassign delivery admin orders
-
-        req.flash('success_msg', message);
+        req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
-
     } catch (error) {
-         // Handle CastError for invalid ID
          if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid user ID format.');
          } else {
-             // Log unexpected errors
              console.error(`Error removing user ${userId}:`, error);
             req.flash('error_msg', 'Error removing user.');
          }
-        res.redirect('/admin/manage-users'); // Redirect back on error
+        res.redirect('/admin/manage-users');
      }
  };
-// --- END UPDATED removeUser ---
-
-// --- REMOVED removeDeliveryAdminAssignment ---
 
 controllers/authController.js:
 const User = require('../models/User');
@@ -1105,30 +1025,25 @@ exports.placeOrder = async (req, res, next) => {
                 validationFailed = true;
                 break;
             }
-
-             if (!item.productId || typeof item.productId !== 'object') {
+            if (!item.productId || typeof item.productId !== 'object') {
                 console.warn(`User ${userId} cart contains invalid item reference: ${item._id}. Removing.`);
                 await User.updateOne({ _id: userId }, { $pull: { cart: { _id: item._id } } });
                 req.flash('error_msg', `An invalid item was detected and removed from your cart. Please review your cart and checkout again.`);
                 validationFailed = true;
                 break;
             }
-
             const currentProduct = await Product.findById(item.productId._id).select('stock name price imageUrl');
-
             if (!currentProduct) {
                 req.flash('error_msg', `Product "${item.productId.name || 'ID: '+item.productId._id}" is no longer available. Please remove it from your cart.`);
                 validationFailed = true;
                 await User.updateOne({ _id: userId }, { $pull: { cart: { productId: item.productId._id } } });
                 break;
             }
-
             if (currentProduct.stock < itemQuantity) {
                 req.flash('error_msg', `Insufficient stock for "${currentProduct.name}". Available: ${currentProduct.stock}. Your cart has ${itemQuantity}. Please update your cart.`);
                 validationFailed = true;
                 break;
             }
-
             orderProducts.push({
                 productId: currentProduct._id,
                 name: currentProduct.name,
@@ -1150,7 +1065,7 @@ exports.placeOrder = async (req, res, next) => {
             return res.redirect('/user/cart');
         }
 
-        // --- 2. Perform Operations (No Transaction Wrapper - CONSIDER adding transactions later) ---
+        // 2. Perform Operations
         try {
             for (const update of productUpdates) {
                 const updateResult = await Product.updateOne(
@@ -1164,7 +1079,6 @@ exports.placeOrder = async (req, res, next) => {
                       throw new Error(`A product (ID: ${update.productId}) was removed during checkout. Please review your cart.`);
                  }
             }
-
             const order = new Order({
                 userId: userId,
                 userEmail: user.email,
@@ -1172,20 +1086,22 @@ exports.placeOrder = async (req, res, next) => {
                 totalAmount: totalAmount,
                 shippingAddress: user.address,
                 paymentMethod: 'COD',
-                status: 'Pending', // Initial status is always Pending
+                status: 'Pending',
             });
-            await order.save();
+            await order.save(); // This will trigger the pre-save hook to set cancellationAllowedUntil
 
             user.cart = [];
             await user.save();
-
             req.session.user.cart = [];
             await req.session.save();
 
+            // Send Confirmation Email (Best Effort)
             try {
                 const subject = 'Your Order Has Been Placed!';
                 let productListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
-                const html = `<h2>Thank you for your order!</h2><p>Your Order ID: ${order._id}</p><p>Total Amount: ₹${order.totalAmount.toFixed(2)}</p><p>Shipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><h3>Items:</h3><ul>${productListHTML}</ul><p>You can track your order status in the 'My Orders' section.</p>`;
+                // Use formatDateIST for confirmation email as well
+                const formattedOrderDate = res.locals.formatDateIST(order.orderDate); // Access helper via res.locals
+                const html = `<h2>Thank you for your order!</h2><p>Your Order ID: ${order._id}</p><p>Order Placed: ${formattedOrderDate}</p><p>Total Amount: ₹${order.totalAmount.toFixed(2)}</p><p>Shipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><h3>Items:</h3><ul>${productListHTML}</ul><p>You can track your order status in the 'My Orders' section.</p>`;
                 await sendEmail(user.email, subject, `Your order ${order._id} has been placed. Total: ₹${totalAmount.toFixed(2)}`, html);
             } catch (emailError) {
                 console.error(`Failed to send order confirmation email for order ${order._id}:`, emailError);
@@ -1196,10 +1112,8 @@ exports.placeOrder = async (req, res, next) => {
 
         } catch (error) {
             console.error("Error during critical order processing block:", error);
-            // Consider rollback logic here if using transactions
-            console.error("Order placement failed AFTER potentially decrementing some stock. Manual stock check might be required.");
             req.flash('error_msg', `Order placement failed due to an unexpected issue: ${error.message}. Please check 'My Orders' or contact support.`);
-            res.redirect('/orders/my-orders'); // Redirect to orders even on failure
+            res.redirect('/orders/my-orders');
         }
 
     } catch (error) {
@@ -1209,7 +1123,7 @@ exports.placeOrder = async (req, res, next) => {
 };
 // --- END UPDATED placeOrder ---
 
-// --- cancelOrder (User) remains largely the same, as users only cancel 'Pending' ---
+// --- cancelOrder (User) ---
 exports.cancelOrder = async (req, res, next) => {
     try {
         const orderId = req.params.id;
@@ -1218,9 +1132,9 @@ exports.cancelOrder = async (req, res, next) => {
         const order = await Order.findOne({
              _id: orderId,
             userId: userId,
-            status: 'Pending', // User can only cancel pending
+            status: 'Pending',
              cancellationAllowedUntil: { $gt: Date.now() }
-        });
+        }).populate('products.productId', '_id'); // Need _id for stock restore
 
         if (!order) {
              req.flash('error_msg', 'Order not found, already processed, or cancellation period expired.');
@@ -1232,11 +1146,15 @@ exports.cancelOrder = async (req, res, next) => {
         const productStockRestorePromises = order.products.map(item => {
              const quantityToRestore = Number(item.quantity);
              if (isNaN(quantityToRestore) || quantityToRestore <= 0) return Promise.resolve();
+              if (!item.productId?._id) {
+                  console.error(`User Cancel: Missing or invalid productId for item in order ${orderId}`);
+                  return Promise.resolve();
+              }
              return Product.updateOne(
-                 { _id: item.productId },
+                 { _id: item.productId._id },
                  { $inc: { stock: quantityToRestore, orderCount: -1 } }
              ).catch(err => {
-                console.error(`User Cancel: Failed to restore stock/orderCount for product ${item.productId} on cancelling order ${orderId}: ${err.message}`);
+                console.error(`User Cancel: Failed to restore stock/orderCount for product ${item.productId._id} on cancelling order ${orderId}: ${err.message}`);
              });
         });
         await Promise.all(productStockRestorePromises);
@@ -1268,26 +1186,24 @@ exports.cancelOrder = async (req, res, next) => {
     }
 };
 
-
 // --- Get User's Orders ---
 exports.getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ userId: req.session.user._id })
                                    .select('+cancellationReason') // Keep reason
                                    .sort({ orderDate: -1 })
-                                   .lean();
+                                   .lean(); // Use lean
 
          const now = Date.now();
         orders.forEach(order => {
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
-            order.formattedOrderDate = new Date(order.orderDate).toLocaleString();
-            order.formattedReceivedDate = order.receivedByDate ? new Date(order.receivedByDate).toLocaleString() : 'N/A';
-            // Removed assignedAdminEmail display logic here, handle in EJS if needed elsewhere
+            // Removed manual date formatting (formattedOrderDate, formattedReceivedDate)
+            // We will use formatDateIST helper in the EJS template
          });
 
         res.render('user/my-orders', {
             title: 'My Orders',
-            orders: orders
+            orders: orders // Pass orders with raw dates
         });
     } catch (error) {
         console.error("Error fetching user orders:", error);
@@ -1296,81 +1212,70 @@ exports.getMyOrders = async (req, res, next) => {
 };
 
 // --- Admin Direct Delivery OTP ---
-// (Logic remains mostly the same, just needs to be called correctly by admin controller)
 exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
      try {
          const order = await Order.findById(orderId);
          if (!order) throw new Error('Order not found.');
-         // Admin can only trigger this if the order is Pending
          if (order.status !== 'Pending') throw new Error(`Cannot confirm direct delivery for order with status '${order.status}'. Must be 'Pending'.`);
 
         const otp = generateOTP();
-         const otpExpires = setOTPExpiration(5); // Short expiry for immediate use
+         const otpExpires = setOTPExpiration(5); // 5 mins
          order.orderOTP = otp;
          order.orderOTPExpires = otpExpires;
          await order.save();
 
-         // Email to CUSTOMER for ADMIN direct delivery confirmation
+         const user = await User.findById(order.userId).select('email');
+         if (!user) {
+             order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
+             throw new Error('Customer user account not found for sending OTP.');
+         }
+
+         // Email to CUSTOMER
          const subject = 'Confirming Delivery - Action Required';
          const text = `An administrator is ready to complete the delivery for your order (${order._id}).\nPlease provide them with the following OTP to confirm you have received your items: ${otp}\nIt will expire in 5 minutes.\nDo not share if you haven't received your items.`;
          const html = `<p>An administrator is ready to complete the delivery for your order (${order._id}).</p><p>Please provide the administrator with the following OTP to confirm you have received your items: <strong>${otp}</strong></p><p>The OTP will expire in 5 minutes.</p><p><strong>Only share this OTP once you have received your items from the administrator.</strong></p>`;
 
-        // Ensure user exists before sending email
-        const user = await User.findById(order.userId).select('email');
-        if (!user) {
-             order.orderOTP = undefined;
-             order.orderOTPExpires = undefined;
-             await order.save();
-             throw new Error('Customer user account not found for sending OTP.');
-         }
-
         const emailSent = await sendEmail(user.email, subject, text, html);
         if (!emailSent) {
-            order.orderOTP = undefined;
-            order.orderOTPExpires = undefined;
-            await order.save(); // Rollback OTP
+            order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
             throw new Error('Failed to send direct delivery confirmation OTP email to the customer.');
          }
         return { success: true, message: `Direct delivery confirmation OTP sent to customer ${user.email}.` };
     } catch (error) {
          console.error(`Error sending ADMIN Direct Delivery OTP for order ${orderId}:`, error);
-         throw error; // Re-throw
+         throw error;
      }
  };
 
-// --- UPDATED: Verify OTP and Confirm Delivery Directly By Admin ---
+// --- Verify OTP and Confirm Delivery Directly By Admin ---
 exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp) => {
      try {
          const order = await Order.findOne({
             _id: orderId,
-            status: 'Pending', // MUST be Pending for this flow
+            status: 'Pending',
              orderOTP: providedOtp,
              orderOTPExpires: { $gt: Date.now() }
          });
 
          if (!order) {
-            // Check specific reason for failure
             const checkOrder = await Order.findById(orderId);
             if (!checkOrder) throw new Error('Order not found.');
             if (checkOrder.status !== 'Pending') throw new Error(`Order status is '${checkOrder.status}', cannot confirm direct delivery from this state.`);
-             // If we reach here, OTP is likely wrong/expired
-             throw new Error('Invalid or expired OTP.');
+            throw new Error('Invalid or expired OTP.');
         }
 
-        // --- OTP Valid: Update Order ---
+        // OTP Valid: Update Order
         order.status = 'Delivered';
         order.receivedByDate = new Date();
-        // Remove assignment fields
-        // order.assignedTo = adminUserId; // NO LONGER NEEDED
-        // order.assignedAdminEmail = `AdminDirect: ${adminUserId}`; // NO LONGER NEEDED
-
-        // The pre-save hook will clear the OTP fields upon save
+        // OTP fields cleared by pre-save hook
         await order.save();
 
-        // --- Send Delivery Confirmation Email ---
+        // Send Delivery Confirmation Email (Best Effort)
         try {
              const subject = `Your Order Has Been Delivered!`;
-             const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by administration.</p><p>Received Date: ${order.receivedByDate.toLocaleString()}</p><p>Thank you for shopping with us!</p>`;
+             // Use formatDateIST in email as well
+             const formattedDeliveryDate = res.locals.formatDateIST(order.receivedByDate); // Assuming res is accessible or pass helper
+             const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by administration.</p><p>Received Date: ${formattedDeliveryDate}</p><p>Thank you for shopping with us!</p>`;
             await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
          } catch (emailError){
              console.error(`Failed sending direct delivery confirmation email for order ${order._id}:`, emailError);
@@ -1378,13 +1283,9 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp)
         return { success: true, order: order };
      } catch (error) {
          console.error(`Error verifying ADMIN Direct Delivery OTP for order ${orderId}:`, error);
-        throw error; // Re-throw
+        throw error;
     }
 };
-// --- END UPDATED confirmDirectDeliveryByAdmin ---
-
-// --- REMOVED generateAndSendDeliveryOTP (Delivery Partner) ---
-// --- REMOVED verifyDeliveryOTP (Delivery Partner) ---
 
 controllers/productController.js:
 // controllers/productController.js
@@ -4294,61 +4195,63 @@ views/admin/assigned-orders-detail.ejs:
     <p><a href="/admin/manage-assigned-orders">« Back to Delivery Admin Overview</a></p>
 
     <% if (orders.length > 0) { %>
-        <table class="data-table">
-            <thead>
-                 <tr>
-                    <th>Image</th>
-                    <th>Order ID</th>
-                    <th>Placed Date</th>
-                     <th>Customer Email</th>
-                     <th>Address</th>
-                     <th>Items</th>
-                    <th>Total</th>
-                     <th>Status</th>
-                     <th>Delivered Date</th>
-                 </tr>
-             </thead>
-            <tbody>
-                <% orders.forEach(order => { %>
+        <div class="table-container card"> <%# Added wrapper %>
+            <table class="data-table">
+                <thead>
                     <tr>
-                        <td>
-                            <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
-                                <a href="/products/<%= order.products[0].productId %>">
-                                    <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
-                                </a>
-                            <% } else { %>
-                                <span class="text-muted">N/A</span>
-                            <% } %>
-                        </td>
-                         <td><%= order._id %></td>
-                         <td><%= order.formattedOrderDate %></td>
-                        <td><%= order.userEmail %></td>
-                        <td>
-                             <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
-                             <br>Ph: <%= order.shippingAddress.phone %>
-                         </td>
-                         <td>
-                            <% if (order.products && order.products.length > 0) { %>
-                                <%= order.products[0].name %> (x<%= order.products[0].quantity %>)
-                                <% if (order.products.length > 1) { %>
-                                    <br><small>+ <%= order.products.length - 1 %> more item(s)</small>
-                                <% } %>
-                            <% } else { %>
-                                No items found
-                            <% } %>
-                         </td>
-                         <%# --- CURRENCY UPDATE --- %>
-                         <td>₹<%= order.totalAmount.toFixed(2) %></td>
-                         <%# --- END CURRENCY UPDATE --- %>
-                         <td><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
-                         <td><%= order.formattedReceivedDate %></td>
+                        <th>Image</th>
+                        <th>Order ID</th>
+                        <th>Placed Date</th>
+                        <th>Customer Email</th>
+                        <th>Address</th>
+                        <th>Items</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Delivered Date</th>
                     </tr>
-                <% }) %>
-             </tbody>
-        </table>
-     <% } else { %>
-         <p>No orders found matching this criteria for <%= deliveryAdminEmail %>.</p>
-     <% } %>
+                </thead>
+                <tbody>
+                    <% orders.forEach(order => { %>
+                        <tr>
+                            <td data-label="Image"> <%# Added data-label %>
+                                <% if (order.products && order.products.length > 0 && order.products[0].imageUrl) { %>
+                                    <a href="/products/<%= order.products[0].productId %>">
+                                        <img src="<%= order.products[0].imageUrl %>" alt="<%= order.products[0].name %>" class="table-img">
+                                    </a>
+                                <% } else { %>
+                                    <span class="text-muted">N/A</span>
+                                <% } %>
+                            </td>
+                            <td data-label="Order ID"><%= order._id %></td>
+                            <%# Use formatDateIST helper %>
+                            <td data-label="Placed Date"><%= formatDateIST(order.orderDate) %></td>
+                            <td data-label="Customer Email"><%= order.userEmail %></td>
+                            <td data-label="Address">
+                                <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
+                                <br>Ph: <%= order.shippingAddress.phone %>
+                            </td>
+                            <td data-label="Items">
+                                <% if (order.products && order.products.length > 0) { %>
+                                    <%= order.products[0].name %> (x<%= order.products[0].quantity %>)
+                                    <% if (order.products.length > 1) { %>
+                                        <br><small>+ <%= order.products.length - 1 %> more item(s)</small>
+                                    <% } %>
+                                <% } else { %>
+                                    No items found
+                                <% } %>
+                            </td>
+                            <td data-label="Total">₹<%= order.totalAmount.toFixed(2) %></td>
+                            <td data-label="Status"><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></td>
+                             <%# Use formatDateIST helper %>
+                            <td data-label="Delivered Date"><%= formatDateIST(order.receivedByDate) %></td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <p>No orders found matching this criteria for <%= deliveryAdminEmail %>.</p>
+    <% } %>
 </div>
 
 <%- include('../partials/footer') %>
@@ -4473,14 +4376,11 @@ views/admin/manage-orders.ejs:
 <div class="admin-manage-container">
     <h1>Manage Orders</h1>
 
-    <%# --- REMOVED Bulk Assign Form --- %>
-
     <% if (orders.length > 0) { %>
         <div class="table-container card">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <%# --- REMOVED Checkbox Header --- %>
                         <th>Images</th>
                         <th>Order ID</th>
                         <th>Date</th>
@@ -4488,14 +4388,13 @@ views/admin/manage-orders.ejs:
                         <th>Address & Phone</th>
                         <th>Items & Prices</th>
                         <th>Total</th>
-                        <th>Status</th> <%# Simplified Header %>
+                        <th>Status</th>
                         <th class="actions-cell" style="text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
                         <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
-                            <%# --- REMOVED Checkbox Cell --- %>
                             <td data-label="Images">
                                 <% if (order.products && order.products.length > 0) { %>
                                     <% order.products.slice(0, 3).forEach(item => { %>
@@ -4509,7 +4408,8 @@ views/admin/manage-orders.ejs:
                                 <% } else { %><span class="text-muted">N/A</span><% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <td data-label="Date"><%= order.formattedOrderDate %></td>
+                            <%# Use formatDateIST helper %>
+                            <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
                             <td data-label="Customer"><%= order.userEmail %></td>
                             <td data-label="Address & Phone">
                                 <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
@@ -4528,11 +4428,11 @@ views/admin/manage-orders.ejs:
                                 <% } else { %>No items found<% } %>
                             </td>
                             <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
-                            <td data-label="Status"> <%# Simplified Cell %>
+                            <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <%# Removed assignedAdminEmail display %>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.formattedReceivedDate) { %><br><small class="text-success">Delivered: <%= order.formattedReceivedDate %></small><% } %>
+                                <%# Use formatDateIST helper for delivery date %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
                             <td data-label="Actions" class="actions-cell">
 
@@ -4553,9 +4453,6 @@ views/admin/manage-orders.ejs:
                                         </form>
                                     </div>
                                 <% } %>
-
-                                <%# --- REMOVED Assign Order Action Group --- %>
-                                <%# --- REMOVED Unassign Order Action Group --- %>
 
                                 <%# Cancel Order (Admin: Pending only now) %>
                                 <% if (order.canBeCancelledByAdmin) { %>
@@ -4649,50 +4546,52 @@ views/admin/manage-users.ejs:
     <h1>Manage Users</h1>
 
     <% if (users.length > 0) { %>
-         <table class="data-table">
-             <thead>
-                <tr>
-                     <th>Name</th>
-                    <th>Email / Phone</th>
-                     <th>Role</th>
-                     <th>Registered On</th>
-                     <th>Verified</th>
-                    <th>Actions</th>
-                 </tr>
-             </thead>
-            <tbody>
-                <% users.forEach(user => { %>
+        <div class="table-container card"> <%# Added table wrapper %>
+            <table class="data-table">
+                <thead>
                     <tr>
-                         <td data-label="Name"><%= user.name %></td>
-                         <td data-label="Email / Phone">
-                            <%= user.email %>
-                            <% if (user.address && user.address.phone) { %>
-                                <br><small>(<%= user.address.phone %>)</small>
-                            <% } %>
-                         </td>
-                         <td data-label="Role">
-                             <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form">
-                                  <select name="role" onchange="this.form.submit()">
-                                      <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
-                                     <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
-                                     <%# --- REMOVED 'delivery_admin' option --- %>
-                                  </select>
-                                  <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
-                             </form>
-                         </td>
-                         <td data-label="Registered On"><%= new Date(user.createdAt).toLocaleDateString() %></td>
-                         <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
-                         <td data-label="Actions" class="actions-cell">
-                             <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');">
-                                <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
-                            </form>
-                         </td>
+                        <th>Name</th>
+                        <th>Email / Phone</th>
+                        <th>Role</th>
+                        <th>Registered On</th>
+                        <th>Verified</th>
+                        <th class="actions-cell" style="text-align: right;">Actions</th>
                     </tr>
-                 <% }) %>
-            </tbody>
-        </table>
-     <% } else { %>
-         <p>No other users registered.</p>
+                </thead>
+                <tbody>
+                    <% users.forEach(user => { %>
+                        <tr>
+                            <td data-label="Name"><%= user.name %></td>
+                            <td data-label="Email / Phone">
+                                <%= user.email %>
+                                <% if (user.address && user.address.phone) { %>
+                                    <br><small>(<%= user.address.phone %>)</small>
+                                <% } %>
+                            </td>
+                            <td data-label="Role">
+                                <form action="/admin/users/<%= user._id %>/update-role" method="POST" class="inline-form form-submit-spinner"> <%# Added spinner class %>
+                                    <select name="role" onchange="this.form.submit()">
+                                        <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                                        <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                                    </select>
+                                    <noscript><button type="submit" class="btn btn-sm btn-primary">Update Role</button></noscript>
+                                </form>
+                            </td>
+                            <%# Use formatDateIST helper %>
+                            <td data-label="Registered On"><%= formatDateIST(user.createdAt) %></td>
+                            <td data-label="Verified"><%= user.isVerified ? 'Yes' : 'No' %></td>
+                            <td data-label="Actions" class="actions-cell">
+                                <form action="/admin/users/<%= user._id %>/remove" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to remove user <%= user.email %>? This is irreversible.');"> <%# Added spinner class %>
+                                    <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-user-times"></i> Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <p class="text-muted mt-3">No other users registered.</p> <%# Added mt-3 for spacing %>
     <% } %>
 </div>
 
@@ -5375,27 +5274,29 @@ views/user/my-orders.ejs:
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
-                <%# Simplified status class, removed assignment check %>
                 <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
                      <div class="order-header">
                          <div><strong>Order ID:</strong> <%= order._id %></div>
-                        <div><strong>Placed on:</strong> <%= order.formattedOrderDate %></div>
+                         <%# Use formatDateIST helper %>
+                        <div><strong>Placed on:</strong> <%= formatDateIST(order.orderDate) %></div>
                          <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
                          <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
                          <div class="order-items-preview">
                              <% order.products.slice(0, 3).forEach(item => { %>
-                                <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
-                                    <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
-                                </a>
+                                <% if (item.productId && item.imageUrl) { %>
+                                    <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
+                                        <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
+                                    </a>
+                                <% } %>
                              <% }) %>
                              <% if(order.products.length > 3) { %><span class="more-items">+ <%= order.products.length - 3 %> more</span><% } %>
                         </div>
                         <div class="order-details">
                              <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <p><strong>Delivered On:</strong> <%= order.formattedReceivedDate %></p>
-                              <%# --- REMOVED Assigned Admin display --- %>
+                             <%# Use formatDateIST helper %>
+                             <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
@@ -5573,6 +5474,7 @@ app.use(
 
 app.use(flash());
 
+// Middleware to set local variables for views
 app.use((req, res, next) => {
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
@@ -5586,33 +5488,57 @@ app.use((req, res, next) => {
   let userInitials = '??'; // Default fallback
   if (req.session.user && req.session.user.email) {
     try {
-      // Try splitting by space first (for names), then fallback to email
       const nameParts = req.session.user.name?.split(' ');
       if (nameParts && nameParts.length > 1) {
           userInitials = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
       } else if (nameParts && nameParts.length === 1 && nameParts[0].length >= 2) {
           userInitials = nameParts[0].substring(0, 2).toUpperCase();
-      }
-       else {
-        // Fallback to email if name didn't work well
+      } else {
         const emailPrefix = req.session.user.email.split('@')[0];
         if (emailPrefix.length >= 2) {
             userInitials = emailPrefix.substring(0, 2).toUpperCase();
         } else if (emailPrefix.length === 1) {
-            userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase(); // Double the single letter
+            userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase();
         }
       }
     } catch (e) {
       console.error("Error generating initials:", e);
-      // Keep default '??'
     }
   }
   res.locals.userInitials = userInitials;
-  // --- END: Calculate User Initials ---
+
+  // --- NEW: Date Formatting Helper for IST ---
+  res.locals.formatDateIST = (dateInput) => {
+      if (!dateInput) return 'N/A';
+      try {
+          const date = new Date(dateInput);
+          // Check if the date is valid
+          if (isNaN(date.getTime())) {
+              console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
+              return 'Invalid Date';
+          }
+
+          const options = {
+              timeZone: 'Asia/Kolkata', // Target timezone IST
+              year: 'numeric',
+              month: 'short', // e.g., 'Jan', 'Feb'
+              day: 'numeric',
+              hour: 'numeric', // e.g., '1', '2'... '12'
+              minute: '2-digit', // e.g., '05', '15'
+              second: '2-digit', // e.g., '08', '59'
+              hour12: true // Use AM/PM
+          };
+          // Use 'en-IN' locale for formatting conventions common in India (though options override most)
+          return date.toLocaleString('en-IN', options);
+      } catch (error) {
+          console.error("Error formatting date to IST:", error, "Input:", dateInput);
+          return 'Date Error'; // Fallback error message
+      }
+  };
+  // --- END: Date Formatting Helper ---
 
   next();
 });
-
 
 app.use('/', mainRouter);
 
