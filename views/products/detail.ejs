@@ -1,24 +1,21 @@
 <%# views/products/detail.ejs %>
 
-<%# Prepare meta description (keep it concise) %>
-<% let metaDesc = `Check out ${product.name} (${product.category}) on miniapp. Price: ₹${product.price.toFixed(2)}.`; %>
-<% if (product.specifications && product.specifications.length > 0) {
-    const shortSpec = product.specifications.substring(0, 100); // Take first 100 chars
-    metaDesc += ` ${shortSpec}${product.specifications.length > 100 ? '...' : ''}`;
-   }
-   // Ensure total length is reasonable (e.g., ~160 chars)
-   if (metaDesc.length > 160) {
-       metaDesc = metaDesc.substring(0, 157) + '...';
+<%# --- UPDATED: Prepare meta description (exclude category/specs) --- %>
+<% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
+<%# Ensure total length is reasonable (e.g., ~160 chars) %>
+<% if (metaDesc.length > 160) {
+     metaDesc = metaDesc.substring(0, 157) + '...';
    }
 %>
+<%# --- END UPDATED --- %>
 
 <%- include('../partials/header', {
     title: product.name,
     metaTitle: product.name + ' - miniapp', /* Add site name to title */
-    metaDescription: metaDesc,
-    metaImageUrl: product.imageUrl, /* ASSUMES absolute URL */
-    metaUrl: fullUrl, /* Already available via res.locals */
-    metaType: 'product' /* Use 'product' type for product pages */
+    metaDescription: metaDesc,           /* Use the new, simpler description */
+    metaImageUrl: product.imageUrl,      /* ASSUMES absolute URL */
+    metaUrl: fullUrl,                    /* Already available via res.locals */
+    metaType: 'product'                  /* Use 'product' type for product pages */
 }) %>
 
 <div class="product-detail-container">
@@ -86,6 +83,7 @@
            </div>
            <!-- End Share Functionality -->
 
+           <%# Specifications are still displayed on the page itself %>
            <div class="product-specifications">
                 <h3>Specifications</h3>
                 <pre><%= product.specifications || 'No specifications provided.' %></pre>
