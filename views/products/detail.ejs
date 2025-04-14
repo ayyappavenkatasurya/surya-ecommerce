@@ -1,4 +1,25 @@
-<%- include('../partials/header', { title: product.name }) %>
+<%# views/products/detail.ejs %>
+
+<%# Prepare meta description (keep it concise) %>
+<% let metaDesc = `Check out ${product.name} (${product.category}) on miniapp. Price: ₹${product.price.toFixed(2)}.`; %>
+<% if (product.specifications && product.specifications.length > 0) {
+    const shortSpec = product.specifications.substring(0, 100); // Take first 100 chars
+    metaDesc += ` ${shortSpec}${product.specifications.length > 100 ? '...' : ''}`;
+   }
+   // Ensure total length is reasonable (e.g., ~160 chars)
+   if (metaDesc.length > 160) {
+       metaDesc = metaDesc.substring(0, 157) + '...';
+   }
+%>
+
+<%- include('../partials/header', {
+    title: product.name,
+    metaTitle: product.name + ' - miniapp', /* Add site name to title */
+    metaDescription: metaDesc,
+    metaImageUrl: product.imageUrl, /* ASSUMES absolute URL */
+    metaUrl: fullUrl, /* Already available via res.locals */
+    metaType: 'product' /* Use 'product' type for product pages */
+}) %>
 
 <div class="product-detail-container">
    <div class="product-detail-main">
@@ -76,14 +97,12 @@
         <h3>Rate This Product</h3>
         <% if (userCanRate) { %>
             <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
-                <!-- RATING STARS SECTION (Loop 5 down to 1) -->
                 <div class="rating-stars">
                     <% for (let i = 5; i >= 1; i--) { %>
                        <input type="radio" id="star<%= i %>" name="rating" value="<%= i %>" <%= userRating === i ? 'checked' : '' %> required>
                        <label for="star<%= i %>" title="<%= i %> stars"><i class="fas fa-star"></i></label>
                     <% } %>
                 </div>
-                <!-- END RATING STARS SECTION -->
                 <button type="submit" class="btn btn-primary">Submit Rating</button>
             </form>
         <% } else { %>
@@ -91,7 +110,6 @@
         <% } %>
    </div>
 
-    <!-- Rating Statistics Section -->
     <div class="rating-stats-container">
         <h3>Ratings & Reviews</h3>
          <% if (totalRatings > 0) { %>
@@ -113,7 +131,6 @@
                      <div class="rating-bar-row">
                          <span class="rating-bar-label"><%= i %> <i class="fas fa-star"></i></span>
                          <div class="rating-bar-progress">
-                             <!-- Instead of inline CSS, we set the computed percentage as a data attribute -->
                              <div class="rating-bar-fill" data-width="<%= percentage.toFixed(1) %>"></div>
                          </div>
                          <span class="rating-bar-count"><%= count %></span>
@@ -124,11 +141,9 @@
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
-    <!-- End Rating Statistics Section -->
 
 </div>
 
-<!-- Script to set dynamic widths for rating bars -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
