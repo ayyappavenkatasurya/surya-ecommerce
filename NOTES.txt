@@ -13,7 +13,6 @@ const connectDB = async () => {
 
 module.exports = connectDB;
 
-
 config/mailer.js:
 const nodemailer = require('nodemailer');
 
@@ -53,7 +52,6 @@ const sendEmail = async (to, subject, text, html) => {
 };
 
 module.exports = { sendEmail };
-
 
 controllers/adminController.js:
 // controllers/adminController.js
@@ -515,7 +513,6 @@ exports.removeUser = async (req, res, next) => {
          }
      }
  };
-
 controllers/authController.js:
 // controllers/authController.js
 const User = require('../models/User');
@@ -1145,7 +1142,6 @@ exports.getHomePage = async (req, res, next) => {
     next(error); // Pass errors to the global error handler
   }
 };
-
 controllers/orderController.js:
 // controllers/orderController.js
 const Order = require('../models/Order');
@@ -1503,7 +1499,6 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
         throw error;
     }
 };
-
 controllers/productController.js:
 // controllers/productController.js
 const Product = require('../models/Product');
@@ -1629,7 +1624,6 @@ exports.getProductDetails = async (req, res, next) => {
         next(error);
      }
  };
-
 controllers/userController.js:
 // controllers/userController.js
 const User = require('../models/User');
@@ -1992,7 +1986,6 @@ exports.getCheckoutPage = async (req, res, next) => {
         next(error);
     }
 };
-
 middleware/authMiddleware.js:
 const User = require('../models/User');
 
@@ -2026,7 +2019,6 @@ const isAuthenticated = (req, res, next) => {
 };
 
 module.exports = { isAuthenticated };
-
 
 middleware/errorMiddleware.js:
 const notFound = (req, res, next) => {
@@ -2073,7 +2065,6 @@ const errorHandler = (err, req, res, next) => {
 
 module.exports = { notFound, errorHandler };
 
-
 middleware/roleMiddleware.js:
 // middleware/roleMiddleware.js
 
@@ -2090,7 +2081,6 @@ const isAdmin = (req, res, next) => {
 // --- REMOVED isAdminOrDeliveryAdmin ---
 
 module.exports = { isAdmin }; // Only export isAdmin now
-
 models/Order.js:
 // models/Order.js
 const mongoose = require('mongoose');
@@ -2209,7 +2199,6 @@ OrderSchema.pre('save', function(next) {
 const Order = mongoose.model('Order', OrderSchema);
 
 module.exports = Order;
-
 models/Product.js:
 const mongoose = require('mongoose');
 
@@ -2289,7 +2278,6 @@ ProductSchema.pre('save', function(next) {
 const Product = mongoose.model('Product', ProductSchema);
 
 module.exports = Product;
-
 
 models/User.js:
 // models/User.js
@@ -2378,7 +2366,6 @@ UserSchema.methods.matchPassword = async function(enteredPassword) {
 const User = mongoose.model('User', UserSchema);
 
 module.exports = User;
-
 public/css/style.css:
 /* public/css/style.css */
 
@@ -2462,27 +2449,14 @@ ul, ol {
     padding-left: calc(var(--spacing-unit) * 1.5);
 }
 
-.hidden {
-  display: none !important;
-}
-.text-center {
-  text-align: center;
-}
-.text-danger {
-  color: var(--danger-color) !important;
-}
-.text-success {
-  color: var(--success-color) !important;
-}
-.text-warning {
-    color: var(--warning-color) !important;
-}
-.text-info {
-    color: var(--info-color) !important;
-}
-.text-muted {
-  color: var(--secondary-color) !important;
-}
+/* Utility Classes */
+.hidden { display: none !important; }
+.text-center { text-align: center; }
+.text-danger { color: var(--danger-color) !important; }
+.text-success { color: var(--success-color) !important; }
+.text-warning { color: var(--warning-color) !important; }
+.text-info { color: var(--info-color) !important; }
+.text-muted { color: var(--secondary-color) !important; }
 .mb-1 { margin-bottom: calc(var(--spacing-unit) * 0.25) !important; }
 .mb-2 { margin-bottom: calc(var(--spacing-unit) * 0.5) !important; }
 .mb-3 { margin-bottom: var(--spacing-unit) !important; }
@@ -2492,6 +2466,7 @@ ul, ol {
 .d-block { display: block !important; }
 .small { font-size: 0.875em; }
 
+/* Forms */
 .inline-form {
     display: block;
     margin-bottom: calc(var(--spacing-unit) * 0.5);
@@ -2499,7 +2474,6 @@ ul, ol {
 .inline-form > * {
     margin-bottom: calc(var(--spacing-unit) * 0.25);
 }
-
 
 .form-group {
   margin-bottom: calc(var(--spacing-unit) * 0.8);
@@ -2554,6 +2528,7 @@ select:focus {
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
+/* Buttons */
 .btn {
   display: inline-block;
   font-weight: 400;
@@ -2648,14 +2623,22 @@ select:focus {
     100% { transform: rotate(360deg); }
 }
 
+/* Alerts / Messages */
 .alert {
   padding: calc(var(--spacing-unit) * 0.8) var(--spacing-unit);
   margin-bottom: var(--spacing-unit);
   border: 1px solid transparent;
   border-radius: var(--border-radius);
   position: relative;
-  opacity: 0.95;
+  opacity: 0.95; /* Keep existing opacity slightly less than 1 if you like */
+  margin-left: var(--spacing-unit);
+  margin-right: var(--spacing-unit);
+  margin-top: var(--spacing-unit);
+  /* --- NEW: Add transition for smooth fade --- */
+  transition: opacity 0.5s ease-out;
+  /* --- END NEW --- */
 }
+
 .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
 .alert-danger { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
 .alert-warning { color: #856404; background-color: #fff3cd; border-color: #ffeeba; }
@@ -2676,7 +2659,7 @@ select:focus {
   opacity: 1;
 }
 
-
+/* Header & Navigation */
 .app-header {
   background-color: var( --primary-color);
   color: var(--light-color);
@@ -2732,7 +2715,7 @@ select:focus {
   text-decoration: none;
 }
 .nav-link span {
-  display: none;
+  display: none; /* Hide text labels on mobile */
 }
 .nav-link i {
     font-size: 1.1rem;
@@ -2794,7 +2777,7 @@ select:focus {
     line-height: 1;
 }
 
-
+/* Main Content & Footer */
 .container {
   width: 100%;
   padding: var(--spacing-unit);
@@ -2810,9 +2793,10 @@ select:focus {
   background-color: var(--light-color);
   border-top: 1px solid var(--border-color);
   margin-top: auto;
+  display: none; /* Hide footer on mobile by default */
 }
 
-
+/* Product Index Page */
 .product-index-container h1 {
     font-size: 1.5rem;
 }
@@ -2873,8 +2857,8 @@ select:focus {
 
 .product-image {
   width: 100%;
-  aspect-ratio: 1 / 1;
-  object-fit: cover;
+  aspect-ratio: 1 / 1; /* Ensures square aspect ratio */
+  object-fit: cover;   /* Covers the area, might crop */
 }
 
 .product-info {
@@ -2887,8 +2871,9 @@ select:focus {
   font-weight: 500;
   margin-bottom: calc(var(--spacing-unit) * 0.25);
   line-height: 1.3;
-  height: 2.6em;
+  height: 2.6em; /* Limit height to 2 lines */
   overflow: hidden;
+  text-overflow: ellipsis; /* Add ellipsis if text overflows */
 }
 
 .product-price {
@@ -2920,6 +2905,7 @@ select:focus {
     margin-right: calc(var(--spacing-unit) * 0.25);
 }
 
+/* Product Detail Page */
 .product-detail-container {
   background-color: var(--card-bg);
   padding: var(--spacing-unit);
@@ -2931,8 +2917,25 @@ select:focus {
     flex-direction: column;
     gap: var(--spacing-unit);
 }
-.product-detail-image img {
+.product-detail-image {
+    /* --- UPDATED for fixed aspect ratio --- */
+    width: 100%;                  /* Take full width on mobile */
+    max-width: 450px;             /* Limit size on mobile */
+    margin: 0 auto var(--spacing-unit) auto; /* Center on mobile, add bottom margin */
+    aspect-ratio: 1 / 1;          /* Force square shape */
+    overflow: hidden;             /* Hide parts of image outside the aspect ratio */
     border-radius: 10px;
+    background-color: #f8f9fa;    /* Light background for 'contain' or transparent images */
+    position: relative;
+}
+.product-detail-image img {
+    /* --- UPDATED for object-fit --- */
+    display: block;
+    width: 100%;                  /* Fill container width */
+    height: 100%;                 /* Fill container height */
+    object-fit: cover;            /* Cover container, crop if needed. Use 'contain' to fit all image inside. */
+    object-position: center center; /* Center the image content */
+    border-radius: inherit;       /* Inherit radius from container */
 }
 .product-detail-info h1 {
     font-size: 1.6rem;
@@ -2998,6 +3001,7 @@ select:focus {
     overflow-y: auto;
 }
 
+/* Product Rating Section */
 .product-rating-section {
     margin-top: var(--spacing-unit);
     border-top: 1px solid var(--border-color);
@@ -3038,490 +3042,7 @@ select:focus {
   color: #f8d347;
 }
 
-
-.auth-container {
-  max-width: 450px;
-  margin: var(--spacing-unit) auto;
-  padding: var(--spacing-unit);
-  background-color: var(--card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  box-shadow: var(--card-shadow);
-}
-.auth-container h1 {
-    font-size: 1.6rem;
-    text-align: center;
-    margin-bottom: var(--spacing-unit);
-}
-.auth-form .btn {
-    width: 100%;
-    margin-top: calc(var(--spacing-unit) * 0.5);
-    padding: calc(var(--spacing-unit) * 0.7);
-}
-.auth-links {
-    margin-top: var(--spacing-unit);
-    font-size: 0.9rem;
-    text-align: center;
-}
-.auth-links p {
-    margin-bottom: calc(var(--spacing-unit) * 0.4);
-}
-
-.auth-container p { text-align: center; margin-bottom: var(--spacing-unit);}
-.auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--spacing-unit); }
-#otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; }
-
-.cart-container h1 {
-    font-size: 1.5rem;
-    margin-bottom: var(--spacing-unit);
-}
-
-.cart-items {
-  margin-bottom: var(--spacing-unit);
-}
-
-.cart-item {
-  display: grid;
-  grid-template-columns: 80px 1fr auto;
-  grid-template-areas:
-    "image details remove"
-    "image quantity subtotal";
-  gap: calc(var(--spacing-unit) * 0.75);
-  background-color: var(--card-bg);
-  padding: calc(var(--spacing-unit) * 0.75);
-  border-bottom: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  margin-bottom: var(--spacing-unit);
-  box-shadow: var(--card-shadow);
-}
-
-.cart-item-image { grid-area: image; align-self: center;}
-.cart-item-image img {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: calc(var(--border-radius) * 0.5);
-}
-.cart-item-details { grid-area: details; }
-.cart-item-quantity {
-    grid-area: quantity;
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-.cart-item-subtotal {
-    grid-area: subtotal;
-    text-align: right;
-    font-weight: 500;
-    align-self: center;
-}
-.cart-item-remove { grid-area: remove; text-align: right; align-self: start;}
-
-.cart-item-name {
-    font-size: 1rem;
-    font-weight: 500;
-    margin-bottom: calc(var(--spacing-unit) * 0.2);
-}
-.cart-item-price {
-    font-size: 0.9rem;
-    color: var(--secondary-color);
-    margin-bottom: calc(var(--spacing-unit) * 0.2);
-}
-.cart-item-stock {
-    font-size: 0.8rem;
-    color: #6c757d;
-}
-
-.cart-item-quantity label {
-    font-size: 0.9rem;
-    margin-bottom: 0;
-    display: none;
-}
-.cart-item-quantity input {
-    width: 50px;
-    padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.4);
-    text-align: center;
-    font-size: 0.9rem;
-}
-.cart-item-quantity .btn-update-qty {
-    font-size: 0.8rem;
-    padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.6);
-}
-
-.cart-item-subtotal {
-    font-size: 0.9rem;
-    white-space: nowrap;
-}
-
-.cart-item-remove .btn {
-    padding: 0.1rem 0.4rem;
-    font-size: 0.8rem;
-    line-height: 1;
-}
-
-.cart-summary {
-  margin-top: calc(var(--spacing-unit) * 1.5);
-  padding: var(--spacing-unit);
-  background-color: #f8f9fa;
-  border-top: 2px solid var(--primary-color);
-  border-radius: var(--border-radius);
-  text-align: right;
-}
-
-.cart-summary h2 {
-  font-size: 1.3rem;
-  margin-bottom: calc(var(--spacing-unit) * 0.75);
-}
-.btn-checkout {
-    width: 100%;
-    padding: calc(var(--spacing-unit) * 0.7);
-    font-size: 1.1rem;
-}
-
-.checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit);}
-
-.checkout-grid {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-unit);
-}
-
-.checkout-address, .checkout-summary {
-    background-color: var(--card-bg);
-    padding: var(--spacing-unit);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    box-shadow: var(--card-shadow);
-}
-.checkout-address h2, .checkout-summary h2 {
-    font-size: 1.2rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: calc(var(--spacing-unit) * 0.4);
-    margin-bottom: var(--spacing-unit);
-}
-.saved-address { font-size: 0.95rem; margin-bottom: var(--spacing-unit); }
-.saved-address p { margin-bottom: calc(var(--spacing-unit) * 0.2); line-height: 1.4; }
-#edit-address-btn { margin-top: calc(var(--spacing-unit) * 0.5); }
-
-.address-form h3 { font-size: 1.1rem; }
-
-.checkout-items {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-bottom: var(--spacing-unit);
-    padding-right: calc(var(--spacing-unit) * 0.5);
-}
-.checkout-item {
-    display: flex;
-    align-items: center;
-    gap: calc(var(--spacing-unit) * 0.5);
-    margin-bottom: calc(var(--spacing-unit) * 0.5);
-    font-size: 0.9rem;
-}
-.checkout-item-image img {
-    width: 40px;
-    height: 40px;
-    object-fit: cover;
-    border-radius: 4px;
-}
-.checkout-item-info { flex-grow: 1; }
-.checkout-item-price { font-weight: 500; white-space: nowrap;}
-
-.checkout-totals { font-size: 0.95rem; }
-.checkout-totals p {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: calc(var(--spacing-unit) * 0.3);
-}
-.checkout-totals hr { margin: calc(var(--spacing-unit) * 0.5) 0; border-color: var(--border-color); opacity: 0.5;}
-.checkout-totals strong { font-weight: bold; }
-
-.checkout-payment h3 { font-size: 1.1rem; margin: calc(var(--spacing-unit) * 1) 0 calc(var(--spacing-unit) * 0.5) 0; }
-.payment-option { padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background-color: #f0f0f0; opacity: 0.8; margin-bottom: 0.5rem; cursor: pointer;}
-.payment-option.selected { border-color: var(--primary-color); opacity: 1; background-color: #e7f3ff; }
-.payment-option label { font-weight: normal; display: flex; align-items: center; cursor: pointer; margin-bottom: 0; }
-.payment-option input[type="radio"] { margin-right: 0.5rem; }
-.payment-option i { margin-right: 0.3rem; color: var(--success-color);}
-
-.place-order-form { margin-top: var(--spacing-unit); }
-.btn-place-order {
-    width: 100%;
-    font-size: 1.1rem;
-    padding: calc(var(--spacing-unit) * 0.7);
-}
-
-.my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
-.order-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-unit);
-}
-.order-card {
-  background-color: var(--card-bg);
-  border-radius: var(--border-radius);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--card-shadow);
-  overflow: hidden;
-}
-
-.order-header {
-  background-color: #f8f9fa;
-  padding: calc(var(--spacing-unit) * 0.6);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  font-size: 0.85rem;
-  color: var(--secondary-color);
-  border-bottom: 1px solid var(--border-color);
-}
-.order-header > div {
-    margin-right: calc(var(--spacing-unit) * 0.8);
-    margin-bottom: calc(var(--spacing-unit) * 0.2);
-    white-space: nowrap;
-}
-.order-header strong { color: var(--text-color); }
-.order-status {
-    display: inline-block;
-}
-
-.order-body {
-  padding: calc(var(--spacing-unit) * 0.75);
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--spacing-unit) * 0.75);
-}
-
-.order-items-preview {
-    display: flex;
-    gap: calc(var(--spacing-unit) * 0.3);
-    flex-wrap: wrap;
-}
-.order-items-preview img {
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
-}
-.more-items {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 50px;
-    height: 50px;
-    border: 1px dashed var(--border-color);
-    border-radius: 4px;
-    font-size: 0.8rem;
-    color: var(--secondary-color);
-}
-
-.order-details { font-size: 0.9rem; line-height: 1.5;}
-.order-details p { margin-bottom: calc(var(--spacing-unit) * 0.3); }
-
-.order-actions {
-    padding: 0 calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75);
-    text-align: right;
-}
-
-.status-badge {
-    font-weight: bold;
-    padding: 0.2em 0.5em;
-    border-radius: var(--border-radius);
-    color: #333;
-    background-color: var(--secondary-color);
-    font-size: 0.85em;
-    display: inline-block;
-    vertical-align: middle;
-}
-.status-pending, .status-badge.status-pending { background-color: #fff3cd; color: #856404; }
-.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: #d1ecf1; color: #0c5460; }
-.status-delivered, .status-badge.status-delivered { background-color: #d4edda; color: #155724; }
-.status-cancelled, .status-badge.status-cancelled { background-color: #f8d7da; color: #721c24; }
-
-.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; }
-
-
-.admin-manage-container {
-    padding: var(--spacing-unit);
-}
-.admin-manage-container h1 {
-    font-size: 1.5rem;
-    margin-bottom: var(--spacing-unit);
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: calc(var(--spacing-unit) * 0.5);
-}
-
-.table-container {
-    overflow-x: auto;
-    margin-bottom: var(--spacing-unit);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.data-table thead {
-  display: none;
-}
-
-.data-table tbody tr {
-  display: block;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius);
-  padding: calc(var(--spacing-unit) * 0.75);
-  background-color: var(--card-bg);
-  box-shadow: var(--card-shadow);
-}
-.table-container .data-table tbody tr {
-    margin-bottom: 0;
-    border: none;
-    border-bottom: 1px solid var(--border-color);
-    border-radius: 0;
-    box-shadow: none;
-    padding: calc(var(--spacing-unit) * 0.5);
-}
-.table-container .data-table tbody tr:last-child {
-    border-bottom: none;
-}
-
-
-.data-table td {
-  display: block;
-  text-align: right;
-  padding: calc(var(--spacing-unit) * 0.5) 0;
-  position: relative;
-  border-bottom: 1px dashed #eee;
-  transition: background-color 0.2s ease-in-out;
-}
-.data-table td:last-child {
-    border-bottom: none;
-}
-
-.data-table td::before {
-  content: attr(data-label);
-  position: absolute;
-  left: 0;
-  font-weight: bold;
-  text-align: left;
-  padding-right: 10px;
-  color: #555;
-  width: 40%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.table-img {
-  max-width: 50px;
-  border-radius: 4px;
-  display: inline-block;
-  margin-left: 45%;
-}
-
-.data-table td:has(img) { text-align: right; padding: 5px 0; }
-.data-table td:has(form), .actions-cell { padding: 10px 0;}
-.data-table td:has(form) { margin-left: 45%; }
-
-.actions-cell form, .actions-cell .btn {
-    margin: calc(var(--spacing-unit) * 0.2) 0;
-    display: block;
-    width: 100%;
-}
-.actions-cell .inline-form { margin-bottom: calc(var(--spacing-unit) * 0.5); }
-.action-group {
-    border-top: 1px dashed #ccc;
-    padding-top: calc(var(--spacing-unit) * 0.5);
-    margin-top: calc(var(--spacing-unit) * 0.5);
-    text-align: left;
-}
-.action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-.action-group-title {
-    font-size: 0.8em;
-    font-weight: bold;
-    color: var(--secondary-color);
-    margin-bottom: calc(var(--spacing-unit) * 0.3);
-    display: block;
-    text-align: left;
-}
-
-
-.actions-cell select.form-control-sm {
-    margin-bottom: 5px;
-    font-size: 0.9rem;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
-    height: auto;
-}
-.data-table td:has(label) {
-    text-align: left;
-}
-.data-table td:has(label) > * {
-    margin-left: 45%;
-}
-
-.verify-otp-form { display: flex; align-items: center; gap: 5px; }
-.verify-otp-form input[name="otp"] {
-    flex-grow: 1;
-    max-width: 120px;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
-    font-size: 0.9rem;
-    text-align: center;
-}
-.verify-otp-form button {
-    flex-shrink: 0;
-    width: auto;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
-}
-.cancel-delivery-form select { width: 100%; }
-
-
-.admin-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--spacing-unit);
-    margin-top: var(--spacing-unit);
-}
-.admin-action-card {
-    background-color: var(--card-bg);
-    padding: var(--spacing-unit);
-    border-radius: var(--border-radius);
-    border: 1px solid var(--border-color);
-    text-align: center;
-    box-shadow: var(--card-shadow);
-    transition: transform 0.2s, box-shadow 0.2s;
-    color: var(--text-color);
-    text-decoration: none;
-}
-.admin-action-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    text-decoration: none;
-}
-.admin-action-card i {
-    font-size: 2rem;
-    color: var(--primary-color);
-    margin-bottom: 0.5rem;
-}
-.admin-action-card h3 {
-    font-size: 1.1rem;
-    margin-bottom: 0.3rem;
-    color: var(--text-color);
-}
-.admin-action-card p {
-    font-size: 0.85rem;
-    color: var(--secondary-color);
-    margin-bottom: 0.5rem;
-}
-
-
-.error-container { text-align: center; padding-top: 2rem; }
-.error-container h1 { color: var(--danger-color); margin-bottom: 0.5rem; }
-.error-container .lead { font-size: 1.1rem; }
-.error-container details { text-align: left; }
-
+/* Rating Statistics Section */
 .rating-stats-container {
   margin-top: 30px;
   padding-top: 20px;
@@ -3587,7 +3108,6 @@ select:focus {
   font-size: 0.9em;
 }
 
-
 .rating-bar-progress {
   flex-grow: 1;
   height: 8px;
@@ -3598,16 +3118,16 @@ select:focus {
 
 .rating-bar-fill {
   height: 100%;
-  background-color: #28a745;
+  background-color: #28a745; /* Default color */
   border-radius: 4px;
   transition: width 0.3s ease-in-out;
 }
-.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; }
-.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; }
-.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; }
-.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; }
-.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; }
-
+/* Color fills based on rating */
+.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; } /* 5 stars */
+.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; } /* 4 stars */
+.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; } /* 3 stars */
+.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; } /* 2 stars */
+.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; } /* 1 star */
 
 .rating-bar-count {
   width: 40px;
@@ -3617,7 +3137,505 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* Auth Pages */
+.auth-container {
+  max-width: 450px;
+  margin: var(--spacing-unit) auto;
+  padding: var(--spacing-unit);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+}
+.auth-container h1 {
+    font-size: 1.6rem;
+    text-align: center;
+    margin-bottom: var(--spacing-unit);
+}
+.auth-form .btn {
+    width: 100%;
+    margin-top: calc(var(--spacing-unit) * 0.5);
+    padding: calc(var(--spacing-unit) * 0.7);
+}
+.auth-links {
+    margin-top: var(--spacing-unit);
+    font-size: 0.9rem;
+    text-align: center;
+}
+.auth-links p {
+    margin-bottom: calc(var(--spacing-unit) * 0.4);
+}
 
+.auth-container p { text-align: center; margin-bottom: var(--spacing-unit);}
+.auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--spacing-unit); }
+#otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; }
+
+/* Cart Page */
+.cart-container h1 {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-unit);
+}
+
+.cart-items {
+  margin-bottom: var(--spacing-unit);
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  grid-template-areas:
+    "image details remove"
+    "image quantity subtotal";
+  gap: calc(var(--spacing-unit) * 0.75);
+  background-color: var(--card-bg);
+  padding: calc(var(--spacing-unit) * 0.75);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing-unit);
+  box-shadow: var(--card-shadow);
+}
+
+.cart-item-image { grid-area: image; align-self: center;}
+.cart-item-image img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) * 0.5);
+}
+.cart-item-details { grid-area: details; }
+.cart-item-quantity {
+    grid-area: quantity;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+.cart-item-subtotal {
+    grid-area: subtotal;
+    text-align: right;
+    font-weight: 500;
+    align-self: center;
+}
+.cart-item-remove { grid-area: remove; text-align: right; align-self: start;}
+
+.cart-item-name {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: calc(var(--spacing-unit) * 0.2);
+}
+.cart-item-price {
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    margin-bottom: calc(var(--spacing-unit) * 0.2);
+}
+.cart-item-stock {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.cart-item-quantity label {
+    font-size: 0.9rem;
+    margin-bottom: 0;
+    display: none; /* Hide label by default */
+}
+.cart-item-quantity input {
+    width: 50px;
+    padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.4);
+    text-align: center;
+    font-size: 0.9rem;
+}
+.cart-item-quantity .btn-update-qty {
+    font-size: 0.8rem;
+    padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.6);
+}
+
+.cart-item-subtotal {
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.cart-item-remove .btn {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.8rem;
+    line-height: 1;
+}
+
+.cart-summary {
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  padding: var(--spacing-unit);
+  background-color: #f8f9fa;
+  border-top: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  text-align: right;
+}
+
+.cart-summary h2 {
+  font-size: 1.3rem;
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
+}
+.btn-checkout {
+    width: 100%;
+    padding: calc(var(--spacing-unit) * 0.7);
+    font-size: 1.1rem;
+}
+
+/* Checkout Page */
+.checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit);}
+
+.checkout-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+}
+
+.checkout-address, .checkout-summary {
+    background-color: var(--card-bg);
+    padding: var(--spacing-unit);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+}
+.checkout-address h2, .checkout-summary h2 {
+    font-size: 1.2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: calc(var(--spacing-unit) * 0.4);
+    margin-bottom: var(--spacing-unit);
+}
+.saved-address { font-size: 0.95rem; margin-bottom: var(--spacing-unit); }
+.saved-address p { margin-bottom: calc(var(--spacing-unit) * 0.2); line-height: 1.4; }
+#edit-address-btn { margin-top: calc(var(--spacing-unit) * 0.5); }
+
+.address-form h3 { font-size: 1.1rem; }
+
+.checkout-items {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: var(--spacing-unit);
+    padding-right: calc(var(--spacing-unit) * 0.5); /* space for scrollbar */
+}
+.checkout-item {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--spacing-unit) * 0.5);
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    font-size: 0.9rem;
+}
+.checkout-item-image img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+.checkout-item-info { flex-grow: 1; }
+.checkout-item-price { font-weight: 500; white-space: nowrap;}
+
+.checkout-totals { font-size: 0.95rem; }
+.checkout-totals p {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+}
+.checkout-totals hr { margin: calc(var(--spacing-unit) * 0.5) 0; border-color: var(--border-color); opacity: 0.5;}
+.checkout-totals strong { font-weight: bold; }
+
+.checkout-payment h3 { font-size: 1.1rem; margin: calc(var(--spacing-unit) * 1) 0 calc(var(--spacing-unit) * 0.5) 0; }
+.payment-option { padding: 0.5rem; border: 1px solid var(--border-color); border-radius: var(--border-radius); background-color: #f0f0f0; opacity: 0.8; margin-bottom: 0.5rem; cursor: pointer;}
+.payment-option.selected { border-color: var(--primary-color); opacity: 1; background-color: #e7f3ff; }
+.payment-option label { font-weight: normal; display: flex; align-items: center; cursor: pointer; margin-bottom: 0; }
+.payment-option input[type="radio"] { margin-right: 0.5rem; }
+.payment-option i { margin-right: 0.3rem; color: var(--success-color);}
+
+.place-order-form { margin-top: var(--spacing-unit); }
+.btn-place-order {
+    width: 100%;
+    font-size: 1.1rem;
+    padding: calc(var(--spacing-unit) * 0.7);
+}
+
+/* My Orders Page */
+.my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
+.order-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+}
+.order-card {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.order-header {
+  background-color: #f8f9fa;
+  padding: calc(var(--spacing-unit) * 0.6);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--secondary-color);
+  border-bottom: 1px solid var(--border-color);
+}
+.order-header > div {
+    margin-right: calc(var(--spacing-unit) * 0.8);
+    margin-bottom: calc(var(--spacing-unit) * 0.2);
+    white-space: nowrap;
+}
+.order-header strong { color: var(--text-color); }
+.order-status {
+    display: inline-block;
+}
+
+.order-body {
+  padding: calc(var(--spacing-unit) * 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
+.order-items-preview {
+    display: flex;
+    gap: calc(var(--spacing-unit) * 0.3);
+    flex-wrap: wrap;
+}
+.order-items-preview img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+.more-items {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border: 1px dashed var(--border-color);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: var(--secondary-color);
+    text-align: center;
+}
+
+.order-details { font-size: 0.9rem; line-height: 1.5;}
+.order-details p { margin-bottom: calc(var(--spacing-unit) * 0.3); }
+
+.order-actions {
+    padding: 0 calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75);
+    text-align: right;
+}
+
+.status-badge {
+    font-weight: bold;
+    padding: 0.2em 0.5em;
+    border-radius: var(--border-radius);
+    color: #333; /* Default text */
+    background-color: var(--secondary-color); /* Default background */
+    font-size: 0.85em;
+    display: inline-block;
+    vertical-align: middle;
+    text-transform: capitalize;
+}
+.status-pending, .status-badge.status-pending { background-color: #fff3cd; color: #856404; }
+.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: #d1ecf1; color: #0c5460; }
+.status-delivered, .status-badge.status-delivered { background-color: #d4edda; color: #155724; }
+.status-cancelled, .status-badge.status-cancelled { background-color: #f8d7da; color: #721c24; }
+
+.order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; }
+
+
+/* Admin General & Tables */
+.admin-manage-container, .admin-dashboard-container {
+    padding: var(--spacing-unit);
+}
+.admin-manage-container h1, .admin-dashboard-container h1 {
+    font-size: 1.5rem;
+    margin-bottom: var(--spacing-unit);
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: calc(var(--spacing-unit) * 0.5);
+}
+
+.table-container {
+    overflow-x: auto; /* Allow horizontal scroll on small screens */
+    margin-bottom: var(--spacing-unit);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: var(--card-bg);
+    box-shadow: var(--card-shadow);
+}
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+/* Mobile Table Styles (Stacking) */
+.data-table thead {
+  display: none; /* Hide headers on mobile */
+}
+
+.data-table tbody tr {
+  display: block; /* Stack rows */
+  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: calc(var(--spacing-unit) * 0.75);
+  background-color: var(--card-bg);
+  box-shadow: var(--card-shadow);
+}
+/* Remove extra styling when inside .table-container wrapper */
+.table-container .data-table tbody tr {
+    margin-bottom: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: calc(var(--spacing-unit) * 0.5);
+    border-bottom: 1px solid var(--border-color);
+}
+.table-container .data-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+
+.data-table td {
+  display: block; /* Stack cells */
+  text-align: right; /* Align cell content to the right */
+  padding: calc(var(--spacing-unit) * 0.5) 0;
+  position: relative;
+  border-bottom: 1px dashed #eee;
+  transition: background-color 0.2s ease-in-out;
+}
+.data-table td:last-child {
+    border-bottom: none;
+}
+
+/* Add data-label pseudo-element */
+.data-table td::before {
+  content: attr(data-label);
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+  text-align: left;
+  padding-right: 10px;
+  color: #555;
+  width: 40%; /* Adjust width as needed */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-img {
+  max-width: 50px; /* Adjust size as needed */
+  border-radius: 4px;
+  display: inline-block; /* Allows margin-left to work */
+  margin-left: 45%; /* Push image past the label */
+  vertical-align: middle;
+}
+
+/* Adjustments for cells containing specific elements */
+.data-table td:has(img) { text-align: right; padding: 5px 0; }
+.data-table td:has(form), .actions-cell { padding: 10px 0;}
+.data-table td:has(form) { margin-left: 45%; } /* Push form past the label */
+
+/* Mobile Actions */
+.actions-cell form, .actions-cell .btn {
+    margin: calc(var(--spacing-unit) * 0.2) 0;
+    display: block;
+    width: 100%;
+}
+.actions-cell .inline-form { margin-bottom: calc(var(--spacing-unit) * 0.5); }
+.action-group {
+    border-top: 1px dashed #ccc;
+    padding-top: calc(var(--spacing-unit) * 0.5);
+    margin-top: calc(var(--spacing-unit) * 0.5);
+    text-align: left; /* Align group content */
+}
+.action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.action-group-title {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--secondary-color);
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+    display: block;
+    text-align: left;
+}
+
+.actions-cell select.form-control-sm {
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    height: auto;
+}
+.data-table td:has(label) { text-align: left; }
+.data-table td:has(label) > * { margin-left: 45%; }
+
+/* Specific mobile forms */
+.verify-otp-form { display: flex; align-items: center; gap: 5px; }
+.verify-otp-form input[name="otp"] {
+    flex-grow: 1;
+    max-width: 120px;
+    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    font-size: 0.9rem;
+    text-align: center;
+}
+.verify-otp-form button {
+    flex-shrink: 0;
+    width: auto;
+    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+}
+.cancel-delivery-form select { width: 100%; }
+
+/* Admin Dashboard */
+.admin-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* 2 columns on small screens */
+    gap: var(--spacing-unit);
+    margin-top: var(--spacing-unit);
+}
+.admin-action-card {
+    background-color: var(--card-bg);
+    padding: var(--spacing-unit);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    color: var(--text-color);
+    text-decoration: none;
+}
+.admin-action-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    text-decoration: none;
+}
+.admin-action-card i {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+.admin-action-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.3rem;
+    color: var(--text-color);
+}
+.admin-action-card p {
+    font-size: 0.85rem;
+    color: var(--secondary-color);
+    margin-bottom: 0.5rem;
+}
+
+/* Error Page */
+.error-container { text-align: center; padding-top: 2rem; }
+.error-container h1 { color: var(--danger-color); margin-bottom: 0.5rem; }
+.error-container .lead { font-size: 1.1rem; }
+.error-container details { text-align: left; margin-top: 1rem; background: #f1f1f1; padding: 0.5rem; border-radius: 4px;}
+.error-container details summary { cursor: pointer; font-weight: bold; }
+.error-container details pre { white-space: pre-wrap; font-size: 0.8em; margin-top: 0.5rem; }
+
+
+/* Profile Page */
 .profile-container {
     max-width: 800px;
     margin: var(--spacing-unit) auto;
@@ -3645,8 +3663,10 @@ select:focus {
     border-top: 1px solid var(--border-color);
 }
 .profile-section:first-of-type {
+     border-top: none; /* No top border for the first section */
+     padding-top: 0;
+     margin-top: calc(var(--spacing-unit) * 0.8); /* Adjust top margin */
 }
-
 
 .profile-section h2 {
     font-size: 1.4rem;
@@ -3667,7 +3687,7 @@ select:focus {
 }
 
 .address-form {
-    max-width: 500px;
+    max-width: 500px; /* Limit width of address form */
 }
 .address-form h3 {
     font-size: 1.2rem;
@@ -3688,48 +3708,65 @@ select:focus {
 }
 
 
-
+/* =================================== */
+/* ===== Medium Screens & Up (Tablet) ====== */
+/* =================================== */
 @media (min-width: 768px) {
-  :root {
-  }
+  /* Layout Adjustments */
   .container {
     max-width: 960px;
   }
 
-  .app-logo .app-name { display: inline; }
-  .nav-link { flex-direction: row; font-size: 0.9rem; }
-  .nav-link span { display: inline; }
+  /* Header/Nav Adjustments */
+  .app-logo .app-name { display: inline; } /* Show app name */
+  .nav-link { flex-direction: row; font-size: 0.9rem; align-items: center; } /* Row layout for links */
+  .nav-link span { display: inline; } /* Show text labels */
   .nav-link i { margin-right: 0.4rem; margin-bottom: 0; font-size: 1rem; }
   .nav-right { gap: var(--spacing-unit); }
 
+  /* Footer */
+  .app-footer { display: block; } /* Show footer */
 
-  .app-footer { display: block; }
+  /* Product Grid */
+  .product-grid { grid-template-columns: repeat(3, 1fr); } /* 3 columns */
+  .product-name { height: auto; white-space: normal; } /* Allow name to wrap */
 
-  .product-grid { grid-template-columns: repeat(3, 1fr); }
-  .product-name { height: auto; white-space: normal; }
 
-
+  /* Product Detail Page Layout */
   .product-detail-main {
-    flex-direction: row;
+    flex-direction: row; /* Side-by-side layout */
     align-items: flex-start;
   }
-  .product-detail-image { flex: 1 1 40%; }
-  .product-detail-info { flex: 1 1 60%; }
+  .product-detail-info {
+    flex: 1 1 60%; /* Take 60% width */
+  }
+  .product-detail-image {
+    /* --- UPDATED for responsive flex layout --- */
+    flex: 1 1 40%;    /* Take 40% width */
+    width: auto;      /* Override mobile width */
+    max-width: none;  /* Override mobile max-width */
+    margin: 0;        /* Reset mobile margin */
+    /* aspect-ratio, overflow, border-radius, background-color are inherited */
+  }
+  /* No changes needed for .product-detail-image img */
+
   .product-actions { flex-direction: row; align-items: center; }
   .product-actions .btn { width: auto; }
   .quantity-selector { max-width: 120px; margin-bottom: 0; }
 
+  /* Auth Container */
   .auth-container { margin: calc(var(--spacing-unit) * 2) auto; }
 
+  /* Cart Layout Adjustments */
    .cart-item {
-        grid-template-columns: 100px 1fr 150px 120px 80px;
+        grid-template-columns: 100px 1fr 100px 150px 80px; /* Adjusted columns for price */
         grid-template-areas: "image details price quantity remove";
         align-items: center;
         padding: var(--spacing-unit);
    }
    .cart-item-details { grid-area: details; }
    .cart-item-price {
-       display: block;
+       display: block; /* Show price column */
        grid-area: price;
        text-align: right;
        font-weight: 500;
@@ -3738,22 +3775,35 @@ select:focus {
        margin-bottom: 0;
    }
    .cart-item-quantity { grid-area: quantity; justify-content: center; }
-   .cart-item-subtotal { display: none; }
+   .cart-item-subtotal { display: none; } /* Hide mobile subtotal */
    .cart-item-remove { grid-area: remove; align-self: center; text-align: center; }
 
 
+   /* Checkout Layout Adjustments */
     .checkout-grid {
-        flex-direction: row;
+        flex-direction: row; /* Side-by-side */
         gap: calc(var(--spacing-unit) * 1.5);
         align-items: flex-start;
     }
-    .checkout-address { flex: 1 1 55%; }
-    .checkout-summary { flex: 1 1 45%; }
+    .checkout-address { flex: 1 1 55%; } /* Address takes more space */
+    .checkout-summary { flex: 1 1 45%; } /* Summary takes less space */
 
-   .table-container { border: none; border-radius: 0; }
-   .data-table thead { display: table-header-group; }
+   /* Table Styles for Desktop */
+   .table-container { border: none; border-radius: 0; background: none; box-shadow: none; }
+   .data-table { border: 1px solid var(--border-color); border-radius: var(--border-radius); }
+   .data-table thead {
+       display: table-header-group; /* Show table headers */
+       background-color: #f8f9fa;
+       font-weight: 500;
+    }
+    .data-table th {
+        padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.5);
+        text-align: left;
+        border-bottom: 2px solid var(--border-color);
+    }
+
    .data-table tbody tr {
-       display: table-row;
+       display: table-row; /* Use standard table rows */
        margin-bottom: 0;
        border: none;
        padding: 0;
@@ -3762,19 +3812,21 @@ select:focus {
        border-bottom: 1px solid var(--border-color);
    }
    .data-table tbody tr:last-child { border-bottom: none; }
+   .data-table tbody tr:hover { background-color: #f8f9fa; }
+
    .data-table td {
-       display: table-cell;
-       text-align: left;
+       display: table-cell; /* Use standard table cells */
+       text-align: left; /* Default align */
        padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.5);
        vertical-align: middle;
-       border-bottom: none;
+       border-bottom: none; /* Remove mobile border */
        position: static;
-       margin-left: 0 !important;
+       margin-left: 0 !important; /* Reset mobile margin */
    }
-    .data-table td::before { content: none; }
+    .data-table td::before { content: none; } /* Hide mobile labels */
     .data-table td:has(form), .actions-cell {
-       text-align: right;
-       white-space: nowrap;
+       text-align: right; /* Align action cells right */
+       white-space: nowrap; /* Prevent actions wrapping */
    }
    .inline-form { display: inline-block; margin: 0 5px 0 0;}
    .inline-form > * { margin-bottom: 0; }
@@ -3783,15 +3835,15 @@ select:focus {
    .actions-cell > form, .actions-cell > div > form { display: inline-block; }
    .actions-cell > a { display: inline-block; margin-right: 5px; vertical-align: middle;}
 
-
+   /* Specific Column Alignments */
    .data-table th[data-label*="Price"],
    .data-table td[data-label*="Price"],
    .data-table th[data-label*="Stock"],
    .data-table td[data-label*="Stock"],
    .data-table th[data-label*="Rating"],
    .data-table td[data-label*="Rating"],
-   .data-table th[data-label*="Sold"],
-   .data-table td[data-label*="Sold"] {
+   .data-table th[data-label*="Sold"], /* Added Sold */
+   .data-table td[data-label*="Sold"] { /* Added Sold */
        text-align: center;
    }
    .data-table th[data-label="Status"],
@@ -3804,7 +3856,9 @@ select:focus {
         font-weight: 500;
    }
    .data-table th.actions-cell,
-   .data-table td.actions-cell { text-align: right !important; }
+   .data-table td.actions-cell { text-align: right !important; } /* Ensure actions are right aligned */
+
+   /* Desktop Actions */
    .actions-cell form, .actions-cell .btn { display: inline-block; width: auto; margin: 0 0 0 5px;}
    .actions-cell .btn-block { display: inline-block; width: auto; }
 
@@ -3812,8 +3866,10 @@ select:focus {
    .table-img { max-width: 60px; margin-left: 0; }
    .data-table td:has(img) { text-align: left; }
 
-    .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
+   /* Admin Dashboard Layout */
+    .admin-actions-grid { grid-template-columns: repeat(3, 1fr); } /* 3 columns */
 
+    /* Rating Stats Layout */
     .rating-stats-container {
         display: flex;
         align-items: flex-start;
@@ -3823,33 +3879,42 @@ select:focus {
         flex-direction: column;
         align-items: center;
         margin-bottom: 0;
-        flex-basis: 150px;
+        flex-basis: 150px; /* Give summary fixed space */
         flex-shrink: 0;
     }
     .rating-average-value { font-size: 3em; }
     .rating-total { font-size: 1em; }
     .rating-bars {
-        max-width: none;
+        max-width: none; /* Let bars take remaining space */
         flex-grow: 1;
     }
 
+    /* Profile Container Padding */
     .profile-container {
         padding: calc(var(--spacing-unit) * 2);
     }
 
+} /* End @media 768px */
 
-}
 
-
+/* =================================== */
+/* ===== Large Screens & Up (Desktop) ===== */
+/* =================================== */
 @media (min-width: 1024px) {
+  /* Layout Adjustments */
   .container { max-width: 1140px; }
-  .product-grid { grid-template-columns: repeat(4, 1fr); }
 
-  .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); }
+  /* Product Grid */
+  .product-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns */
 
-  .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
+  /* Spacing */
+  .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); } /* Increase gap */
 
-}
+  /* Admin Dashboard */
+  .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns */
+
+} /* End @media 1024px */
+
 
 public/js/main.js:
 console.log("Main JS loaded.");
@@ -4143,7 +4208,6 @@ function handleEmptyCartDisplay() {
          // No need to hide summary as it's removed
      }
 }
-
 routes/adminRoutes.js:
 // routes/adminRoutes.js
 const express = require('express');
@@ -4191,7 +4255,6 @@ router.post('/users/:id/remove', adminController.removeUser);
 
 
 module.exports = router;
-
 routes/authRoutes.js:
 const express = require('express');
 const authController = require('../controllers/authController');
@@ -4216,7 +4279,6 @@ router.post('/reset-password/:token', authController.resetPassword);
 
 
 module.exports = router;
-
 
 routes/index.js:
 // routes/index.js
@@ -4245,7 +4307,6 @@ router.use('/admin', adminRoutes);
 
 
 module.exports = router;
-
 routes/orderRoutes.js:
 const express = require('express');
 const orderController = require('../controllers/orderController');
@@ -4263,7 +4324,6 @@ router.get('/my-orders', orderController.getMyOrders);
 
 module.exports = router;
 
-
 routes/productRoutes.js:
 const express = require('express');
 const productController = require('../controllers/productController');
@@ -4277,7 +4337,6 @@ router.get('/:id', productController.getProductDetails);
  router.post('/:id/rate', isAuthenticated, productController.rateProduct);
 
 module.exports = router;
-
 
 routes/userRoutes.js:
 // routes/userRoutes.js
@@ -4303,7 +4362,6 @@ router.post('/address/save', userController.saveAddress); // Keep existing save 
 router.get('/checkout', userController.getCheckoutPage);
 
 module.exports = router;
-
 services/otpService.js:
 const crypto = require('crypto');
 
@@ -4323,7 +4381,6 @@ const setOTPExpiration = (minutes = 10) => {
 };
 
 module.exports = { generateOTP, setOTPExpiration };
-
 
 views/admin/assigned-orders-detail.ejs:
 <%# views/admin/assigned-orders-detail.ejs %>
@@ -4400,7 +4457,6 @@ views/admin/assigned-orders-detail.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/admin/dashboard.ejs:
 <%- include('../partials/header', { title: 'Admin Dashboard' }) %>
 
@@ -4429,16 +4485,10 @@ views/admin/dashboard.ejs:
              <h3>Manage Users</h3>
              <p>Update roles or remove users.</p>
         </a>
-         <a href="/admin/manage-assigned-orders" class="admin-action-card card"> <%# ADDED .card %>
-            <i class="fas fa-shipping-fast"></i>
-            <h3>Manage Assigned Orders</h3>
-             <p>Track delivery admin progress.</p>
-         </a>
     </div>
 </div>
 
  <%- include('../partials/footer') %>
-
 views/admin/edit-product.ejs:
 <%- include('../partials/header', { title: title }) %>
 
@@ -4477,41 +4527,6 @@ views/admin/edit-product.ejs:
  </div>
 
  <%- include('../partials/footer') %>
-
-
-views/admin/manage-assigned-orders.ejs:
-<%- include('../partials/header', { title: 'Admin Dashboard' }) %>
-
-<div class="admin-dashboard-container">
-    <h1>Admin Dashboard</h1>
-    <p class="text-muted mb-3">Welcome, <%= currentUser.name %>!</p>
-
-    <div class="admin-actions-grid">
-         <a href="/admin/upload-product" class="admin-action-card card"> <%# ADDED .card %>
-            <i class="fas fa-upload"></i>
-            <h3>Upload Products</h3>
-            <p>Add new products to the store.</p>
-        </a>
-         <a href="/admin/manage-products" class="admin-action-card card"> <%# ADDED .card %>
-            <i class="fas fa-edit"></i>
-            <h3>Manage Products</h3>
-            <p>Edit or remove existing products.</p>
-         </a>
-        <a href="/admin/manage-orders" class="admin-action-card card"> <%# ADDED .card %>
-             <i class="fas fa-clipboard-list"></i>
-             <h3>Manage Orders</h3>
-             <p>View, verify, and assign orders.</p>
-        </a>
-        <a href="/admin/manage-users" class="admin-action-card card"> <%# ADDED .card %>
-             <i class="fas fa-users-cog"></i>
-             <h3>Manage Users</h3>
-             <p>Update roles or remove users.</p>
-        </a>
-    </div>
-</div>
-
- <%- include('../partials/footer') %>
-
 views/admin/manage-orders.ejs:
 <%# views/admin/manage-orders.ejs %>
 <%- include('../partials/header', { title: 'Manage Orders' }) %>
@@ -4628,7 +4643,6 @@ views/admin/manage-orders.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/admin/manage-products.ejs:
 <%# Example: views/admin/manage-products.ejs %>
 <%- include('../partials/header', { title: 'Manage Products' }) %>
@@ -4679,7 +4693,6 @@ views/admin/manage-products.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/admin/manage-users.ejs:
 <%# views/admin/manage-users.ejs %>
 <%- include('../partials/header', { title: 'Manage Users' }) %>
@@ -4739,7 +4752,6 @@ views/admin/manage-users.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/admin/upload-product.ejs:
 <%- include('../partials/header', { title: 'Upload New Product' }) %>
 
@@ -4778,7 +4790,6 @@ views/admin/upload-product.ejs:
 
  <%- include('../partials/footer') %>
 
-
 views/auth/forgot-password.ejs:
 <%- include('../partials/header', { title: 'Forgot Password' }) %>
 
@@ -4799,7 +4810,6 @@ views/auth/forgot-password.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 
 views/auth/login.ejs:
 <%- include('../partials/header', { title: 'Login' }) %>
@@ -4826,7 +4836,6 @@ views/auth/login.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/auth/register.ejs:
 <%- include('../partials/header', { title: 'Register' }) %>
 
@@ -4859,7 +4868,6 @@ views/auth/register.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/auth/reset-password.ejs:
 <%- include('../partials/header', { title: 'Reset Password' }) %>
 
@@ -4884,7 +4892,6 @@ views/auth/reset-password.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 
 views/auth/verify-otp.ejs:
 <%- include('../partials/header', { title: title || 'Verify OTP' }) %>
@@ -4920,7 +4927,6 @@ views/auth/verify-otp.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/partials/footer.ejs:
     </main> <%# End Main Content Area %>
 
@@ -4932,7 +4938,6 @@ views/partials/footer.ejs:
 
 </body>
 </html>
-
 views/partials/header.ejs:
 <%# views/partials/header.ejs %>
 <!DOCTYPE html>
@@ -4940,7 +4945,42 @@ views/partials/header.ejs:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= title %> | miniapp</title>
+    <%# --- META TAGS FOR RICH LINK PREVIEWS --- %>
+    <% const pageTitle = typeof title !== 'undefined' ? title + ' | miniapp' : 'miniapp'; %>
+    <% const siteName = typeof defaultSiteName !== 'undefined' ? defaultSiteName : 'miniapp'; %>
+    <% const currentMetaTitle = typeof metaTitle !== 'undefined' ? metaTitle : (typeof title !== 'undefined' ? title : 'miniapp'); %>
+    <% const currentMetaDesc = typeof metaDescription !== 'undefined' ? metaDescription : 'Check out our products on ' + siteName; %>
+    <%# Use a default logo/image if specific one isn't provided %>
+    <% const currentMetaImage = typeof metaImageUrl !== 'undefined' ? metaImageUrl : '/images/default-logo.png'; /* Adjust path if needed */ %>
+    <% const currentMetaUrl = typeof fullUrl !== 'undefined' ? fullUrl : ''; %>
+    <% const currentMetaType = typeof metaType !== 'undefined' ? metaType : 'website'; %>
+
+    <title><%= pageTitle %></title>
+
+    <%# -- Standard Meta -- %>
+    <meta name="description" content="<%= currentMetaDesc %>">
+
+    <%# -- Open Graph Meta Tags (Facebook, WhatsApp, etc.) -- %>
+    <meta property="og:title" content="<%= currentMetaTitle %>" />
+    <meta property="og:description" content="<%= currentMetaDesc %>" />
+    <meta property="og:image" content="<%= currentMetaImage %>" />
+    <% if (currentMetaUrl) { %><meta property="og:url" content="<%= currentMetaUrl %>" /><% } %>
+    <meta property="og:type" content="<%= currentMetaType %>" />
+    <meta property="og:site_name" content="<%= siteName %>" />
+    <%# Optional: Add image dimensions if known for better rendering %>
+    <%# <meta property="og:image:width" content="1200" /> %>
+    <%# <meta property="og:image:height" content="630" /> %>
+
+    <%# -- Twitter Card Meta Tags -- %>
+    <meta name="twitter:card" content="summary_large_image"> <%# Use summary_large_image for products %>
+    <meta name="twitter:title" content="<%= currentMetaTitle %>">
+    <meta name="twitter:description" content="<%= currentMetaDesc %>">
+    <meta name="twitter:image" content="<%= currentMetaImage %>">
+    <%# Optional: Add Twitter site/creator handle if you have one %>
+    <%# <meta name="twitter:site" content="@YourTwitterHandle"> %>
+    <%# <meta name="twitter:creator" content="@YourTwitterHandle"> %>
+    <%# --- END META TAGS --- %>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -4974,13 +5014,9 @@ views/partials/header.ejs:
                     <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders">
                         <i class="fas fa-box"></i> <span>Orders</span>
                     </a>
-
-                    <%# --- START: Profile Avatar Link --- %>
                     <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile">
                          <span class="profile-avatar-initials"><%= userInitials %></span>
                     </a>
-                    <%# --- END: Profile Avatar Link --- %>
-
                 <% } else { %>
                     <a href="/auth/login" class="btn btn-login-register">
                         <i class="fas fa-sign-in-alt"></i> Login / Register
@@ -4993,7 +5029,6 @@ views/partials/header.ejs:
      <%- include('messages') %>
 
     <main class="container">
-
 views/partials/messages.ejs:
 <% if (success_msg && success_msg.length > 0) { %>
   <div class="alert alert-success" role="alert">
@@ -5017,9 +5052,26 @@ views/partials/messages.ejs:
 <% } %>
 
 
-
 views/products/detail.ejs:
-<%- include('../partials/header', { title: product.name }) %>
+<%# views/products/detail.ejs %>
+
+<%# --- UPDATED: Prepare meta description (exclude category/specs) --- %>
+<% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
+<%# Ensure total length is reasonable (e.g., ~160 chars) %>
+<% if (metaDesc.length > 160) {
+     metaDesc = metaDesc.substring(0, 157) + '...';
+   }
+%>
+<%# --- END UPDATED --- %>
+
+<%- include('../partials/header', {
+    title: product.name,
+    metaTitle: product.name + ' - miniapp', /* Add site name to title */
+    metaDescription: metaDesc,           /* Use the new, simpler description */
+    metaImageUrl: product.imageUrl,      /* ASSUMES absolute URL */
+    metaUrl: fullUrl,                    /* Already available via res.locals */
+    metaType: 'product'                  /* Use 'product' type for product pages */
+}) %>
 
 <div class="product-detail-container">
    <div class="product-detail-main">
@@ -5086,6 +5138,7 @@ views/products/detail.ejs:
            </div>
            <!-- End Share Functionality -->
 
+           <%# Specifications are still displayed on the page itself %>
            <div class="product-specifications">
                 <h3>Specifications</h3>
                 <pre><%= product.specifications || 'No specifications provided.' %></pre>
@@ -5097,14 +5150,12 @@ views/products/detail.ejs:
         <h3>Rate This Product</h3>
         <% if (userCanRate) { %>
             <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
-                <!-- RATING STARS SECTION (Loop 5 down to 1) -->
                 <div class="rating-stars">
                     <% for (let i = 5; i >= 1; i--) { %>
                        <input type="radio" id="star<%= i %>" name="rating" value="<%= i %>" <%= userRating === i ? 'checked' : '' %> required>
                        <label for="star<%= i %>" title="<%= i %> stars"><i class="fas fa-star"></i></label>
                     <% } %>
                 </div>
-                <!-- END RATING STARS SECTION -->
                 <button type="submit" class="btn btn-primary">Submit Rating</button>
             </form>
         <% } else { %>
@@ -5112,7 +5163,6 @@ views/products/detail.ejs:
         <% } %>
    </div>
 
-    <!-- Rating Statistics Section -->
     <div class="rating-stats-container">
         <h3>Ratings & Reviews</h3>
          <% if (totalRatings > 0) { %>
@@ -5134,7 +5184,6 @@ views/products/detail.ejs:
                      <div class="rating-bar-row">
                          <span class="rating-bar-label"><%= i %> <i class="fas fa-star"></i></span>
                          <div class="rating-bar-progress">
-                             <!-- Instead of inline CSS, we set the computed percentage as a data attribute -->
                              <div class="rating-bar-fill" data-width="<%= percentage.toFixed(1) %>"></div>
                          </div>
                          <span class="rating-bar-count"><%= count %></span>
@@ -5145,11 +5194,9 @@ views/products/detail.ejs:
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
-    <!-- End Rating Statistics Section -->
 
 </div>
 
-<!-- Script to set dynamic widths for rating bars -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
@@ -5162,8 +5209,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <%- include('../partials/footer') %>
-
-
 views/products/index.ejs:
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
@@ -5224,7 +5269,6 @@ views/products/index.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/user/cart.ejs:
 <%# views/user/cart.ejs %>
 <%- include('../partials/header', { title: 'Shopping Cart' }) %>
@@ -5291,7 +5335,6 @@ views/user/cart.ejs:
 </div>
 
  <%- include('../partials/footer') %>
-
 views/user/checkout.ejs:
 <%# views/user/checkout.ejs %>
 <%- include('../partials/header', { title: 'Checkout' }) %>
@@ -5406,7 +5449,6 @@ views/user/checkout.ejs:
 <%- include('../partials/footer') %>
 
 <%# Checkout specific JS logic was moved to public/js/main.js %>
-
 views/user/my-orders.ejs:
 <%# views/user/my-orders.ejs %>
 <%- include('../partials/header', { title: 'My Orders' }) %>
@@ -5467,7 +5509,6 @@ views/user/my-orders.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/user/profile.ejs:
 <%# views/user/profile.ejs %>
 <%- include('../partials/header', { title: title }) %>
@@ -5539,7 +5580,6 @@ views/user/profile.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 views/error.ejs:
 <%- include('./partials/header', { title: 'Error' }) %>
 
@@ -5559,8 +5599,6 @@ views/error.ejs:
 </div>
 
 <%- include('./partials/footer') %>
-
-
 .env:
 NODE_ENV=development
 PORT=3000
@@ -5573,8 +5611,8 @@ MAIL_PORT=587
 MAIL_USER=ayyappanallamothu4@gmail.com
 MAIL_PASS=yxor nmot lxmq skyc
 MAIL_FROM='"Surya Ecom" ayyappanallamothu4@gmail.com'
-
 server.js:
+// server.js
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
@@ -5585,78 +5623,115 @@ const flash = require('connect-flash');
 const methodOverride = require('method-override');
 
 const connectDB = require('./config/database');
-const mainRouter = require('./routes/index'); // This now correctly includes the updated routes
+const mainRouter = require('./routes/index'); // Main router including all sub-routes
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
 
+// Connect to Database
 connectDB();
 
 const app = express();
 
+// View Engine Setup
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(methodOverride('_method'));
+// Middleware Setup
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(express.static(path.join(__dirname, 'public'))); // Serve static files (CSS, JS, images)
+app.use(methodOverride('_method')); // Support PUT/DELETE via POST with _method query param
 
+// Session Middleware
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    store: MongoStore.create({
+    secret: process.env.SESSION_SECRET, // Secret used to sign the session ID cookie
+    resave: false, // Don't save session if unmodified
+    saveUninitialized: false, // Don't create session until something stored
+    store: MongoStore.create({ // Store session data in MongoDB
         mongoUrl: process.env.MONGO_URI,
-        collectionName: 'sessions'
+        collectionName: 'sessions' // Optional: specify collection name
     }),
     cookie: {
-        maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000', 10),
-        httpOnly: true
+        maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000', 10), // Session duration (default 1 day)
+        httpOnly: true // Prevent client-side JS from accessing cookie
+        // secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS) - Uncomment if using HTTPS
+        // sameSite: 'lax' // Mitigate CSRF attacks
     }
   })
 );
 
-app.use(flash());
+// Flash Message Middleware
+app.use(flash()); // Requires session middleware
 
-// Middleware to set local variables for views
+// Middleware to set local variables for views (accessible in EJS templates)
 app.use((req, res, next) => {
+  // Flash messages
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
-  res.locals.error = req.flash('error');
-  res.locals.currentUser = req.session.user || null;
-  res.locals.currentUrl = req.originalUrl;
-  res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
-  res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + item.quantity, 0) || 0;
+  res.locals.error = req.flash('error'); // General error flash
 
-  // --- Calculate User Initials ---
+  // User information
+  res.locals.currentUser = req.session.user || null; // Logged-in user object or null
+
+  // URL information
+  res.locals.currentUrl = req.originalUrl; // Current path (e.g., /products/123)
+  res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`; // Full URL including domain
+
+  // Cart count (calculated safely)
+  res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + (item.quantity || 0), 0) || 0;
+
+  // Calculate User Initials for Avatar
   let userInitials = '??'; // Default fallback
-  if (req.session.user && req.session.user.email) {
+  if (req.session.user && req.session.user.name) { // Check for name first
     try {
-      const nameParts = req.session.user.name?.split(' ');
-      if (nameParts && nameParts.length > 1) {
-          userInitials = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
-      } else if (nameParts && nameParts.length === 1 && nameParts[0].length >= 2) {
+      const nameParts = req.session.user.name.trim().split(' ');
+      if (nameParts.length > 1 && nameParts[0] && nameParts[1]) {
+          // Use first letter of first and last name parts
+          userInitials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+      } else if (nameParts.length === 1 && nameParts[0].length >= 2) {
+          // Use first two letters of single name
           userInitials = nameParts[0].substring(0, 2).toUpperCase();
-      } else {
+      } else if (nameParts.length === 1 && nameParts[0].length === 1) {
+           // Use single letter twice if only one letter name
+           userInitials = (nameParts[0][0] + nameParts[0][0]).toUpperCase();
+      }
+       // Fallback to email if name processing failed or name is empty
+       else if (req.session.user.email) {
+            const emailPrefix = req.session.user.email.split('@')[0];
+            if (emailPrefix.length >= 2) {
+                userInitials = emailPrefix.substring(0, 2).toUpperCase();
+            } else if (emailPrefix.length === 1) {
+                userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase();
+            }
+       }
+    } catch (e) {
+      console.error("Error generating initials:", e);
+      // Fallback to email if error during name processing
+       if (req.session.user.email) {
+            const emailPrefix = req.session.user.email.split('@')[0];
+            if (emailPrefix.length >= 2) {
+                userInitials = emailPrefix.substring(0, 2).toUpperCase();
+            } else if (emailPrefix.length === 1) {
+                userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase();
+            }
+       }
+    }
+  } else if (req.session.user && req.session.user.email) { // If no name, use email
         const emailPrefix = req.session.user.email.split('@')[0];
         if (emailPrefix.length >= 2) {
             userInitials = emailPrefix.substring(0, 2).toUpperCase();
         } else if (emailPrefix.length === 1) {
             userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase();
         }
-      }
-    } catch (e) {
-      console.error("Error generating initials:", e);
-    }
   }
   res.locals.userInitials = userInitials;
 
-  // --- NEW: Date Formatting Helper for IST ---
+  // Date Formatting Helper for IST timezone
   res.locals.formatDateIST = (dateInput) => {
-      if (!dateInput) return 'N/A';
+      if (!dateInput) return 'N/A'; // Handle null or undefined dates
       try {
           const date = new Date(dateInput);
-          // Check if the date is valid
+          // Check if the date object is valid
           if (isNaN(date.getTime())) {
               console.warn(`formatDateIST received invalid dateInput: ${dateInput}`);
               return 'Invalid Date';
@@ -5669,28 +5744,35 @@ app.use((req, res, next) => {
               day: 'numeric',
               hour: 'numeric', // e.g., '1', '2'... '12'
               minute: '2-digit', // e.g., '05', '15'
-              second: '2-digit', // e.g., '08', '59'
+              // second: '2-digit', // Optional: include seconds if needed
               hour12: true // Use AM/PM
           };
-          // Use 'en-IN' locale for formatting conventions common in India (though options override most)
+          // Use 'en-IN' locale for formatting conventions common in India (can use 'en-US' too)
           return date.toLocaleString('en-IN', options);
       } catch (error) {
           console.error("Error formatting date to IST:", error, "Input:", dateInput);
           return 'Date Error'; // Fallback error message
       }
   };
-  // --- END: Date Formatting Helper ---
 
-  next();
+  // Default Site Name for Meta Tags
+  res.locals.defaultSiteName = 'miniapp'; // Change this to your actual application name
+
+  // Pass NODE_ENV to views for conditional rendering (e.g., error stack)
+  res.locals.NODE_ENV = process.env.NODE_ENV;
+
+  next(); // Proceed to the next middleware or route handler
 });
 
-app.use('/', mainRouter);
+// Main Application Routes
+app.use('/', mainRouter); // Mount the main router at the root path
 
+// Error Handling Middleware (Should be LAST after routes)
+app.use(notFound); // Handle 404 Not Found errors
+app.use(errorHandler); // Handle all other errors
 
-app.use(notFound);
-app.use(errorHandler);
-
-const PORT = process.env.PORT || 3000;
+// Start Server
+const PORT = process.env.PORT || 3000; // Use port from .env or default to 3000
 
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
