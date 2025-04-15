@@ -2,11 +2,11 @@
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Product = require('../models/Product');
-const { sendEmail } = require('../config/mailer');
+const { sendEmail } = require('../config/mailer'); // Keep require, might be used elsewhere
 const mongoose = require('mongoose');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 
-// --- UPDATED placeOrder ---
+// --- placeOrder (Existing Code) ---
 exports.placeOrder = async (req, res, next) => {
     try {
         const userId = req.session.user._id;
@@ -162,9 +162,9 @@ exports.placeOrder = async (req, res, next) => {
         next(error); // Pass to the main error handler
     }
 };
-// --- END UPDATED placeOrder ---
+// --- END placeOrder ---
 
-// --- cancelOrder (User) ---
+// --- cancelOrder (User) (Existing Code) ---
 exports.cancelOrder = async (req, res, next) => {
     const sessionDB = await mongoose.startSession(); // Use transaction for stock restore + order update
     sessionDB.startTransaction();
@@ -239,39 +239,49 @@ exports.cancelOrder = async (req, res, next) => {
         sessionDB.endSession(); // Always end session
     }
 };
+// --- END cancelOrder ---
 
-// --- Get User's Orders ---
+// --- Get User's Orders (Includes OTP Logic) ---
 exports.getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ userId: req.session.user._id })
-                                   .select('+cancellationReason') // Keep reason if needed
+                                   // Select all fields needed, including OTP fields and cancellation reason
+                                   .select('+cancellationReason +orderOTP +orderOTPExpires')
                                    .sort({ orderDate: -1 })
                                    .lean(); // Use lean for performance
 
-         const now = Date.now();
+        const now = Date.now();
         orders.forEach(order => {
             // Determine if the order is cancellable by the user
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
+
+            // --- Determine if Delivery OTP should be shown ---
+            order.showDeliveryOtp = order.status === 'Pending' &&
+                                    order.orderOTP &&
+                                    order.orderOTPExpires &&
+                                    new Date(order.orderOTPExpires).getTime() > now;
+            // ------------------------------------------------------
+
             // Dates will be formatted in the EJS template using the helper
-         });
+        });
 
         res.render('user/my-orders', {
             title: 'My Orders',
-            orders: orders // Pass orders with raw dates
+            orders: orders // Pass orders with raw dates and new showDeliveryOtp flag
         });
     } catch (error) {
         console.error("Error fetching user orders:", error);
         next(error); // Pass to global error handler
     }
 };
+// --- END Get User's Orders ---
 
-// --- Admin Direct Delivery OTP ---
-// This function doesn't interact with `res`, so it remains unchanged regarding date helpers
+// --- Admin Direct Delivery OTP (Email Sending Removed) ---
 exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
      try {
          const order = await Order.findById(orderId);
          if (!order) throw new Error('Order not found.');
-         if (order.status !== 'Pending') throw new Error(`Cannot send OTP for order with status '${order.status}'. Must be 'Pending'.`);
+         if (order.status !== 'Pending') throw new Error(`Cannot generate OTP for order with status '${order.status}'. Must be 'Pending'.`);
 
          const otp = generateOTP();
          const otpExpires = setOTPExpiration(5); // 5 mins expiry for delivery OTP
@@ -279,34 +289,43 @@ exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
          order.orderOTPExpires = otpExpires;
          await order.save(); // Save OTP to order
 
-         const user = await User.findById(order.userId).select('email');
+         const user = await User.findById(order.userId).select('email'); // Still useful for the message
          if (!user) {
-             // Clean up OTP if user not found
+             // Clean up OTP if user not found (good practice)
              order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
-             throw new Error('Customer user account not found for sending OTP.');
+             // Throw error as we can't confirm who the customer is even for the message
+             throw new Error('Customer user account not found for this order.');
          }
 
-         // Email to CUSTOMER containing the OTP
+         // --- Email Sending Section REMOVED/COMMENTED ---
+         /*
          const subject = 'Confirming Delivery - Action Required';
          const text = `An administrator is ready to complete the delivery for your order (${order._id}).\nPlease provide them with the following OTP to confirm you have received your items: ${otp}\nIt will expire in 5 minutes.\nDo not share if you haven't received your items.`;
          const html = `<p>An administrator is ready to complete the delivery for your order (${order._id}).</p><p>Please provide the administrator with the following OTP to confirm you have received your items: <strong>${otp}</strong></p><p>The OTP will expire in 5 minutes.</p><p><strong>Only share this OTP once you have received your items from the administrator.</strong></p>`;
 
         const emailSent = await sendEmail(user.email, subject, text, html);
         if (!emailSent) {
-            // Clean up OTP if email fails
-            order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
-            throw new Error('Failed to send direct delivery confirmation OTP email to the customer.');
+            // Clean up OTP if email fails (optional, but perhaps less critical now)
+            // order.orderOTP = undefined; order.orderOTPExpires = undefined; await order.save();
+            // throw new Error('Failed to send direct delivery confirmation OTP email to the customer.');
+            console.warn(`Direct delivery OTP generated for order ${orderId}, but email sending is disabled.`);
          }
-        // Return success message to be flashed by the caller controller
-        return { success: true, message: `Direct delivery confirmation OTP sent to customer ${user.email}.` };
+         */
+         // --- End of Removed Email Section ---
+
+        // Adjust success message
+        console.log(`Direct delivery OTP generated for order ${orderId} (Email sending disabled). OTP: ${otp}`); // Log OTP for admin reference if needed
+        return { success: true, message: `OTP generated for order ${orderId}. It's available on the customer's 'My Orders' page.` };
+
     } catch (error) {
-         console.error(`Error sending ADMIN Direct Delivery OTP for order ${orderId}:`, error);
+         console.error(`Error generating ADMIN Direct Delivery OTP for order ${orderId}:`, error);
          // Re-throw the error to be caught by the caller controller
          throw error;
      }
  };
+ // --- END generateAndSendDirectDeliveryOTPByAdmin ---
 
-// --- Verify OTP and Confirm Delivery Directly By Admin ---
+// --- Verify OTP and Confirm Delivery Directly By Admin (Existing Code) ---
 // Added 'resForHelper' parameter to access the date formatter
 exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper) => {
      try {
@@ -332,7 +351,7 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
         // OTP fields should be cleared by the pre-save hook in Order.js when status changes
         await order.save();
 
-        // Send Delivery Confirmation Email (Best Effort)
+        // Send Delivery Confirmation Email (Best Effort - STILL SEND CONFIRMATION EMAIL)
         try {
              const subject = `Your Order Has Been Delivered!`;
              // --- USE formatDateIST from resForHelper.locals (if available) ---
@@ -354,3 +373,4 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
         throw error;
     }
 };
+// --- END confirmDirectDeliveryByAdmin ---

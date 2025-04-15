@@ -1338,6 +1338,36 @@ select:focus {
     min-width: 120px;
 }
 
+/* My Orders Page - Delivery OTP Display */
+.delivery-otp-display {
+    margin-top: 10px; /* Add some space above */
+    padding: 8px 12px;
+    background-color: #e6ffed; /* Light green background */
+    border: 1px solid #b7e4c7; /* Soft green border */
+    border-radius: var(--border-radius);
+    font-size: 0.95rem;
+}
+.delivery-otp-display p {
+    margin-bottom: 3px !important; /* Reduce margin for the main line */
+}
+
+.delivery-otp-code {
+    font-weight: bold;
+    color: #2b9348; /* Darker green for the code */
+    font-size: 1.15em; /* Make code slightly larger */
+    margin: 0 5px;
+    letter-spacing: 1px; /* Space out digits slightly */
+    background-color: #fff; /* Optional: white background for code itself */
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.delivery-otp-display small {
+    display: block; /* Ensure small text is on its own line */
+    margin-top: 3px;
+    color: #555; /* Slightly darker muted text */
+}
+
 
 /* =================================== */
 /* ===== Medium Screens & Up (Tablet) ====== */
@@ -1545,4 +1575,3 @@ select:focus {
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns */
 
 } /* End @media 1024px */
-

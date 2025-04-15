@@ -33,6 +33,22 @@
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
+
+                              <%# --- NEW: Display Delivery OTP if applicable --- %>
+                              <% if (order.showDeliveryOtp) { %>
+                                <div class="delivery-otp-display">
+                                    <p>
+                                        <strong>Delivery OTP:</strong>
+                                        <span class="delivery-otp-code"><%= order.orderOTP %></span>
+                                    </p>
+                                    <small class="text-muted">Provide this code to the admin upon direct delivery.</small>
+                                    <% if (order.orderOTPExpires) { %>
+                                        <small class="text-muted">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
+                                    <% } %>
+                                </div>
+                              <% } %>
+                              <%# --- END: Display Delivery OTP --- %>
+
                          </div>
                     </div>
                      <div class="order-actions">
@@ -40,12 +56,14 @@
                             <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner">
                                 <button type="submit" class="btn btn-danger btn-sm">Cancel Order</button>
                              </form>
-                         <% } else if (order.status === 'Pending') { %>
+                         <% } else if (order.status === 'Pending' && !order.showDeliveryOtp) { %> <%# Modified condition slightly %>
                              <small class="text-muted">Cancellation window closed or processing.</small>
                          <% } else if (order.status === 'Delivered') { %>
                               <small class="text-success">Order delivered.</small>
                          <% } else if (order.status === 'Cancelled') { %>
                               <small class="text-danger">Order was cancelled.</small>
+                         <% } else if (order.status === 'Pending' && order.showDeliveryOtp) { %>
+                              <small class="text-info">Awaiting delivery confirmation.</small> <%# Added hint when OTP is showing %>
                          <% } %>
                      </div>
                 </div>
