@@ -9,7 +9,4 @@ const isAdmin = (req, res, next) => {
   }
 };
 
-// --- REMOVED isDeliveryAdmin ---
-// --- REMOVED isAdminOrDeliveryAdmin ---
-
-module.exports = { isAdmin }; // Only export isAdmin now
+module.exports = { isAdmin }; 

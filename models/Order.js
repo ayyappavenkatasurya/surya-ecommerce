@@ -48,27 +48,19 @@ const OrderSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        // --- REMOVED 'Out for Delivery' ---
         enum: ['Pending', 'Delivered', 'Cancelled'],
-        // ---------------------------------
         default: 'Pending',
     },
     orderDate: {
         type: Date,
         default: Date.now,
     },
-    receivedByDate: { // Renamed for clarity (date customer received it)
+    receivedByDate: {
         type: Date,
     },
-    // --- REMOVED assignedTo and assignedAdminEmail ---
-    // assignedTo: { ... }
-    // assignedAdminEmail: { ... }
-    // ------------------------------------------------
 
-    // --- OTP now only for Admin Direct Delivery ---
     orderOTP: String,
     orderOTPExpires: Date,
-    // -------------------------------------------
 
     cancellationAllowedUntil: {
         type: Date,
@@ -82,28 +74,22 @@ const OrderSchema = new mongoose.Schema({
 });
 
 OrderSchema.pre('save', function(next) {
-    // Set customer cancellation window only for new orders
     if (this.isNew && !this.cancellationAllowedUntil) {
         const now = this.orderDate || Date.now();
-        // Allow customer cancellation for 1 hour after placement
         this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000);
     }
 
-    // Clear fields when order is cancelled (removed assignment fields)
     if (this.isModified('status') && this.status === 'Cancelled') {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
-        this.receivedByDate = undefined; // Clear received date on cancellation
-        this.cancellationAllowedUntil = undefined; // Prevent further user cancellation
+        this.receivedByDate = undefined;
+        this.cancellationAllowedUntil = undefined;
     }
 
-    // --- UPDATED: Clear OTP if status changes away from 'Pending' ---
-    // OTP is only relevant in 'Pending' (for potential admin direct delivery)
     if (this.isModified('status') && this.status !== 'Pending') {
          this.orderOTP = undefined;
          this.orderOTPExpires = undefined;
     }
-    // Clear OTP if status becomes Delivered or Cancelled (ensures OTP is gone after successful delivery/cancellation)
     if (this.status === 'Delivered' || this.status === 'Cancelled') {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;

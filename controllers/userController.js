@@ -1,12 +1,9 @@
-// controllers/userController.js
 const User = require('../models/User');
 const Product = require('../models/Product');
 
-// --- UPDATED: Get User Profile Page ---
 exports.getUserProfilePage = async (req, res, next) => {
     try {
         const userId = req.session.user._id;
-        // Select necessary fields including role and address
         const user = await User.findById(userId).select('name email role address').lean();
 
         if (!user) {
@@ -19,17 +16,14 @@ exports.getUserProfilePage = async (req, res, next) => {
 
         res.render('user/profile', {
             title: 'My Profile',
-            user: user // Pass the user object to the view
-            // No need to check for delivery role here anymore
+            user: user
         });
 
     } catch (error) {
         next(error);
     }
 };
-// --- END UPDATED FUNCTION ---
 
-// --- saveAddress remains the same, source logic is still useful ---
 exports.saveAddress = async (req, res, next) => {
     const { name, phone, pincode, cityVillage, landmarkNearby, source } = req.body;
     const userId = req.session.user._id;
@@ -77,7 +71,6 @@ exports.saveAddress = async (req, res, next) => {
     }
 };
 
-// --- Existing Cart functions remain the same ---
 exports.getCart = async (req, res, next) => {
     try {
         const user = await User.findById(req.session.user._id)
@@ -96,8 +89,6 @@ exports.getCart = async (req, res, next) => {
         const populatedCart = user.cart.map(item => {
              if (!item.productId) {
                  console.warn(`Cart item refers to a non-existent product ID: ${item._id} for user: ${user.email}`);
-                 // Optionally remove invalid item from cart here
-                 // User.updateOne({ _id: user._id }, { $pull: { cart: { _id: item._id } } }).catch(console.error);
                  return null;
              }
             const itemSubtotal = item.productId.price * item.quantity;
@@ -112,9 +103,8 @@ exports.getCart = async (req, res, next) => {
                 quantity: item.quantity,
                 subtotal: itemSubtotal
             };
-         }).filter(item => item !== null); // Filter out null items
+         }).filter(item => item !== null);
 
-         // Update session cart
          req.session.user.cart = user.cart.filter(item => item.productId);
 
         res.render('user/cart', {
@@ -195,7 +185,7 @@ exports.updateCartQuantity = async (req, res, next) => {
          const userId = req.session.user._id;
         const numQuantity = parseInt(quantity, 10);
 
-          if (!productId || isNaN(numQuantity) || numQuantity < 0) { // Allow 0 for removal
+          if (!productId || isNaN(numQuantity) || numQuantity < 0) {
               return res.status(400).json({ success: false, message: 'Invalid product ID or quantity.' });
          }
 

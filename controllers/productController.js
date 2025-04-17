@@ -2,14 +2,12 @@
 const Product = require('../models/Product');
 const User = require('../models/User');
 
-// getProducts remains the same...
 exports.getProducts = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
     let query = { stock: { $gt: 0 } };
 
     if (searchTerm) {
-      // Escape regex special characters for safety
       const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
       const regex = new RegExp(escapedSearchTerm, 'i');
       query.$or = [
@@ -47,29 +45,27 @@ exports.getProductDetails = async (req, res, next) => {
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // --- Calculate Rating Counts ---
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
-        totalRatings = product.ratings.length; // Use the actual array length for calculation
+        totalRatings = product.ratings.length;
         product.ratings.forEach(r => {
             if (ratingCounts.hasOwnProperty(r.rating)) {
                 ratingCounts[r.rating]++;
             }
         });
     }
-    // Ensure totalRatings used for percentage calculation matches numReviews if available
-    // This handles potential small discrepancies if numReviews wasn't updated perfectly
+
     const displayTotalRatings = product.numReviews || totalRatings;
-    // --- End Calculation ---
+
 
     res.render('products/detail', {
       title: product.name,
       product: product,
       userRating: userRating,
       userCanRate: req.session.user ? true : false,
-      ratingCounts: ratingCounts, // Pass the counts
-      totalRatings: displayTotalRatings // Pass the total count for percentage calculation
+      ratingCounts: ratingCounts,
+      totalRatings: displayTotalRatings
     });
   } catch (error) {
        if (error.name === 'CastError') {
@@ -81,7 +77,7 @@ exports.getProductDetails = async (req, res, next) => {
   }
 };
 
-// rateProduct remains the same...
+
  exports.rateProduct = async (req, res, next) => {
      const { rating } = req.body;
     const productId = req.params.id;
@@ -103,16 +99,15 @@ exports.getProductDetails = async (req, res, next) => {
          const existingRatingIndex = product.ratings.findIndex(r => r.userId.toString() === userId.toString());
 
          if (existingRatingIndex > -1) {
-            // Update existing rating
+
             product.ratings[existingRatingIndex].rating = Number(rating);
-             // Optionally update timestamp if RatingSchema has timestamps:true
-             // product.ratings[existingRatingIndex].updatedAt = new Date();
+
          } else {
-            // Add new rating
+
             product.ratings.push({ userId, rating: Number(rating) });
         }
 
-        // Pre-save hook in Product.js will recalculate averageRating and numReviews
+
         await product.save();
 
          req.flash('success_msg', 'Thank you for your rating!');
