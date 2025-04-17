@@ -4,20 +4,9 @@
 <div class="profile-container">
     <h1>My Profile</h1>
     <p class="text-muted mb-3">Welcome, <%= user.name %> (<%= user.email %>)</p>
+    <p class="mb-3">Your current role: <span class="badge bg-info text-dark"><%= user.role %></span></p>
 
-    <%# --- Conditional Dashboards --- %>
-    <div class="profile-section dashboards-section">
-        <h2>Dashboards</h2>
-        <% if (user.role === 'admin') { %>
-            <p><a href="/admin/dashboard" class="btn btn-info"><i class="fas fa-user-shield"></i> Go to Admin Dashboard</a></p>
-        <% } %>
-        <%# --- REMOVED delivery_admin check --- %>
-        <% if (user.role === 'user') { %>
-            <p>You have standard user access.</p>
-        <% } %>
-    </div>
-
-    <%# --- Address Management (remains the same) --- %>
+    <%# --- Address Management --- %>
     <div class="profile-section address-section">
         <h2>My Address</h2>
         <div id="saved-address-display" class="<%= (!user.address || !user.address.name) ? 'hidden' : '' %>">
@@ -27,8 +16,12 @@
                 <p><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %></p>
                 <p>Pincode: <%= user.address.pincode %></p>
                 <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+            <% } else { %>
+                <p>You haven't saved an address yet.</p>
+                 <button type="button" id="edit-address-btn" class="btn btn-primary btn-sm">Add Address</button>
             <% } %>
         </div>
+        <%# Address Form (hidden initially if address exists) %>
         <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner">
              <h3><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
              <input type="hidden" name="source" value="profile">
@@ -53,6 +46,7 @@
                  <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= user.address?.landmarkNearby || '' %>">
              </div>
              <button type="submit" class="btn btn-primary">Save Address</button>
+             <%# Show Cancel only if editing an existing address %>
              <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel</button>
         </form>
     </div>

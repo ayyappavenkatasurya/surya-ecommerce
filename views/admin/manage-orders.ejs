@@ -12,12 +12,14 @@
                         <th>Images</th>
                         <th>Order ID</th>
                         <th>Date</th>
-                        <th>Customer</th>
-                        <th>Address & Phone</th>
+                        <%# Show Customer Email only for Admin %>
+                        <% if (userRole === 'admin') { %><th>Customer Email</th><% } %>
+                        <th>Customer & Address</th>
                         <th>Items & Prices</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <th class="actions-cell" style="text-align: right;">Actions</th>
+                        <%# Show Actions column only for Admin %>
+                        <% if (userRole === 'admin') { %><th class="actions-cell" style="text-align: right;">Actions</th><% } %>
                     </tr>
                 </thead>
                 <tbody>
@@ -27,8 +29,9 @@
                                 <% if (order.products && order.products.length > 0) { %>
                                     <% order.products.slice(0, 3).forEach(item => { %>
                                         <% if (item.productId && item.productId._id && item.imageUrl) { %>
-                                            <a href="/products/<%= item.productId._id %>" title="View Product: <%= item.name %>">
-                                                <img src="<%= item.imageUrl %>" alt="<%= item.name %>" class="table-img">
+                                            <%# Link only if product exists (it should based on population) %>
+                                            <a href="/products/<%= item.productId._id %>" title="View Product: <%= item.productId.name %>">
+                                                <img src="<%= item.imageUrl %>" alt="<%= item.productId.name %>" class="table-img">
                                             </a>
                                         <% } else { %><span class="text-muted" style="font-size: 0.8em;">[?]</span><% } %>
                                     <% }) %>
@@ -36,34 +39,26 @@
                                 <% } else { %><span class="text-muted">N/A</span><% } %>
                             </td>
                             <td data-label="Order ID"><%= order._id %></td>
-                            <%# --- USE HELPER --- %>
                             <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
-                            <td data-label="Customer"><%= order.userEmail %></td>
-                            <td data-label="Address & Phone">
+                            <%# Conditional Customer Email %>
+                            <% if (userRole === 'admin') { %><td data-label="Customer Email"><%= order.userEmail %></td><% } %>
+                            <td data-label="Customer & Address">
                                 <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
                                 <br><strong>Ph: <%= order.shippingAddress.phone %></strong>
                             </td>
                             <td data-label="Items & Prices">
-                                <% if (order.products && order.products.length > 0) { %>
-                                    <% order.products.forEach((item, index) => { %>
-                                        <% if (item.productId) { %>
-                                            <%= item.name %> (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %>
-                                        <% } else { %>
-                                            [Removed Product] (Qty: <%= item.quantity %>) : ₹<%= item.priceAtOrder.toFixed(2) %>
-                                        <% } %>
-                                        <% if (index < order.products.length - 1) { %><br><% } %>
-                                    <% }) %>
-                                <% } else { %>No items found<% } %>
+                                <%- order.itemsSummary %> <%# Use pre-formatted summary %>
                             </td>
                             <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <%# --- USE HELPER --- %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
+                            <%# --- Admin Actions --- %>
+                            <% if (userRole === 'admin') { %>
                             <td data-label="Actions" class="actions-cell">
-                                <%# Direct Delivery Confirmation by Admin (Pending orders) %>
+                                <%# Direct Delivery Actions (Admin Only) %>
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
                                     <div class="action-group">
                                         <p class="action-group-title">Admin Direct Delivery:</p>
@@ -81,7 +76,7 @@
                                     </div>
                                 <% } %>
 
-                                <%# Cancel Order (Admin: Pending only now) %>
+                                <%# Cancel Order Action (Admin Only) %>
                                 <% if (order.canBeCancelledByAdmin) { %>
                                     <div class="action-group">
                                         <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order? This cannot be undone.');">
@@ -97,18 +92,19 @@
                                     </div>
                                 <% } %>
 
-                                <%# Fallback %>
+                                <%# Fallback Text when no actions are available %>
                                 <% if (!order.canBeDirectlyDeliveredByAdmin && !order.canBeCancelledByAdmin) { %>
                                     <% if (order.status === 'Delivered') { %><small class="text-success">Completed.</small><% } else if (order.status === 'Cancelled') { %><small class="text-danger">Cancelled.</small><% } else { %><small class="text-muted">No actions available.</small><% } %>
                                 <% } %>
                             </td>
+                            <% } %> <%# End Admin Role Check for Actions Column %>
                         </tr>
                     <% }) %>
                 </tbody>
             </table>
         </div>
     <% } else { %>
-        <p>No orders received yet.</p>
+        <p>No orders found matching your criteria.</p>
     <% } %>
 </div>
 

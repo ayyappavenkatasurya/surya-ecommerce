@@ -4,12 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <%# --- META TAGS FOR RICH LINK PREVIEWS --- %>
+    <%# --- META TAGS (Assume unchanged unless product detail logic needs adjustment) --- %>
     <% const pageTitle = typeof title !== 'undefined' ? title + ' | miniapp' : 'miniapp'; %>
     <% const siteName = typeof defaultSiteName !== 'undefined' ? defaultSiteName : 'miniapp'; %>
     <% const currentMetaTitle = typeof metaTitle !== 'undefined' ? metaTitle : (typeof title !== 'undefined' ? title : 'miniapp'); %>
     <% const currentMetaDesc = typeof metaDescription !== 'undefined' ? metaDescription : 'Check out our products on ' + siteName; %>
-    <%# Use a default logo/image if specific one isn't provided %>
     <% const currentMetaImage = typeof metaImageUrl !== 'undefined' ? metaImageUrl : '/images/default-logo.png'; /* Adjust path if needed */ %>
     <% const currentMetaUrl = typeof fullUrl !== 'undefined' ? fullUrl : ''; %>
     <% const currentMetaType = typeof metaType !== 'undefined' ? metaType : 'website'; %>
@@ -19,25 +18,19 @@
     <%# -- Standard Meta -- %>
     <meta name="description" content="<%= currentMetaDesc %>">
 
-    <%# -- Open Graph Meta Tags (Facebook, WhatsApp, etc.) -- %>
+    <%# -- Open Graph Meta Tags -- %>
     <meta property="og:title" content="<%= currentMetaTitle %>" />
     <meta property="og:description" content="<%= currentMetaDesc %>" />
     <meta property="og:image" content="<%= currentMetaImage %>" />
     <% if (currentMetaUrl) { %><meta property="og:url" content="<%= currentMetaUrl %>" /><% } %>
     <meta property="og:type" content="<%= currentMetaType %>" />
     <meta property="og:site_name" content="<%= siteName %>" />
-    <%# Optional: Add image dimensions if known for better rendering %>
-    <%# <meta property="og:image:width" content="1200" /> %>
-    <%# <meta property="og:image:height" content="630" /> %>
 
     <%# -- Twitter Card Meta Tags -- %>
-    <meta name="twitter:card" content="summary_large_image"> <%# Use summary_large_image for products %>
+    <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="<%= currentMetaTitle %>">
     <meta name="twitter:description" content="<%= currentMetaDesc %>">
     <meta name="twitter:image" content="<%= currentMetaImage %>">
-    <%# Optional: Add Twitter site/creator handle if you have one %>
-    <%# <meta name="twitter:site" content="@YourTwitterHandle"> %>
-    <%# <meta name="twitter:creator" content="@YourTwitterHandle"> %>
     <%# --- END META TAGS --- %>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -58,6 +51,7 @@
             </div>
             <div class="nav-right">
                 <% if (currentUser) { %>
+                    <%# Common Links %>
                     <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home">
                         <i class="fas fa-home"></i> <span>Home</span>
                     </a>
@@ -73,10 +67,20 @@
                     <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders">
                         <i class="fas fa-box"></i> <span>Orders</span>
                     </a>
+
+                    <%# --- Role Specific Management Links --- %>
+                    <% if (currentUser.role === 'admin' || currentUser.role === 'seller') { %>
+                         <a href="/admin/dashboard" class="nav-link <%= currentUrl.startsWith('/admin') ? 'active' : '' %>" title="<%= currentUser.role === 'admin' ? 'Admin Dashboard' : 'Seller Dashboard' %>">
+                             <i class="fas fa-tachometer-alt"></i> <span>Dashboard</span>
+                         </a>
+                    <% } %>
+
+                    <%# Profile Link (Always Show if Logged In) %>
                     <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile">
                          <span class="profile-avatar-initials"><%= userInitials %></span>
                     </a>
                 <% } else { %>
+                    <%# Login/Register Button %>
                     <a href="/auth/login" class="btn btn-login-register">
                         <i class="fas fa-sign-in-alt"></i> Login / Register
                     </a>

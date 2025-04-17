@@ -1,3 +1,4 @@
+// models/Product.js
 const mongoose = require('mongoose');
 
 const RatingSchema = new mongoose.Schema({
@@ -38,12 +39,25 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    sellerEmail: {
+    sellerEmail: { // Email of the user who uploaded (admin or seller)
         type: String,
         required: true,
         lowercase: true,
         trim: true,
     },
+    // --- NEW FIELDS for Review Workflow ---
+    status: {
+        type: String,
+        enum: ['Pending Review', 'Approved', 'Rejected'],
+        required: true,
+        // Default is set in controller based on role
+    },
+    rejectionReason: {
+        type: String,
+        trim: true,
+        default: null
+    },
+    // --- END NEW FIELDS ---
     ratings: [RatingSchema],
     averageRating: {
       type: Number,
@@ -58,10 +72,16 @@ const ProductSchema = new mongoose.Schema({
         default: 0,
     }
 }, {
-    timestamps: true
+    timestamps: true // Adds createdAt and updatedAt
 });
 
+// Indexes for faster querying
+ProductSchema.index({ sellerEmail: 1 });
+ProductSchema.index({ status: 1 });
+ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' }); // For search
+
 ProductSchema.pre('save', function(next) {
+    // Calculate average rating and numReviews
     if (this.ratings && this.ratings.length > 0) {
         this.numReviews = this.ratings.length;
         this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
@@ -69,6 +89,12 @@ ProductSchema.pre('save', function(next) {
         this.numReviews = 0;
         this.averageRating = 0;
     }
+
+    // Clear rejection reason if approved or pending
+    if (this.isModified('status') && (this.status === 'Approved' || this.status === 'Pending Review')) {
+        this.rejectionReason = null;
+    }
+
     next();
 });
 

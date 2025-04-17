@@ -49,7 +49,8 @@ const UserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin'],
+        // --- Added 'seller' role ---
+        enum: ['user', 'admin', 'seller'],
         default: 'user',
     },
     isVerified: {
@@ -76,6 +77,7 @@ UserSchema.pre('save', async function(next) {
 });
 
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+    if (!this.password) return false; // Handle cases where password might not be selected
     return await bcrypt.compare(enteredPassword, this.password);
 };
 

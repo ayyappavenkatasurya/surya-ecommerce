@@ -1,28 +1,42 @@
+// routes/adminRoutes.js
 const express = require('express');
 const adminController = require('../controllers/adminController');
 const { isAuthenticated } = require('../middleware/authMiddleware');
-const { isAdmin } = require('../middleware/roleMiddleware');
+// --- Use specific role middleware ---
+const { isAdmin, isSellerOrAdmin } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
 
-router.use(isAuthenticated, isAdmin);
+// All admin/seller routes require login first
+router.use(isAuthenticated);
 
-router.get('/dashboard', adminController.getAdminDashboard);
+// --- Dashboard (Accessible to Admin & Seller) ---
+router.get('/dashboard', isSellerOrAdmin, adminController.getAdminDashboard);
 
-router.get('/upload-product', adminController.getUploadProductPage);
-router.post('/upload-product', adminController.uploadProduct);
-router.get('/manage-products', adminController.getManageProductsPage);
-router.get('/manage-products/edit/:id', adminController.getEditProductPage);
-router.post('/manage-products/update/:id', adminController.updateProduct);
-router.post('/manage-products/remove/:id', adminController.removeProduct);
+// --- Product Management (Accessible to Admin & Seller, logic inside controller handles ownership) ---
+router.get('/upload-product', isSellerOrAdmin, adminController.getUploadProductPage);
+router.post('/upload-product', isSellerOrAdmin, adminController.uploadProduct);
+router.get('/manage-products', isSellerOrAdmin, adminController.getManageProductsPage);
+router.get('/manage-products/edit/:id', isSellerOrAdmin, adminController.getEditProductPage);
+router.post('/manage-products/update/:id', isSellerOrAdmin, adminController.updateProduct);
+router.post('/manage-products/remove/:id', isSellerOrAdmin, adminController.removeProduct);
 
-router.get('/manage-orders', adminController.getManageOrdersPage);
-router.post('/orders/:orderId/send-direct-delivery-otp', adminController.sendDirectDeliveryOtpByAdmin);
-router.post('/orders/:orderId/confirm-direct-delivery', adminController.confirmDirectDeliveryByAdmin);
-router.post('/orders/:orderId/cancel', adminController.cancelOrderByAdmin);
+// --- Product Review (Admin Only) ---
+router.get('/review-products', isAdmin, adminController.getReviewProductsPage);
+router.post('/products/:id/approve', isAdmin, adminController.approveProduct);
+router.post('/products/:id/reject', isAdmin, adminController.rejectProduct);
 
-router.get('/manage-users', adminController.getManageUsersPage);
-router.post('/users/:id/update-role', adminController.updateUserRole);
-router.post('/users/:id/remove', adminController.removeUser);
+// --- Order Management (Viewable by Admin & Seller, Actions restricted by role in controller) ---
+router.get('/manage-orders', isSellerOrAdmin, adminController.getManageOrdersPage);
+
+// --- Order Actions (Explicitly Admin Only Routes) ---
+router.post('/orders/:orderId/send-direct-delivery-otp', isAdmin, adminController.sendDirectDeliveryOtpByAdmin);
+router.post('/orders/:orderId/confirm-direct-delivery', isAdmin, adminController.confirmDirectDeliveryByAdmin);
+router.post('/orders/:orderId/cancel', isAdmin, adminController.cancelOrderByAdmin); // Kept admin only for now
+
+// --- User Management (Admin Only) ---
+router.get('/manage-users', isAdmin, adminController.getManageUsersPage);
+router.post('/users/:id/update-role', isAdmin, adminController.updateUserRole);
+router.post('/users/:id/remove', isAdmin, adminController.removeUser);
 
 module.exports = router;
