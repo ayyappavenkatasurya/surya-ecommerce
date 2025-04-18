@@ -1518,3 +1518,58 @@ select:focus {
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
 
 }
+
+/* public/css/style.css */
+
+/* ... (keep existing styles) ... */
+
+
+/* --- NEW Styles for Order Item Images --- */
+.order-items-images {
+  display: flex; /* Arrange images horizontally */
+  flex-wrap: wrap; /* Allow wrapping to next line if needed */
+  gap: 8px; /* Space between images */
+  margin-top: 8px; /* Space above the image row */
+  padding-left: 5px; /* Small indent */
+}
+
+.order-item-thumbnail {
+  display: inline-block;
+  width: 50px; /* Adjust size as needed */
+  height: 50px; /* Adjust size as needed */
+  object-fit: cover; /* Ensures image covers the area without distortion */
+  border-radius: 4px; /* Rounded corners */
+  border: 1px solid var(--border-color); /* Subtle border */
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
+  vertical-align: middle; /* Align vertically if wrapped next to text/placeholders */
+}
+
+.order-item-thumbnail:hover {
+  opacity: 0.85; /* Slight fade on hover */
+  transform: scale(1.05); /* Slight zoom effect */
+}
+
+/* Style for the placeholder shown when image is missing */
+.order-item-thumbnail-placeholder {
+  display: inline-flex; /* Use flex to center text vertically/horizontally */
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 4px;
+  border: 1px dashed var(--secondary-color); /* Dashed border */
+  background-color: var(--light-color); /* Light background */
+  color: var(--secondary-color); /* Muted text color */
+  font-size: 0.7rem;
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none; /* Remove underline from link */
+  transition: background-color 0.2s ease-in-out;
+  vertical-align: middle;
+}
+.order-item-thumbnail-placeholder:hover {
+   background-color: #e2e6ea; /* Slightly darker background on hover */
+   text-decoration: none;
+}
+
+/* ... (rest of existing styles) ... */

@@ -24,10 +24,10 @@
                              <td data-label="Details">
                                  <strong>ID:</strong> <%= order._id %><br>
                                  <small><%= formatDateIST(order.orderDate) %></small><br>
+                                 <%# Minimal info about seller involvement %>
                                  <% if (order.products && order.products.length > 0 && order.products[0].productId && order.products[0].productId.sellerId) { %>
-                                    <small>Seller(s) involved</small> <%# Example: Could list sellers if needed %>
+                                    <small class="text-muted">Contains items from seller(s)</small>
                                  <% } %>
-                                 <%# Removed image preview for cleaner mobile view, focus on data %>
                             </td>
                             <td data-label="Customer">
                                 <%= order.shippingAddress.name %>
@@ -35,7 +35,33 @@
                                 <br><small><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small>
                                 <br><small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
-                             <td data-label="Items"> <%- order.itemsSummary %></td> <%# Use pre-formatted summary %>
+                             <td data-label="Items">
+                                 <%# Existing text summary %>
+                                 <%- order.itemsSummary %>
+
+                                 <%# --- NEW: Display Product Images --- %>
+                                 <% if (order.products && order.products.length > 0) { %>
+                                     <div class="order-items-images mt-2"> <%# Container for images %>
+                                         <% order.products.forEach(item => { %>
+                                             <%# Safely check if product info (especially ID and image) exists %>
+                                             <% if (item.productId && item.productId._id && item.productId.imageUrl) { %>
+                                                 <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
+                                                     <img src="<%= item.productId.imageUrl %>"
+                                                          alt="<%= item.productId.name || 'Product Image' %>"
+                                                          class="order-item-thumbnail">
+                                                 </a>
+                                             <% } else if (item.productId && item.productId._id) { %>
+                                                  <%# Fallback if image URL is missing but product exists %>
+                                                  <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
+                                             <% } else { %>
+                                                  <%# Basic fallback if product link is broken %>
+                                                  <span class="order-item-thumbnail-placeholder" title="Product data missing">[N/A]</span>
+                                             <% } %>
+                                         <% }) %>
+                                     </div>
+                                 <% } %>
+                                 <%# --- End: Display Product Images --- %>
+                             </td>
                             <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>

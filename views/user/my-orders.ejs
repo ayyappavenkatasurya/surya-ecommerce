@@ -15,7 +15,7 @@
                          <div><strong>Status:</strong><br><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
-                         <%# Simplified item display %>
+                         <%# Simplified item display (text) %>
                          <p class="mb-1"><strong>Items:</strong></p>
                          <div class="order-items-list mb-2">
                             <% order.products.forEach((item, index) => { %>
@@ -23,7 +23,28 @@
                             <% }) %>
                          </div>
 
-                        <div class="order-details">
+                         <%# --- NEW: Display Product Images --- %>
+                         <div class="order-items-images mt-2">
+                            <% order.products.forEach(item => { %>
+                                <%# Check if product was populated and has necessary info %>
+                                <% if (item.productId && item.productId._id && item.imageUrl) { %>
+                                    <a href="/products/<%= item.productId._id %>" title="View <%= item.name || 'Product' %>">
+                                        <img src="<%= item.imageUrl %>"
+                                             alt="<%= item.name || 'Product Image' %>"
+                                             class="order-item-thumbnail">
+                                    </a>
+                                <% } else if (item.productId && item.productId._id) { %>
+                                    <%# Fallback if image URL is missing but product exists %>
+                                    <a href="/products/<%= item.productId._id %>" class="order-item-thumbnail-placeholder" title="View <%= item.name || 'Product' %>">[No Img]</a>
+                                <% } else { %>
+                                    <%# Very basic fallback if productId is missing entirely %>
+                                    <span class="order-item-thumbnail-placeholder">[Item NA]</span>
+                                <% } %>
+                            <% }) %>
+                         </div>
+                         <%# --- End: Display Product Images --- %>
+
+                        <div class="order-details mt-3"> <%# Add margin-top for spacing %>
                              <p class="mb-1"><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
                              <% if (order.status === 'Delivered' && order.receivedByDate) { %>
                                 <p class="text-success mb-1"><small><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></small></p>
@@ -32,7 +53,7 @@
                                 <p class="text-danger mb-1"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
 
-                              <%# --- UPDATED: Display Delivery OTP for Customer --- %>
+                              <%# Display Delivery OTP for Customer %>
                               <% if (order.showDeliveryOtp) { %>
                                 <div class="delivery-otp-display mt-2 p-2 border rounded bg-light">
                                     <p class="mb-1">
@@ -45,8 +66,7 @@
                                     <% } %>
                                 </div>
                               <% } %>
-                              <%# --- End: Display Delivery OTP --- %>
-
+                              <%# End: Display Delivery OTP %>
                          </div>
                     </div>
                      <div class="order-actions text-end p-2 border-top"> <%# Adjusted padding/border %>
