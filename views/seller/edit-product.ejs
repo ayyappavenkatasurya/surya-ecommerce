@@ -1,0 +1,48 @@
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container"> <%# Reuse admin style %>
+    <h1><%= title %></h1>
+    <p class="text-muted small mb-3">Updating the product will reset its status to 'pending' and trigger a new review.</p>
+
+     <form action="/seller/products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
+        <%# Display current status (read-only) %>
+         <div class="alert alert-<%= product.reviewStatus === 'approved' ? 'success' : (product.reviewStatus === 'rejected' ? 'danger' : 'warning') %>" role="alert">
+           <strong>Current Status:</strong> <span class="text-capitalize"><%= product.reviewStatus %></span>
+           <% if(product.reviewStatus === 'rejected' && product.rejectionReason) { %>
+            <br><strong>Rejection Reason:</strong> <%= product.rejectionReason %>
+           <% } %>
+         </div>
+
+        <div class="form-group">
+             <label for="name">Product Name:</label>
+            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+         </div>
+        <div class="form-group">
+            <label for="category">Category:</label>
+             <input type="text" id="category" name="category" value="<%= product.category %>" required>
+         </div>
+         <div class="form-group">
+            <label for="price">Price (₹):</label>
+            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+         </div>
+        <div class="form-group">
+             <label for="stock">Stock Quantity:</label>
+             <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+        </div>
+         <div class="form-group">
+             <label for="imageUrl">Image URL:</label>
+             <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+             <% if(product.imageUrl) { %>
+                <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border: 1px solid #ddd; padding: 2px;">
+             <% } %>
+         </div>
+         <div class="form-group">
+             <label for="specifications">Specifications (Optional):</label>
+             <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+        </div>
+         <button type="submit" class="btn btn-primary">Update & Resubmit for Review</button>
+         <a href="/seller/products" class="btn btn-secondary">Cancel</a>
+    </form>
+ </div>
+
+ <%- include('../partials/footer') %>

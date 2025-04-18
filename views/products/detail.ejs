@@ -1,24 +1,46 @@
 <%# views/products/detail.ejs %>
 
-<%# --- UPDATED: Prepare meta description (exclude category/specs) --- %>
+<%# --- Meta Description Preparation (Same as before) --- %>
 <% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
-<%# Ensure total length is reasonable (e.g., ~160 chars) %>
-<% if (metaDesc.length > 160) {
-     metaDesc = metaDesc.substring(0, 157) + '...';
-   }
-%>
-<%# --- END UPDATED --- %>
+<% if (metaDesc.length > 160) { metaDesc = metaDesc.substring(0, 157) + '...'; } %>
 
 <%- include('../partials/header', {
     title: product.name,
-    metaTitle: product.name + ' - miniapp', /* Add site name to title */
-    metaDescription: metaDesc,           /* Use the new, simpler description */
-    metaImageUrl: product.imageUrl,      /* ASSUMES absolute URL */
-    metaUrl: fullUrl,                    /* Already available via res.locals */
-    metaType: 'product'                  /* Use 'product' type for product pages */
+    metaTitle: product.name + ' - ' + defaultSiteName, // Use defaultSiteName
+    metaDescription: metaDesc,
+    metaImageUrl: product.imageUrl,
+    metaUrl: fullUrl,
+    metaType: 'product'
 }) %>
 
 <div class="product-detail-container">
+
+   <%# --- Status Banner for Admin/Owner if Not Approved --- %>
+   <% if (!isApproved && (isAdminView || isOwnerView)) { %>
+     <div class="alert alert-<%= product.reviewStatus === 'rejected' ? 'danger' : 'warning' %> mb-3" role="alert">
+       <strong>Status:</strong> <span class="text-capitalize fw-bold"><%= product.reviewStatus %></span>
+       <% if (product.reviewStatus === 'rejected' && product.rejectionReason) { %>
+         <br><strong>Reason:</strong> <%= product.rejectionReason %>
+       <% } else if (product.reviewStatus === 'pending') { %>
+          - This product is awaiting review and is not visible to customers.
+       <% } %>
+       <% if (isOwnerView && product.reviewStatus !== 'approved') { %> <%# Show edit link only to owner if not approved %>
+          <br><a href="/seller/products/edit/<%= product._id %>" class="alert-link">Edit and Resubmit for Review</a>
+        <% } else if (isAdminView && product.reviewStatus !== 'approved') { %>
+           <br><a href="/admin/manage-products/edit/<%= product._id %>" class="alert-link">Admin: Edit Status/Details</a>
+       <% } %>
+     </div>
+   <% } else if (!isApproved && !isAdminView && !isOwnerView) { %>
+      <%# This block should technically not be reachable due to controller redirect, but acts as safety %>
+      <div class="alert alert-danger">This product is currently unavailable.</div>
+      <%# Early exit or hide the rest of the content %>
+      </div> <%- /* End product-detail-container */ %>
+      <%- include('../partials/footer') %>
+      <% return; %> <%# Stop rendering further %>
+   <% } %>
+   <%# --- End Status Banner --- %>
+
+
    <div class="product-detail-main">
         <div class="product-detail-image">
            <img src="<%= product.imageUrl %>" alt="<%= product.name %>">
@@ -26,55 +48,74 @@
        <div class="product-detail-info">
             <h1><%= product.name %></h1>
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
-            <p class="detail-stock">Available Stock: <%= product.stock %></p>
+            <p class="detail-stock">
+                <% if (product.stock > 0) { %>
+                    Available Stock: <%= product.stock %>
+                <% } else { %>
+                    <span class="text-danger fw-bold">Out of Stock</span>
+                <% } %>
+            </p>
 
+           <%# Rating Display %>
            <% if (product.numReviews > 0) { %>
                 <p class="detail-rating">
                     Rating:
-                   <% for(let i=1; i<=5; i++) { %>
-                       <i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i>
-                   <% } %>
+                   <% for(let i=1; i<=5; i++) { %><i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i><% } %>
                     (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
                 </p>
             <% } else { %>
                 <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
             <% } %>
 
-            <p>Seller: <%= product.sellerEmail %></p>
+            <p class="small text-muted">Sold by: <%= product.sellerId?.name || product.sellerEmail || 'Unknown Seller' %></p>
 
-           <div class="product-actions">
-                <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
-                   <input type="hidden" name="productId" value="<%= product._id %>">
-                    <div class="quantity-selector">
-                       <label for="quantity">Qty:</label>
-                        <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary" <%= product.stock <= 0 ? 'disabled' : '' %>>
-                        <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
-                    </button>
-               </form>
 
-                 <% if (product.stock > 0) { %>
-                 <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
-                       <input type="hidden" name="productId" value="<%= product._id %>">
-                       <input type="hidden" name="quantity" value="1">
-                      <button type="submit" class="btn btn-success">Buy Now</button>
-                    </form>
-                 <% } else {%>
-                   <button class="btn btn-success" disabled>Buy Now</button>
-                 <% } %>
-           </div>
+           <%# --- Conditional Purchase Actions --- %>
+           <% if (isApproved) { %>
+               <div class="product-actions">
+                   <%# Add to Cart Form %>
+                   <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
+                      <input type="hidden" name="productId" value="<%= product._id %>">
+                       <div class="quantity-selector mb-2"> <%# Added mb-2 %>
+                          <label for="quantity" class="visually-hidden">Quantity:</label> <%# Hide label visually %>
+                           <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px; display: inline-block;">
+                       </div>
+                       <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
+                           <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
+                       </button>
+                  </form>
+
+                   <%# Buy Now Form %>
+                    <% if (product.stock > 0) { %>
+                    <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
+                          <input type="hidden" name="productId" value="<%= product._id %>">
+                          <input type="hidden" name="quantity" value="1">
+                         <button type="submit" class="btn btn-success btn-sm">Buy Now</button>
+                       </form>
+                    <% } else {%>
+                      <button class="btn btn-success btn-sm" disabled>Buy Now</button>
+                    <% } %>
+               </div>
+            <% } else { %>
+                <div class="product-actions">
+                     <button class="btn btn-primary btn-sm" disabled><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                     <button class="btn btn-success btn-sm" disabled>Buy Now</button>
+                     <p class="text-muted small mt-2">This product is currently under review or unavailable.</p>
+                 </div>
+            <% } %>
+            <%# --- End Conditional Purchase Actions --- %>
+
 
            <!-- Share Functionality -->
-           <div class="share-section">
-               <button id="share-product-btn" class="btn btn-secondary btn-sm"
+           <div class="share-section mt-3">
+               <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
                        data-title="<%= product.name %>"
                        data-text="Check out this product: <%= product.name %>"
                        data-url="<%= fullUrl %>">
                    <i class="fas fa-share-alt"></i> Share
                </button>
                <div id="fallback-share-links" class="fallback-share-links hidden">
-                   <span>Share via:</span>
+                   <small>Share via:</small>
                    <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
                    <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
                    <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
@@ -83,55 +124,58 @@
            </div>
            <!-- End Share Functionality -->
 
-           <%# Specifications are still displayed on the page itself %>
-           <div class="product-specifications">
+           <%# Specifications %>
+           <div class="product-specifications mt-3">
                 <h3>Specifications</h3>
-                <pre><%= product.specifications || 'No specifications provided.' %></pre>
+                <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
             </div>
        </div>
     </div>
 
-   <div class="product-rating-section">
+   <%# --- Conditional Rating Section --- %>
+   <div class="product-rating-section mt-4 border-top pt-3">
         <h3>Rate This Product</h3>
-        <% if (userCanRate) { %>
-            <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
-                <div class="rating-stars">
-                    <% for (let i = 5; i >= 1; i--) { %>
-                       <input type="radio" id="star<%= i %>" name="rating" value="<%= i %>" <%= userRating === i ? 'checked' : '' %> required>
-                       <label for="star<%= i %>" title="<%= i %> stars"><i class="fas fa-star"></i></label>
-                    <% } %>
-                </div>
-                <button type="submit" class="btn btn-primary">Submit Rating</button>
-            </form>
-        <% } else { %>
-           <p><a href="/auth/login?returnTo=<%= encodeURIComponent(currentUrl) %>">Login</a> to rate this product.</p>
-        <% } %>
+        <% if (isApproved) { %> <%# Only allow rating if approved %>
+            <% if (userCanRate) { %>
+                <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
+                    <div class="rating-stars">
+                        <% for (let i = 5; i >= 1; i--) { %><input type="radio" id="star<%= i %>" name="rating" value="<%= i %>" <%= userRating === i ? 'checked' : '' %> required><label for="star<%= i %>" title="<%= i %> stars"><i class="fas fa-star"></i></label><% } %>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">Submit Rating</button>
+                </form>
+            <% } else { %>
+               <p><a href="/auth/login?returnTo=<%= encodeURIComponent(currentUrl) %>">Login</a> to rate this product.</p>
+            <% } %>
+         <% } else { %>
+             <p class="text-muted">Rating is unavailable until the product is approved.</p>
+         <% } %>
    </div>
+   <%# --- End Conditional Rating Section --- %>
 
-    <div class="rating-stats-container">
-        <h3>Ratings & Reviews</h3>
+
+    <%# --- Rating Stats Display --- %>
+    <div class="rating-stats-container mt-4 border-top pt-3">
+        <h3>Ratings & Reviews Summary</h3>
          <% if (totalRatings > 0) { %>
-             <div class="rating-summary">
+             <div class="rating-summary mb-3">
                  <div class="rating-average">
-                     <span class="rating-average-value"><%= product.averageRating.toFixed(1) %></span> <i class="fas fa-star"></i>
+                     <span class="rating-average-value"><%= product.averageRating.toFixed(1) %></span> <i class="fas fa-star text-warning"></i>
                  </div>
-                 <div class="rating-total">
-                     <%= totalRatings %> Rating<%= totalRatings !== 1 ? 's' : '' %>
+                 <div class="rating-total text-muted small">
+                     Based on <%= totalRatings %> Rating<%= totalRatings !== 1 ? 's' : '' %>
                  </div>
              </div>
-
             <div class="rating-bars">
-                <% for (let i = 5; i >= 1; i--) { %>
-                    <%
-                        const count = ratingCounts[i] || 0;
-                        const percentage = totalRatings > 0 ? (count / totalRatings) * 100 : 0;
-                    %>
+                <% for (let i = 5; i >= 1; i--) {
+                      const count = ratingCounts[i] || 0;
+                      const percentage = totalRatings > 0 ? (count / totalRatings) * 100 : 0;
+                 %>
                      <div class="rating-bar-row">
-                         <span class="rating-bar-label"><%= i %> <i class="fas fa-star"></i></span>
-                         <div class="rating-bar-progress">
-                             <div class="rating-bar-fill" data-width="<%= percentage.toFixed(1) %>"></div>
+                         <span class="rating-bar-label small"><%= i %> <i class="fas fa-star text-warning"></i></span>
+                         <div class="rating-bar-progress progress" style="height: 8px;"> <%# Use Bootstrap progress bar style %>
+                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div> <%# Start width at 0 %>
                          </div>
-                         <span class="rating-bar-count"><%= count %></span>
+                         <span class="rating-bar-count small text-muted"><%= count %></span>
                      </div>
                  <% } %>
             </div>
@@ -139,15 +183,19 @@
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
+     <%# --- End Rating Stats Display --- %>
 
-</div>
+</div> <%# End product-detail-container %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Animate progress bars
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            el.style.width = width + '%';
+            setTimeout(() => { // Small delay for visual effect
+                 el.style.width = width + '%';
+            }, 100);
         }
     });
 });

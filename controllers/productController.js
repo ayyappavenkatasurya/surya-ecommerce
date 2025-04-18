@@ -1,35 +1,38 @@
 // controllers/productController.js
 const Product = require('../models/Product');
-const User = require('../models/User'); // Keep User model if needed for ratings etc.
+const User = require('../models/User'); // Keep for user rating logic
 
-/**
- * @desc    Get approved products for the public listing/search page
- * @route   GET /products
- * @access  Public
- */
+// --- UPDATE Get Products (Show ONLY Approved) ---
 exports.getProducts = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
-    // --- BASE QUERY: Only show APPROVED products with stock > 0 ---
-    let query = { status: 'Approved', stock: { $gt: 0 } };
+    let query = {
+        // *** ADDED: Filter by approved status and stock ***
+        reviewStatus: 'approved',
+        stock: { $gt: 0 }
+    };
 
     if (searchTerm) {
-      const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-      const regex = new RegExp(escapedSearchTerm, 'i');
-      // Apply search using text index (or fallback to regex within approved products)
-      // Using text index is generally more efficient if set up correctly in the model
-      // query.$text = { $search: escapedSearchTerm }; // Option 1: Use text index
-      // Option 2: Regex search (as before)
-      query.$or = [
-         { name: regex },
-         { category: regex },
-         { specifications: regex }
-      ];
+      // Using text index for search
+      query.$text = { $search: searchTerm };
+      // If not using text index, use regex:
+      // const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+      // const regex = new RegExp(escapedSearchTerm, 'i');
+      // query.$or = [
+      //    { name: regex },
+      //    { category: regex },
+      //    { specifications: regex }
+      // ];
     }
 
-    const products = await Product.find(query)
-                                   .sort({ createdAt: -1 }) // Sort newest first
-                                   .lean(); // Use lean for performance as it's read-only
+    // Define projection for text search score if using $text
+    const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
+    const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
+
+
+    const products = await Product.find(query, projection) // Add projection
+                                    .sort(sort)        // Sort by score or date
+                                    .lean();             // Use lean for performance
 
     res.render('products/index', {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
@@ -37,142 +40,145 @@ exports.getProducts = async (req, res, next) => {
       searchTerm: searchTerm
     });
   } catch (error) {
-    console.error("Error fetching products for home page:", error);
-    next(error); // Pass error to the error handler
+    next(error);
   }
 };
 
 
-/**
- * @desc    Get details of a single APPROVED product
- * @route   GET /products/:id
- * @access  Public
- */
+// --- UPDATE Get Product Details (Check Status/Ownership) ---
 exports.getProductDetails = async (req, res, next) => {
   try {
-    const productId = req.params.id;
+    const product = await Product.findById(req.params.id)
+                                    .populate('sellerId', 'name email') // Populate seller
+                                    .lean(); // Use lean()
 
-    // --- CRITICAL: Find product by ID *AND* ensure it's Approved ---
-    const product = await Product.findOne({
-        _id: productId,
-        status: 'Approved' // Only fetch if the product status is 'Approved'
-    }); // Don't use lean here if we modify later (e.g., potentially updating views count, though not implemented)
-
-    // If no product is found (either wrong ID or not Approved), trigger the 404 error
     if (!product) {
-       // This is the point where the error "Product not found or not available" is correctly generated.
-       const error = new Error('Product not found or not available.');
+       // Handles CastError implicitly if ID is invalid format for findById
+       const error = new Error('Product not found');
        error.status = 404;
-       return next(error); // Pass the error to the error handling middleware
+       return next(error); // Use central error handler
     }
 
-    // --- Rating Logic (Only runs if product is found and approved) ---
+    // *** ADDED: Check if product is viewable ***
+    const isApproved = product.reviewStatus === 'approved';
+    const user = req.session.user;
+    const isAdmin = user?.role === 'admin';
+    // Check if user is explicitly the seller comparing ObjectIds as strings
+    const isOwner = user && product.sellerId?._id && user._id.toString() === product.sellerId._id.toString();
+
+
+    if (!isApproved && !isAdmin && !isOwner) {
+        // If product isn't approved, only admin or owner can see it
+         const error = new Error('Product not available');
+         error.status = 404; // Or 403 Forbidden, but 404 is less revealing
+         return next(error);
+    }
+
+
+    // User rating logic (no change needed here)
     let userRating = null;
-    if (req.session.user) {
-       // Find if the current user has rated this product
-       const ratingData = product.ratings.find(r => r.userId.toString() === req.session.user._id.toString());
+    if (user) {
+       // Note: lean() means product.ratings doesn't have Mongoose methods. Need manual find.
+       const ratingData = product.ratings?.find(r => r.userId?.toString() === user._id.toString());
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // Calculate rating distribution
+    // Rating stats calculation (no change needed here)
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
         totalRatings = product.ratings.length;
         product.ratings.forEach(r => {
-            // Ensure rating is within expected bounds before counting
-            if (ratingCounts.hasOwnProperty(r.rating)) {
+            // Check rating value exists and is within expected range
+            if (r.rating && ratingCounts.hasOwnProperty(r.rating)) {
                 ratingCounts[r.rating]++;
             }
         });
     }
-    // Use numReviews from product document (calculated on save) as the source of truth
-    const displayTotalRatings = product.numReviews || 0;
-    // --- End Rating Logic ---
 
-    // Render the product detail page
+    const displayTotalRatings = product.numReviews || totalRatings;
+
+
     res.render('products/detail', {
       title: product.name,
-      product: product, // Pass the full mongoose document
+      product: product,
+      // Pass status flags to view for conditional rendering (e.g., banners)
+      isApproved: isApproved,
+      isAdminView: isAdmin,
+      isOwnerView: isOwner,
       userRating: userRating,
-      userCanRate: req.session.user ? true : false, // Allow rating if logged in
+      // Allow rating only if product is approved (or maybe always for owner/admin?)
+      userCanRate: user ? true : false, // Existing logic: logged in = can rate
+      // Pass rating data
       ratingCounts: ratingCounts,
       totalRatings: displayTotalRatings
-      // No need to pass userRole here, this is the public view
     });
-
   } catch (error) {
-       // Handle potential CastError if the ID format is invalid
+       // Mongoose CastError (invalid ID format) should be caught by findById -> null
        if (error.name === 'CastError') {
-           const notFoundError = new Error('Product not found (Invalid ID format)');
+           const notFoundError = new Error('Product not found (Invalid ID)');
            notFoundError.status = 404;
            return next(notFoundError);
        }
-       // Pass any other errors to the main error handler
-       next(error);
+    next(error); // Pass other errors to central handler
   }
 };
 
 
-/**
- * @desc    Rate an APPROVED product
- * @route   POST /products/:id/rate
- * @access  Private (Authenticated Users)
- */
+// --- Rate Product (No fundamental change, but check product exists) ---
  exports.rateProduct = async (req, res, next) => {
      const { rating } = req.body;
     const productId = req.params.id;
-    // Ensure user is logged in (should be handled by isAuthenticated middleware)
-    if (!req.session.user || !req.session.user._id) {
-        req.flash('error_msg', 'You must be logged in to rate products.');
-        return res.redirect('/auth/login');
-    }
     const userId = req.session.user._id;
 
-    // Validate rating input
-     if (!rating || rating < 1 || rating > 5) {
+     if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) { // Added NaN check
          req.flash('error_msg', 'Please provide a valid rating between 1 and 5.');
-        // Redirect back to the product page they were on
-        return res.redirect(`/products/${productId}`);
+        // Redirect back is safer than assuming specific path
+        return res.redirect('back'); // Redirect to previous page
      }
 
     try {
-        // --- Find the product, ensuring it exists AND is Approved ---
-        // We use findOneAndUpdate to potentially update the rating atomically,
-        // though the current logic finds then saves. Let's stick to find then save for clarity with hooks.
-        const product = await Product.findOne({ _id: productId, status: 'Approved' });
+        // Find the product *without* lean() to use save() method
+        const product = await Product.findById(productId);
 
          if (!product) {
-             // Product not found or not approved for rating
-             req.flash('error_msg', 'Product not found or not available for rating.');
-             return res.status(404).redirect('/'); // Redirect home or to product list
+             req.flash('error_msg', 'Product not found.');
+             // Redirecting to home might be better than back if product disappeared
+             return res.status(404).redirect('/');
          }
 
-         // --- Rating Logic ---
-         const existingRatingIndex = product.ratings.findIndex(r => r.userId.toString() === userId.toString());
+         // --- OPTIONAL: Prevent rating non-approved products? ---
+         // if (product.reviewStatus !== 'approved') {
+         //     req.flash('error_msg', 'This product cannot be rated currently.');
+         //     return res.redirect('back');
+         // }
+
+
+         // Find existing rating index
+         const existingRatingIndex = product.ratings.findIndex(r => r.userId?.toString() === userId.toString());
 
          if (existingRatingIndex > -1) {
-            // User has already rated, update their existing rating
+             // Update existing rating
             product.ratings[existingRatingIndex].rating = Number(rating);
-            product.ratings[existingRatingIndex].updatedAt = Date.now(); // Optionally track update time
+             // Optionally update timestamp if RatingSchema tracks it
          } else {
-            // User hasn't rated yet, add a new rating entry
+            // Add new rating
             product.ratings.push({ userId, rating: Number(rating) });
-        }
+         }
 
-        // The pre-save hook in Product.js will recalculate averageRating and numReviews
+        // Mongoose pre-save hook will recalculate averageRating and numReviews
         await product.save();
 
          req.flash('success_msg', 'Thank you for your rating!');
-         res.redirect(`/products/${productId}`); // Redirect back to the product page
+         res.redirect(`/products/${productId}`); // Redirect back to product page
 
      } catch (error) {
-         // Handle potential errors
-         if (error.name === 'CastError') {
+        // Handle CastError for productId
+        if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid product ID.');
-            return res.redirect('/'); // Redirect home for bad IDs
-         }
-         // Pass other errors to the error handler
-        next(error);
+            return res.status(400).redirect('/');
+        }
+        console.error("Error rating product:", error);
+        next(error); // Central error handler
      }
  };

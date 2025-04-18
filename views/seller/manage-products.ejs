@@ -1,0 +1,58 @@
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container"> <%# Reuse admin style %>
+    <h1>Manage Your Products</h1>
+    <a href="/seller/products/upload" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Upload New Product</a>
+
+   <% if (products.length > 0) { %>
+       <div class="table-container card">
+           <table class="data-table">
+               <thead>
+                   <tr>
+                       <th>Image</th>
+                       <th>Name</th>
+                       <th>Price</th>
+                       <th>Stock</th>
+                       <th>Status</th> <%# NEW %>
+                       <th>Reason</th> <%# NEW %>
+                       <th class="actions-cell" style="text-align: right;">Actions</th>
+                   </tr>
+                </thead>
+                <tbody>
+                   <% products.forEach(product => { %>
+                       <tr class="status-<%= product.reviewStatus %>"> <%# Add status class %>
+                           <td data-label="Image"><a href="/products/<%= product._id %>"><img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="table-img"></a></td>
+                            <td data-label="Name"><%= product.name %><br><small class="text-muted"><%= product.category %></small></td>
+                            <td data-label="Price">₹<%= product.price.toFixed(2) %></td>
+                            <td data-label="Stock"><%= product.stock %></td>
+                            <td data-label="Status">
+                                <span class="status-badge status-<%= product.reviewStatus %> text-capitalize">
+                                    <%= product.reviewStatus %>
+                                </span>
+                            </td>
+                             <td data-label="Reason">
+                                <% if(product.reviewStatus === 'rejected' && product.rejectionReason) { %>
+                                    <small class="text-danger"><%= product.rejectionReason %></small>
+                                <% } else { %>
+                                    <span class="text-muted">--</span>
+                                <% } %>
+                            </td>
+                            <td data-label="Actions" class="actions-cell">
+                               <%# Edit button always available, triggers re-review %>
+                               <a href="/seller/products/edit/<%= product._id %>" class="btn btn-text btn-sm" title="Edit Product"><i class="fas fa-edit"></i> Edit</a>
+
+                               <form action="/seller/products/remove/<%= product._id %>" method="POST" class="inline-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to permanently remove this product: <%= product.name %>?');">
+                                    <button type="submit" class="btn btn-text btn-danger btn-sm" title="Remove Product"><i class="fas fa-trash"></i> Remove</button>
+                               </form>
+                           </td>
+                        </tr>
+                    <% }) %>
+               </tbody>
+            </table>
+       </div>
+   <% } else { %>
+        <p class="text-muted mt-3">You haven't uploaded any products yet. <a href="/seller/products/upload">Upload your first product!</a></p>
+   <% } %>
+</div>
+
+<%- include('../partials/footer') %>

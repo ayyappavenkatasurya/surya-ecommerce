@@ -1,0 +1,31 @@
+<%- include('../partials/header', { title: 'Seller Dashboard' }) %>
+
+<div class="admin-dashboard-container"> <%# Re-use admin style container %>
+    <h1>Seller Dashboard</h1>
+    <p class="text-muted mb-3">Manage your products and orders.</p>
+
+    <div class="admin-actions-grid"> <%# Re-use admin style grid %>
+         <a href="/seller/products/upload" class="admin-action-card">
+            <i class="fas fa-upload text-primary"></i> <%# Added color class %>
+            <h3>Upload Product</h3>
+            <p>Add a new product to your listings.</p>
+        </a>
+         <a href="/seller/products" class="admin-action-card">
+            <i class="fas fa-edit text-success"></i> <%# Added color class %>
+            <h3>Manage Products</h3>
+            <p>View status, edit, or remove your products.</p>
+         </a>
+        <a href="/seller/orders" class="admin-action-card">
+             <i class="fas fa-clipboard-list text-info"></i> <%# Added color class %>
+             <h3>Manage Orders</h3>
+             <p>View and manage orders containing your products.</p>
+        </a>
+        <a href="/user/profile" class="admin-action-card">
+             <i class="fas fa-user-cog text-secondary"></i> <%# Added color class %>
+             <h3>My Profile</h3>
+             <p>View or update your profile and address.</p>
+        </a>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>

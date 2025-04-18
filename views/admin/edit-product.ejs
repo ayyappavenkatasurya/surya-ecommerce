@@ -2,36 +2,77 @@
 
 <div class="admin-manage-container">
     <h1><%= title %></h1>
+    <p>Admin editing view for product originally uploaded by <%= product.sellerId ? product.sellerId.email : 'Unknown Seller' %>.</p>
 
-     <form action="/admin/manage-products/update/<%= product._id %>" method="POST">
+    <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
-             <label for="name">Product Name:</label>
+            <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" value="<%= product.name %>" required>
-         </div>
+        </div>
+
         <div class="form-group">
             <label for="category">Category:</label>
-             <input type="text" id="category" name="category" value="<%= product.category %>" required>
-         </div>
-         <div class="form-group">
-            <label for="price">Price:</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
-         </div>
-        <div class="form-group">
-             <label for="stock">Stock Quantity:</label>
-             <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+            <input type="text" id="category" name="category" value="<%= product.category %>" required>
         </div>
-         <div class="form-group">
-             <label for="imageUrl">Image URL:</label>
-             <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
-             <% if(product.imageUrl) { %> <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px;"> <% } %>
-         </div>
-         <div class="form-group">
-             <label for="specifications">Specifications:</label>
-             <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
-        </div>
-         <button type="submit" class="btn btn-primary">Update Product</button>
-         <a href="/admin/manage-products" class="btn btn-secondary">Cancel</a>
-    </form>
- </div>
 
- <%- include('../partials/footer') %>
+        <div class="form-group">
+            <label for="price">Price (₹):</label>
+            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+        </div>
+
+        <div class="form-group">
+            <label for="stock">Stock Quantity:</label>
+            <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+        </div>
+
+        <div class="form-group">
+            <label for="imageUrl">Image URL:</label>
+            <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+            <% if (product.imageUrl) { %>
+                <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
+            <% } %>
+        </div>
+
+        <div class="form-group">
+            <label for="specifications">Specifications:</label>
+            <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+        </div>
+
+        <hr>
+        <h4>Admin Review Control</h4>
+
+        <div class="form-group">
+            <label for="reviewStatus">Review Status:</label>
+            <select id="reviewStatus" name="reviewStatus" class="form-control" onchange="toggleRejectionReason(this.value)">
+                <option value="pending" <%= product.reviewStatus === 'pending' ? 'selected' : '' %>>Pending</option>
+                <option value="approved" <%= product.reviewStatus === 'approved' ? 'selected' : '' %>>Approved</option>
+                <option value="rejected" <%= product.reviewStatus === 'rejected' ? 'selected' : '' %>>Rejected</option>
+            </select>
+        </div>
+
+        <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
+            <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
+            <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Update Product (Admin)</button>
+        <a href="/admin/manage-products" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+
+<script>
+    function toggleRejectionReason(status) {
+        const reasonGroup = document.getElementById('rejectionReasonGroup');
+        if (status === 'rejected') {
+            reasonGroup.style.display = 'block';
+        } else {
+            reasonGroup.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        toggleRejectionReason(document.getElementById('reviewStatus').value);
+    });
+</script>
+
+<%- include('../partials/footer') %>

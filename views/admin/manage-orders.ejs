@@ -1,74 +1,59 @@
 <%# views/admin/manage-orders.ejs %>
-<%- include('../partials/header', { title: 'Manage Orders' }) %>
+<%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
-    <h1>Manage Orders</h1>
+    <h1><%= title %></h1> <%# Title now passed from controller %>
 
     <% if (orders.length > 0) { %>
         <div class="table-container card">
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Images</th>
-                        <th>Order ID</th>
-                        <th>Date</th>
-                        <%# Show Customer Email only for Admin %>
-                        <% if (userRole === 'admin') { %><th>Customer Email</th><% } %>
-                        <th>Customer & Address</th>
-                        <th>Items & Prices</th>
+                        <%# Simplified headers for mobile-first data-label %>
+                        <th>Details</th>
+                        <th>Customer</th>
+                        <th>Items</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <%# Show Actions column only for Admin %>
-                        <% if (userRole === 'admin') { %><th class="actions-cell" style="text-align: right;">Actions</th><% } %>
+                        <th class="actions-cell" style="text-align: right;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
                         <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
-                            <td data-label="Images">
-                                <% if (order.products && order.products.length > 0) { %>
-                                    <% order.products.slice(0, 3).forEach(item => { %>
-                                        <% if (item.productId && item.productId._id && item.imageUrl) { %>
-                                            <%# Link only if product exists (it should based on population) %>
-                                            <a href="/products/<%= item.productId._id %>" title="View Product: <%= item.productId.name %>">
-                                                <img src="<%= item.imageUrl %>" alt="<%= item.productId.name %>" class="table-img">
-                                            </a>
-                                        <% } else { %><span class="text-muted" style="font-size: 0.8em;">[?]</span><% } %>
-                                    <% }) %>
-                                    <% if (order.products.length > 3) { %><br><small class="text-muted" style="white-space: nowrap;">+ <%= order.products.length - 3 %> more</small><% } %>
-                                <% } else { %><span class="text-muted">N/A</span><% } %>
+                             <td data-label="Details">
+                                 <strong>ID:</strong> <%= order._id %><br>
+                                 <small><%= formatDateIST(order.orderDate) %></small><br>
+                                 <% if (order.products && order.products.length > 0 && order.products[0].productId && order.products[0].productId.sellerId) { %>
+                                    <small>Seller(s) involved</small> <%# Example: Could list sellers if needed %>
+                                 <% } %>
+                                 <%# Removed image preview for cleaner mobile view, focus on data %>
                             </td>
-                            <td data-label="Order ID"><%= order._id %></td>
-                            <td data-label="Date"><%= formatDateIST(order.orderDate) %></td>
-                            <%# Conditional Customer Email %>
-                            <% if (userRole === 'admin') { %><td data-label="Customer Email"><%= order.userEmail %></td><% } %>
-                            <td data-label="Customer & Address">
-                                <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %>
-                                <br><strong>Ph: <%= order.shippingAddress.phone %></strong>
+                            <td data-label="Customer">
+                                <%= order.shippingAddress.name %>
+                                <br><small class="text-muted"><%= order.userEmail || order.userId?.email %></small> <%# Safer email access %>
+                                <br><small><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small>
+                                <br><small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
-                            <td data-label="Items & Prices">
-                                <%- order.itemsSummary %> <%# Use pre-formatted summary %>
-                            </td>
+                             <td data-label="Items"> <%- order.itemsSummary %></td> <%# Use pre-formatted summary %>
                             <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered: <%= formatDateIST(order.receivedByDate) %></small><% } %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
                             </td>
-                            <%# --- Admin Actions --- %>
-                            <% if (userRole === 'admin') { %>
                             <td data-label="Actions" class="actions-cell">
-                                <%# Direct Delivery Actions (Admin Only) %>
+                                <%# Admin Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
                                     <div class="action-group">
                                         <p class="action-group-title">Admin Direct Delivery:</p>
-                                        <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner">
-                                            <button type="submit" class="btn btn-warning btn-sm" title="Send delivery confirmation OTP to customer for direct delivery">
+                                        <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner mb-1">
+                                            <button type="submit" class="btn btn-warning btn-sm" title="Send OTP to customer for admin delivery">
                                                 <i class="fas fa-mobile-alt"></i> Send OTP
                                             </button>
                                         </form>
                                         <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
-                                            <input type="text" name="otp" placeholder="6-Digit OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter the 6-digit OTP from customer">
+                                            <input type="text" name="otp" placeholder="Enter OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
                                                 <i class="fas fa-check-double"></i> Confirm
                                             </button>
@@ -76,13 +61,13 @@
                                     </div>
                                 <% } %>
 
-                                <%# Cancel Order Action (Admin Only) %>
+                                <%# Admin Order Cancellation %>
                                 <% if (order.canBeCancelledByAdmin) { %>
                                     <div class="action-group">
-                                        <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order? This cannot be undone.');">
+                                        <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('ADMIN ACTION: Are you sure you want to cancel order <%= order._id %>? This cannot be undone.');">
                                             <label for="reason-<%= order._id %>" class="action-group-title">Cancel Order:</label>
-                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm">
-                                                <option value="" disabled selected>Select Reason...</option>
+                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1"> <%# Style select better %>
+                                                <option value="" disabled selected>Select Admin Reason...</option>
                                                 <% cancellationReasons.forEach(reason => { %>
                                                     <option value="<%= reason %>"><%= reason %></option>
                                                 <% }) %>
@@ -92,19 +77,20 @@
                                     </div>
                                 <% } %>
 
-                                <%# Fallback Text when no actions are available %>
+                                <%# Fallback for no actions %>
                                 <% if (!order.canBeDirectlyDeliveredByAdmin && !order.canBeCancelledByAdmin) { %>
-                                    <% if (order.status === 'Delivered') { %><small class="text-success">Completed.</small><% } else if (order.status === 'Cancelled') { %><small class="text-danger">Cancelled.</small><% } else { %><small class="text-muted">No actions available.</small><% } %>
+                                    <small class="text-muted">
+                                        <% if (order.status === 'Delivered') { %>Completed<% } else if (order.status === 'Cancelled') { %>Cancelled<% } else { %>No admin actions<% } %>
+                                    </small>
                                 <% } %>
                             </td>
-                            <% } %> <%# End Admin Role Check for Actions Column %>
                         </tr>
                     <% }) %>
                 </tbody>
             </table>
         </div>
     <% } else { %>
-        <p>No orders found matching your criteria.</p>
+        <p>No orders received yet.</p>
     <% } %>
 </div>
 

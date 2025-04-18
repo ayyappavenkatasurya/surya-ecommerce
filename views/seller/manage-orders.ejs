@@ -1,0 +1,89 @@
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container"> <%# Reuse admin style %>
+    <h1>Manage Your Orders</h1>
+    <p class="text-muted small mb-3">Showing orders that contain one or more of your products.</p>
+
+    <% if (message) { %> <%# Display specific message if no products/orders %>
+      <p class="alert alert-info"><%= message %></p>
+    <% } %>
+
+    <% if (orders.length > 0) { %>
+        <div class="table-container card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Order ID / Date</th>
+                        <th>Customer / Address</th>
+                        <th>Items (Your items highlighted)</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th class="actions-cell" style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% orders.forEach(order => { %>
+                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
+                            <td data-label="Order ID / Date">
+                                <%= order._id %><br>
+                                <small class="text-muted"><%= formatDateIST(order.orderDate) %></small>
+                            </td>
+                            <td data-label="Customer / Address">
+                                <%= order.shippingAddress.name %><br>
+                                <small class="text-muted"><%= order.userEmail %></small><br>
+                                <small class="text-muted"><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
+                                <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
+                            </td>
+                            <td data-label="Items">
+                                <%- order.itemsSummary %> <%# Use pre-formatted summary %>
+                            </td>
+                            <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
+                            <td data-label="Status">
+                                <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
+                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger" title="Cancellation Reason"><%= order.cancellationReason %></small><% } %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
+
+                                <%# Show customer OTP here if needed by Seller? User sees it on their page. %>
+                                <% if (order.showDeliveryOtp && order.status === 'Pending') { %>
+                                  <div class="delivery-otp-display mt-1">
+                                    <p>Customer OTP Sent</p>
+                                    <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
+                                  </div>
+                                <% } %>
+                            </td>
+                            <td data-label="Actions" class="actions-cell">
+                                <%# Seller Direct Delivery Confirmation %>
+                                <% if (order.canBeDirectlyDeliveredBySeller) { %>
+                                    <div class="action-group">
+                                        <p class="action-group-title">Confirm Delivery:</p>
+                                        <%# Button to Trigger OTP Generation %>
+                                        <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
+                                            <button type="submit" class="btn btn-warning btn-sm" title="Send OTP to customer to confirm delivery">
+                                                <i class="fas fa-mobile-alt"></i> Send OTP
+                                            </button>
+                                        </form>
+                                        <%# Form to Enter OTP and Confirm %>
+                                        <form action="/seller/orders/<%= order._id %>/confirm-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
+                                            <input type="text" name="otp" placeholder="Enter OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
+                                            <button type="submit" class="btn btn-success btn-sm" title="Confirm delivery using customer's OTP">
+                                                <i class="fas fa-check-double"></i> Confirm
+                                            </button>
+                                        </form>
+                                    </div>
+                                <% } else { %>
+                                     <small class="text-muted">
+                                         <% if (order.status === 'Delivered') { %>Completed<% } else if (order.status === 'Cancelled') { %>Cancelled<% } else { %>No actions available<% } %>
+                                    </small>
+                                <% } %>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else if (!message) { %> <%# Show only if no orders and no specific message %>
+        <p>No orders containing your products found.</p>
+    <% } %>
+</div>
+
+<%- include('../partials/footer') %>

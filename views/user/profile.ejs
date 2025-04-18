@@ -1,58 +1,72 @@
-<%# views/user/profile.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="profile-container">
     <h1>My Profile</h1>
     <p class="text-muted mb-3">Welcome, <%= user.name %> (<%= user.email %>)</p>
-    <p class="mb-3">Your current role: <span class="badge bg-info text-dark"><%= user.role %></span></p>
 
-    <%# --- Address Management --- %>
-    <div class="profile-section address-section">
+    <%# --- Conditional Dashboards Section --- %>
+    <div class="profile-section dashboards-section mb-4">
+        <h2>Dashboards</h2>
+        <div class="d-flex flex-wrap gap-2"> <%# Use flex for button layout %>
+            <% if (user.role === 'admin') { %>
+                <a href="/admin/dashboard" class="btn btn-info"><i class="fas fa-user-shield"></i> Admin Dashboard</a>
+            <% } %>
+             <% if (user.role === 'seller') { %>
+                 <a href="/seller/dashboard" class="btn btn-success"><i class="fas fa-store"></i> Seller Dashboard</a>
+             <% } %>
+             <% if (user.role === 'user') { %> <%# Explicitly show user status %>
+                 <p class="mb-0 align-self-center">Standard User Account</p>
+            <% } %>
+         </div>
+    </div>
+
+    <%# --- Address Management Section --- %>
+    <div class="profile-section address-section mb-4">
         <h2>My Address</h2>
+        <%# Display Saved Address %>
         <div id="saved-address-display" class="<%= (!user.address || !user.address.name) ? 'hidden' : '' %>">
             <% if (user.address && user.address.name) { %>
-                <p><strong><%= user.address.name %></strong></p>
-                <p><%= user.address.phone %></p>
-                <p><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %></p>
-                <p>Pincode: <%= user.address.pincode %></p>
-                <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm">Edit Address</button>
+                <p class="mb-1"><strong><%= user.address.name %></strong></p>
+                <p class="mb-1"><%= user.address.phone %></p>
+                <p class="mb-1"><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %>, Pincode: <%= user.address.pincode %></p>
+                <button type="button" id="edit-address-btn" class="btn btn-outline-secondary btn-sm mt-2">Edit Address</button>
             <% } else { %>
-                <p>You haven't saved an address yet.</p>
-                 <button type="button" id="edit-address-btn" class="btn btn-primary btn-sm">Add Address</button>
+                <p class="text-muted">No address saved yet.</p>
+                 <button type="button" id="add-address-btn" class="btn btn-outline-primary btn-sm mt-2">Add Address</button>
             <% } %>
         </div>
-        <%# Address Form (hidden initially if address exists) %>
-        <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner">
-             <h3><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
+
+        <%# Address Form (Initially hidden if address exists) %>
+        <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner mt-3">
+             <h3 class="h5"><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
              <input type="hidden" name="source" value="profile">
              <div class="form-group">
-                 <label for="name">Full Name:</label>
-                 <input type="text" id="name" name="name" value="<%= user.address?.name || '' %>" required autocomplete="name">
+                 <label for="name" class="form-label small">Full Name:</label>
+                 <input type="text" id="name" name="name" class="form-control" value="<%= user.address?.name || '' %>" required autocomplete="name">
              </div>
              <div class="form-group">
-                 <label for="phone">Phone Number:</label>
-                 <input type="tel" id="phone" name="phone" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number (numbers only)" autocomplete="tel">
+                 <label for="phone" class="form-label small">Phone Number:</label>
+                 <input type="tel" id="phone" name="phone" class="form-control" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
              </div>
              <div class="form-group">
-                 <label for="pincode">Pincode:</label>
-                 <input type="text" id="pincode" name="pincode" value="<%= user.address?.pincode || '' %>" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
+                 <label for="pincode" class="form-label small">Pincode:</label>
+                 <input type="text" id="pincode" name="pincode" class="form-control" value="<%= user.address?.pincode || '' %>" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
              </div>
              <div class="form-group">
-                 <label for="cityVillage">City / Village:</label>
-                 <input type="text" id="cityVillage" name="cityVillage" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
+                 <label for="cityVillage" class="form-label small">City / Village:</label>
+                 <input type="text" id="cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
              </div>
              <div class="form-group">
-                 <label for="landmarkNearby">Landmark / Nearby (Optional):</label>
-                 <input type="text" id="landmarkNearby" name="landmarkNearby" value="<%= user.address?.landmarkNearby || '' %>">
+                 <label for="landmarkNearby" class="form-label small">Landmark / Nearby (Optional):</label>
+                 <input type="text" id="landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>">
              </div>
-             <button type="submit" class="btn btn-primary">Save Address</button>
-             <%# Show Cancel only if editing an existing address %>
-             <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel</button>
+             <button type="submit" class="btn btn-primary me-2">Save Address</button>
+             <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel Edit</button>
         </form>
     </div>
 
     <%# --- Logout Section --- %>
-    <div class="profile-section logout-section">
+    <div class="profile-section logout-section mt-4 pt-3 border-top">
         <h2>Account Actions</h2>
         <form action="/auth/logout" method="POST" class="form-submit-spinner">
             <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> Logout</button>
@@ -60,5 +74,57 @@
     </div>
 
 </div>
+
+<%# Add JS specifically for profile page address form toggling %>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const editBtn = document.getElementById('edit-address-btn');
+    const addBtn = document.getElementById('add-address-btn'); // Button shown when no address exists
+    const cancelBtn = document.getElementById('cancel-edit-btn');
+    const addressForm = document.getElementById('address-form');
+    const savedAddressDiv = document.getElementById('saved-address-display');
+
+    const showForm = () => {
+        addressForm.classList.remove('hidden');
+        addressForm.querySelector('h3').textContent = savedAddressDiv.querySelector('strong') ? 'Edit Address' : 'Add Address';
+        savedAddressDiv.classList.add('hidden');
+        if (cancelBtn) cancelBtn.classList.remove('hidden'); // Show cancel only when editing existing
+    };
+
+    const hideForm = () => {
+        addressForm.classList.add('hidden');
+        if (savedAddressDiv.querySelector('strong')) { // Check if address actually exists
+            savedAddressDiv.classList.remove('hidden');
+        } else {
+            savedAddressDiv.classList.remove('hidden'); // Still show "No address" message
+             if (cancelBtn) cancelBtn.classList.add('hidden'); // Hide cancel if no address was being edited
+        }
+    };
+
+    if (editBtn) {
+        editBtn.addEventListener('click', showForm);
+    }
+    if (addBtn) {
+         addBtn.addEventListener('click', () => {
+            addressForm.reset(); // Clear form fields when adding new
+            showForm();
+            if(cancelBtn) cancelBtn.classList.add('hidden'); // Hide cancel when adding new
+         });
+    }
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', hideForm);
+    }
+
+    // Initial state: Show "Add Address" button if no address exists and form is hidden
+    if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden') && addBtn) {
+       addBtn.classList.remove('hidden'); // Ensure add button is visible
+    } else if (addBtn) {
+         addBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
+    }
+
+
+});
+</script>
+
 
 <%- include('../partials/footer') %>

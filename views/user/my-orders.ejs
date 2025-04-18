@@ -7,63 +7,63 @@
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
-                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %>">
+                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %> mb-3"> <%# Add mb-3 for spacing %>
                      <div class="order-header">
-                         <div><strong>Order ID:</strong> <%= order._id %></div>
-                         <%# --- USE HELPER --- %>
-                        <div><strong>Placed on:</strong> <%= formatDateIST(order.orderDate) %></div>
-                         <div><strong>Total:</strong> ₹<%= order.totalAmount.toFixed(2) %></div>
-                         <div><strong>Status:</strong> <span class="order-status"><%= order.status %></span></div>
+                         <div><strong>Order ID:</strong><br><%= order._id %></div>
+                         <div><strong>Placed on:</strong><br><%= formatDateIST(order.orderDate) %></div>
+                         <div><strong>Total:</strong><br>₹<%= order.totalAmount.toFixed(2) %></div>
+                         <div><strong>Status:</strong><br><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
-                         <div class="order-items-preview">
-                             <% order.products.slice(0, 3).forEach(item => { %>
-                                <% if (item.productId && item.imageUrl) { %>
-                                    <a href="/products/<%= item.productId %>" title="<%= item.name %> (Qty: <%= item.quantity %>)">
-                                        <img src="<%= item.imageUrl %>" alt="<%= item.name %>">
-                                    </a>
-                                <% } %>
-                             <% }) %>
-                             <% if(order.products.length > 3) { %><span class="more-items">+ <%= order.products.length - 3 %> more</span><% } %>
-                        </div>
+                         <%# Simplified item display %>
+                         <p class="mb-1"><strong>Items:</strong></p>
+                         <div class="order-items-list mb-2">
+                            <% order.products.forEach((item, index) => { %>
+                                <small><%= item.name || '[Product Name Missing]' %> (Qty: <%= item.quantity %>) <% if(index < order.products.length - 1) { %> | <% } %></small>
+                            <% }) %>
+                         </div>
+
                         <div class="order-details">
-                             <p><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
-                             <%# --- USE HELPER --- %>
-                             <p><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></p>
+                             <p class="mb-1"><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
+                             <% if (order.status === 'Delivered' && order.receivedByDate) { %>
+                                <p class="text-success mb-1"><small><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></small></p>
+                              <% } %>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
-                                <p class="text-danger"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
+                                <p class="text-danger mb-1"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
 
-                              <%# --- NEW: Display Delivery OTP if applicable --- %>
+                              <%# --- UPDATED: Display Delivery OTP for Customer --- %>
                               <% if (order.showDeliveryOtp) { %>
-                                <div class="delivery-otp-display">
-                                    <p>
+                                <div class="delivery-otp-display mt-2 p-2 border rounded bg-light">
+                                    <p class="mb-1">
                                         <strong>Delivery OTP:</strong>
-                                        <span class="delivery-otp-code"><%= order.orderOTP %></span>
+                                        <strong class="delivery-otp-code ms-1"><%= order.orderOTP %></strong> <%# Display full OTP %>
                                     </p>
-                                    <small class="text-muted">Provide this code to the admin upon direct delivery.</small>
+                                    <small class="text-muted d-block">Provide this code to the delivery person (Seller/Admin).</small>
                                     <% if (order.orderOTPExpires) { %>
-                                        <small class="text-muted">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
+                                        <small class="text-muted d-block">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
                                     <% } %>
                                 </div>
                               <% } %>
-                              <%# --- END: Display Delivery OTP --- %>
+                              <%# --- End: Display Delivery OTP --- %>
 
                          </div>
                     </div>
-                     <div class="order-actions">
+                     <div class="order-actions text-end p-2 border-top"> <%# Adjusted padding/border %>
                         <% if (order.isCancellable) { %>
-                            <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner">
+                            <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner d-inline-block">
                                 <button type="submit" class="btn btn-danger btn-sm">Cancel Order</button>
                              </form>
-                         <% } else if (order.status === 'Pending' && !order.showDeliveryOtp) { %> <%# Modified condition slightly %>
-                             <small class="text-muted">Cancellation window closed or processing.</small>
+                         <% } else if (order.status === 'Pending' && !order.showDeliveryOtp && order.cancellationAllowedUntil && new Date(order.cancellationAllowedUntil).getTime() < Date.now()) { %>
+                             <small class="text-muted">Cancellation window closed.</small>
+                         <% } else if (order.status === 'Pending' && !order.showDeliveryOtp) { %>
+                            <small class="text-muted">Processing...</small>
+                        <% } else if (order.status === 'Pending' && order.showDeliveryOtp) { %>
+                             <small class="text-info">Awaiting delivery confirmation...</small>
                          <% } else if (order.status === 'Delivered') { %>
-                              <small class="text-success">Order delivered.</small>
+                              <small class="text-success">Order Completed.</small>
                          <% } else if (order.status === 'Cancelled') { %>
-                              <small class="text-danger">Order was cancelled.</small>
-                         <% } else if (order.status === 'Pending' && order.showDeliveryOtp) { %>
-                              <small class="text-info">Awaiting delivery confirmation.</small> <%# Added hint when OTP is showing %>
+                              <small class="text-danger">Order Cancelled.</small>
                          <% } %>
                      </div>
                 </div>

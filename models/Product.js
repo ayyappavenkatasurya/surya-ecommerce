@@ -13,11 +13,13 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a product name'],
         trim: true,
+        index: true // Added index for searching
     },
     category: {
         type: String,
         required: [true, 'Please provide a product category'],
         trim: true,
+        index: true // Added index for searching
     },
     price: {
         type: Number,
@@ -39,25 +41,20 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    sellerEmail: { // Email of the user who uploaded (admin or seller)
+    // *** UPDATED: Added sellerId reference ***
+    sellerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+        index: true
+    },
+    // Keep sellerEmail for potential display/legacy reasons, but sellerId is primary
+    sellerEmail: {
         type: String,
         required: true,
         lowercase: true,
         trim: true,
     },
-    // --- NEW FIELDS for Review Workflow ---
-    status: {
-        type: String,
-        enum: ['Pending Review', 'Approved', 'Rejected'],
-        required: true,
-        // Default is set in controller based on role
-    },
-    rejectionReason: {
-        type: String,
-        trim: true,
-        default: null
-    },
-    // --- END NEW FIELDS ---
     ratings: [RatingSchema],
     averageRating: {
       type: Number,
@@ -67,36 +64,47 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    orderCount: {
+    orderCount: { // Tracks how many times item appeared in orders
         type: Number,
         default: 0,
+    },
+    // *** NEW: Fields for Review Status ***
+    reviewStatus: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending',
+        index: true // Index for filtering visible products
+    },
+    rejectionReason: {
+        type: String,
+        trim: true
     }
 }, {
-    timestamps: true // Adds createdAt and updatedAt
+    timestamps: true // Automatically adds createdAt and updatedAt
 });
 
-// Indexes for faster querying
-ProductSchema.index({ sellerEmail: 1 });
-ProductSchema.index({ status: 1 });
-ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' }); // For search
-
+// Calculate average rating and numReviews before saving
 ProductSchema.pre('save', function(next) {
-    // Calculate average rating and numReviews
-    if (this.ratings && this.ratings.length > 0) {
-        this.numReviews = this.ratings.length;
-        this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
-    } else {
-        this.numReviews = 0;
-        this.averageRating = 0;
+    if (this.isModified('ratings')) { // Only recalculate if ratings changed
+        if (this.ratings && this.ratings.length > 0) {
+            this.numReviews = this.ratings.length;
+            this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
+        } else {
+            this.numReviews = 0;
+            this.averageRating = 0;
+        }
     }
 
-    // Clear rejection reason if approved or pending
-    if (this.isModified('status') && (this.status === 'Approved' || this.status === 'Pending Review')) {
-        this.rejectionReason = null;
+    // Ensure rejectionReason is cleared if status is not 'rejected'
+    if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
+        this.rejectionReason = undefined;
     }
 
     next();
 });
+
+// Define text index for searching multiple fields
+ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' });
 
 
 const Product = mongoose.model('Product', ProductSchema);

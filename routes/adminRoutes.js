@@ -2,41 +2,36 @@
 const express = require('express');
 const adminController = require('../controllers/adminController');
 const { isAuthenticated } = require('../middleware/authMiddleware');
-// --- Use specific role middleware ---
-const { isAdmin, isSellerOrAdmin } = require('../middleware/roleMiddleware');
+const { isAdmin } = require('../middleware/roleMiddleware'); // Use specific admin check
 
 const router = express.Router();
 
-// All admin/seller routes require login first
-router.use(isAuthenticated);
+// Apply authentication and admin check to ALL routes in this file
+router.use(isAuthenticated, isAdmin);
 
-// --- Dashboard (Accessible to Admin & Seller) ---
-router.get('/dashboard', isSellerOrAdmin, adminController.getAdminDashboard);
+// Dashboard
+router.get('/dashboard', adminController.getAdminDashboard);
 
-// --- Product Management (Accessible to Admin & Seller, logic inside controller handles ownership) ---
-router.get('/upload-product', isSellerOrAdmin, adminController.getUploadProductPage);
-router.post('/upload-product', isSellerOrAdmin, adminController.uploadProduct);
-router.get('/manage-products', isSellerOrAdmin, adminController.getManageProductsPage);
-router.get('/manage-products/edit/:id', isSellerOrAdmin, adminController.getEditProductPage);
-router.post('/manage-products/update/:id', isSellerOrAdmin, adminController.updateProduct);
-router.post('/manage-products/remove/:id', isSellerOrAdmin, adminController.removeProduct);
+// --- Product Management (Admin) ---
+// *** ADDED BACK Admin Product Upload Routes ***
+router.get('/upload-product', adminController.getUploadProductPage); // Page for admin upload form
+router.post('/upload-product', adminController.uploadProduct);       // Handle admin product upload
 
-// --- Product Review (Admin Only) ---
-router.get('/review-products', isAdmin, adminController.getReviewProductsPage);
-router.post('/products/:id/approve', isAdmin, adminController.approveProduct);
-router.post('/products/:id/reject', isAdmin, adminController.rejectProduct);
+// Manage All Products (Existing Routes)
+router.get('/manage-products', adminController.getManageProductsPage);       // Admin sees all
+router.get('/manage-products/edit/:id', adminController.getEditProductPage); // Admin edits any
+router.post('/manage-products/update/:id', adminController.updateProduct);   // Admin updates any
+router.post('/manage-products/remove/:id', adminController.removeProduct);   // Admin removes any
 
-// --- Order Management (Viewable by Admin & Seller, Actions restricted by role in controller) ---
-router.get('/manage-orders', isSellerOrAdmin, adminController.getManageOrdersPage);
+// Order Management (Admin View/Manage ALL - Existing Routes)
+router.get('/manage-orders', adminController.getManageOrdersPage); // Admin sees all
+router.post('/orders/:orderId/send-direct-delivery-otp', adminController.sendDirectDeliveryOtpByAdmin); // Admin OTP send
+router.post('/orders/:orderId/confirm-direct-delivery', adminController.confirmDirectDeliveryByAdmin); // Admin OTP confirm
+router.post('/orders/:orderId/cancel', adminController.cancelOrderByAdmin);                           // Admin cancel
 
-// --- Order Actions (Explicitly Admin Only Routes) ---
-router.post('/orders/:orderId/send-direct-delivery-otp', isAdmin, adminController.sendDirectDeliveryOtpByAdmin);
-router.post('/orders/:orderId/confirm-direct-delivery', isAdmin, adminController.confirmDirectDeliveryByAdmin);
-router.post('/orders/:orderId/cancel', isAdmin, adminController.cancelOrderByAdmin); // Kept admin only for now
-
-// --- User Management (Admin Only) ---
-router.get('/manage-users', isAdmin, adminController.getManageUsersPage);
-router.post('/users/:id/update-role', isAdmin, adminController.updateUserRole);
-router.post('/users/:id/remove', isAdmin, adminController.removeUser);
+// User Management (Existing Routes)
+router.get('/manage-users', adminController.getManageUsersPage);     // List users
+router.post('/users/:id/update-role', adminController.updateUserRole); // Update role (incl. seller)
+router.post('/users/:id/remove', adminController.removeUser);         // Remove user
 
 module.exports = router;
