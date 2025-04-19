@@ -25,11 +25,11 @@
   --dark-color: #343a40;
   --text-color: #333;
   --link-color: var(--primary-color);
-  --bg-color: #fff;
-  --border-color: #dee2e6;
+  --bg-color: #f0f2f5; /* Slightly off-white background */
   --card-bg: #ffffff;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --border-radius: 0.25rem;
+  --border-color: #dee2e6;
+  --border-radius: 0.3rem; /* Slightly larger radius */
   --spacing-unit: 1rem;
 }
 
@@ -95,6 +95,7 @@ ul, ol {
 .mt-3 { margin-top: var(--spacing-unit) !important; }
 .d-block { display: block !important; }
 .small { font-size: 0.875em; }
+.w-100 { width: 100% !important; } /* Utility class */
 
 .inline-form {
     display: block;
@@ -1068,53 +1069,60 @@ select:focus {
     padding-bottom: calc(var(--spacing-unit) * 0.5);
 }
 
+/* --- REFINED TABLE STYLES START --- */
 .table-container {
     overflow-x: auto;
     margin-bottom: var(--spacing-unit);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background-color: var(--card-bg);
-    box-shadow: var(--card-shadow);
+    /* No border/bg here, apply to table itself or rows */
 }
+
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate; /* Use separate for border-spacing */
+  border-spacing: 0; /* Reset default spacing */
   font-size: 0.9rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden; /* Clip corners */
 }
 
 .data-table thead {
-  display: none;
+  display: none; /* Keep hidden on mobile */
+  background-color: #f8f9fa;
+  font-weight: 500;
+  color: var(--dark-color);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.data-table th {
+    padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 0.6);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color); /* Lighter border */
 }
 
 .data-table tbody tr {
   display: block;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  margin-bottom: calc(var(--spacing-unit) * 1); /* Space between cards on mobile */
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  padding: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 0.8);
   background-color: var(--card-bg);
   box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease-in-out;
 }
-.table-container .data-table tbody tr {
-    margin-bottom: 0;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: calc(var(--spacing-unit) * 0.5);
-    border-bottom: 1px solid var(--border-color);
+.data-table tbody tr:hover {
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1); /* Enhance hover shadow */
 }
-.table-container .data-table tbody tr:last-child {
-    border-bottom: none;
-}
-
 
 .data-table td {
   display: block;
-  text-align: right;
-  padding: calc(var(--spacing-unit) * 0.5) 0;
+  text-align: right; /* Value aligns right */
+  padding: calc(var(--spacing-unit) * 0.4) 0; /* Reduced vertical padding */
   position: relative;
-  border-bottom: 1px dashed #eee;
-  transition: background-color 0.2s ease-in-out;
+  border-bottom: 1px dashed #eee; /* Keep subtle separator */
 }
 .data-table td:last-child {
     border-bottom: none;
@@ -1124,73 +1132,174 @@ select:focus {
   content: attr(data-label);
   position: absolute;
   left: 0;
-  font-weight: bold;
+  font-weight: 500; /* Slightly bolder label */
   text-align: left;
   padding-right: 10px;
-  color: #555;
-  width: 40%;
+  color: var(--secondary-color); /* Muted label color */
+  width: 40%; /* Adjust as needed */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.85em; /* Smaller label */
 }
 
 .table-img {
   max-width: 50px;
   border-radius: 4px;
   display: inline-block;
-  margin-left: 45%;
+  margin-left: 45%; /* Align with label end */
   vertical-align: middle;
 }
 
 .data-table td:has(img) { text-align: right; padding: 5px 0; }
-.data-table td:has(form), .actions-cell { padding: 10px 0;}
-.data-table td:has(form) { margin-left: 45%; }
 
-.actions-cell form, .actions-cell .btn {
-    margin: calc(var(--spacing-unit) * 0.2) 0;
-    display: block;
-    width: 100%;
+/* Actions Cell specific mobile */
+.data-table td.actions-cell {
+    padding-top: calc(var(--spacing-unit) * 0.6);
 }
-.actions-cell .inline-form { margin-bottom: calc(var(--spacing-unit) * 0.5); }
-.action-group {
-    border-top: 1px dashed #ccc;
-    padding-top: calc(var(--spacing-unit) * 0.5);
-    margin-top: calc(var(--spacing-unit) * 0.5);
-    text-align: left;
+.data-table td.actions-cell::before {
+    /* Hide label for actions on mobile? Optional */
+     display: none;
 }
-.action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-.action-group-title {
+.actions-cell .action-group {
+    border-top: 1px solid #eee;
+    padding-top: calc(var(--spacing-unit) * 0.6);
+    margin-top: calc(var(--spacing-unit) * 0.6);
+    text-align: left; /* Align content left */
+}
+.actions-cell .action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.actions-cell .action-group-title {
     font-size: 0.8em;
     font-weight: bold;
     color: var(--secondary-color);
-    margin-bottom: calc(var(--spacing-unit) * 0.3);
+    margin-bottom: calc(var(--spacing-unit) * 0.4);
     display: block;
     text-align: left;
 }
-
+.actions-cell form, .actions-cell .btn {
+    margin: calc(var(--spacing-unit) * 0.25) 0; /* Slightly more space */
+    display: block; /* Stack elements */
+    width: 100%; /* Full width buttons */
+}
+.actions-cell .inline-form {
+    display: flex; /* Use flex for better alignment */
+    flex-wrap: wrap; /* Allow wrapping if needed */
+    gap: calc(var(--spacing-unit) * 0.4);
+    align-items: center;
+}
+.actions-cell .inline-form input,
+.actions-cell .inline-form button {
+    width: auto; /* Allow natural width */
+    flex-grow: 1; /* Input takes available space */
+}
+.actions-cell .inline-form button {
+    flex-grow: 0; /* Button takes only needed space */
+    flex-shrink: 0;
+}
 .actions-cell select.form-control-sm {
     margin-bottom: 5px;
     font-size: 0.9rem;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
     height: auto;
+    width: 100%; /* Full width select */
 }
-.data-table td:has(label) { text-align: left; }
-.data-table td:has(label) > * { margin-left: 45%; }
+.actions-cell .no-actions-text {
+    display: block;
+    text-align: left;
+    margin-top: calc(var(--spacing-unit) * 0.5);
+}
 
-.verify-otp-form { display: flex; align-items: center; gap: 5px; }
+
+/* --- Order Table Specific Styles --- */
+.order-table td[data-label="Items"] .order-items-summary {
+    font-size: 0.85em;
+    line-height: 1.5;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    text-align: left; /* Align summary left */
+    margin-left: 45%; /* Indent summary like image */
+}
+.order-table td[data-label="Items"] .order-items-summary strong {
+    color: var(--dark-color);
+}
+
+.order-table .order-items-images {
+  margin-top: calc(var(--spacing-unit) * 0.4);
+  justify-content: flex-end; /* Align images right */
+  margin-left: 45%; /* Align with label end */
+}
+.order-item-thumbnail, .order-item-thumbnail-placeholder {
+  width: 35px; /* Smaller thumbnails for mobile card view */
+  height: 35px;
+  font-size: 0.5rem; /* Smaller placeholder text */
+}
+
+.order-table td[data-label="Total"].order-total strong {
+    font-size: 1.1em;
+    color: var(--success-color);
+}
+.order-table td[data-label="Status"].order-status-cell {
+    /* Align status badge right */
+}
+.order-table td[data-label="Status"] .status-badge {
+    float: right; /* Push badge to right */
+    margin-bottom: 5px; /* Space below badge if text wraps */
+}
+.order-table td[data-label="Status"] small {
+    clear: both; /* Ensure text appears below badge */
+    display: block;
+    text-align: right; /* Align reason/date right */
+    margin-top: calc(var(--spacing-unit) * 0.3);
+}
+
+/* Delivery OTP Display (copied from user view, adjust if needed) */
+.delivery-otp-display {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background-color: #e6ffed;
+    border: 1px solid #b7e4c7;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem; /* Slightly smaller */
+    text-align: left; /* Align text left */
+    clear: both;
+    margin-left: 45%; /* Align with label */
+}
+.delivery-otp-display p { margin-bottom: 3px !important; }
+.delivery-otp-code {
+    font-weight: bold;
+    color: #2b9348;
+    font-size: 1.1em; /* Slightly smaller */
+    margin: 0 3px;
+    letter-spacing: 1px;
+    background-color: #fff;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+.delivery-otp-display small { display: block; margin-top: 3px; color: #555; }
+
+/* OTP Verification Form Refinement */
+.verify-otp-form {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%; /* Make form take full width */
+}
 .verify-otp-form input[name="otp"] {
-    flex-grow: 1;
-    max-width: 120px;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    flex-grow: 1; /* Input takes available space */
+    max-width: 150px; /* Limit max width */
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
     font-size: 0.9rem;
     text-align: center;
+    border-radius: var(--border-radius);
 }
 .verify-otp-form button {
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent button shrinking */
     width: auto;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
+    font-size: 0.9rem;
+    line-height: 1.4; /* Adjust line height */
 }
-.cancel-delivery-form select { width: 100%; }
+/* --- REFINED TABLE STYLES END --- */
+
 
 .admin-actions-grid {
     display: grid;
@@ -1309,33 +1418,57 @@ select:focus {
     min-width: 120px;
 }
 
-.delivery-otp-display {
-    margin-top: 10px;
-    padding: 8px 12px;
-    background-color: #e6ffed;
-    border: 1px solid #b7e4c7;
-    border-radius: var(--border-radius);
-    font-size: 0.95rem;
-}
-.delivery-otp-display p {
-    margin-bottom: 3px !important;
+
+/* --- Styles for Order Item Images (Admin/Seller/User) --- */
+.order-items-images {
+  display: flex; /* Arrange images horizontally */
+  flex-wrap: wrap; /* Allow wrapping to next line if needed */
+  gap: 8px; /* Space between images */
+  /* margin-top: 8px; */ /* Controlled by context */
+  padding-left: 0; /* Remove default padding if any */
 }
 
-.delivery-otp-code {
-    font-weight: bold;
-    color: #2b9348;
-    font-size: 1.15em;
-    margin: 0 5px;
-    letter-spacing: 1px;
-    background-color: #fff;
-    padding: 1px 4px;
-    border-radius: 3px;
+.order-item-thumbnail {
+  display: inline-block;
+  width: 40px; /* Adjust size as needed for tables */
+  height: 40px; /* Adjust size as needed for tables */
+  object-fit: cover; /* Ensures image covers the area without distortion */
+  border-radius: 4px; /* Rounded corners */
+  border: 1px solid var(--border-color); /* Subtle border */
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
+  vertical-align: middle; /* Align vertically if wrapped next to text/placeholders */
+  background-color: #f8f9fa; /* Light bg for placeholders or while loading */
 }
 
-.delivery-otp-display small {
-    display: block;
-    margin-top: 3px;
-    color: #555;
+.order-item-thumbnail:hover {
+  opacity: 0.85; /* Slight fade on hover */
+  transform: scale(1.05); /* Slight zoom effect */
+  z-index: 10; /* Ensure it appears above others on hover */
+}
+
+/* Style for the placeholder shown when image is missing */
+.order-item-thumbnail-placeholder {
+  display: inline-flex; /* Use flex to center text vertically/horizontally */
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px dashed var(--secondary-color); /* Dashed border */
+  background-color: var(--light-color); /* Light background */
+  color: var(--secondary-color); /* Muted text color */
+  font-size: 0.6rem; /* Smaller font for placeholder */
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none; /* Remove underline from link */
+  transition: background-color 0.2s ease-in-out;
+  vertical-align: middle;
+  line-height: 1; /* Adjust line height for centering */
+  padding: 2px; /* Small padding */
+}
+.order-item-thumbnail-placeholder:hover {
+   background-color: #e2e6ea; /* Slightly darker background on hover */
+   text-decoration: none;
 }
 
 
@@ -1405,80 +1538,113 @@ select:focus {
     .checkout-address { flex: 1 1 55%; }
     .checkout-summary { flex: 1 1 45%; }
 
-   .table-container { border: none; border-radius: 0; background: none; box-shadow: none; }
-   .data-table { border: 1px solid var(--border-color); border-radius: var(--border-radius); }
-   .data-table thead {
-       display: table-header-group;
-       background-color: #f8f9fa;
-       font-weight: 500;
+   /* --- Desktop Table Refinements --- */
+    .data-table thead {
+       display: table-header-group; /* Show header */
     }
-    .data-table th {
-        padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.5);
-        text-align: left;
-        border-bottom: 2px solid var(--border-color);
-    }
-
-   .data-table tbody tr {
-       display: table-row;
+    .data-table tbody tr {
+       display: table-row; /* Standard table rows */
        margin-bottom: 0;
        border: none;
        padding: 0;
        box-shadow: none;
        background-color: transparent;
-       border-bottom: 1px solid var(--border-color);
-   }
-   .data-table tbody tr:last-child { border-bottom: none; }
-   .data-table tbody tr:hover { background-color: #f8f9fa; }
+       border-bottom: 1px solid var(--border-color); /* Row separator */
+    }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .data-table tbody tr:hover { background-color: #f8f9fa; } /* Standard hover */
 
    .data-table td {
        display: table-cell;
-       text-align: left;
-       padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.5);
-       vertical-align: middle;
+       text-align: left; /* Default left align */
+       padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
+       vertical-align: middle; /* Better vertical alignment */
        border-bottom: none;
        position: static;
        margin-left: 0 !important;
    }
-    .data-table td::before { content: none; }
-    .data-table td:has(form), .actions-cell {
+    .data-table td::before { content: none; } /* Remove mobile labels */
+
+    .table-img { max-width: 60px; margin-left: 0; }
+    .data-table td:has(img) { text-align: left; width: 80px; } /* Give image col fixed width */
+
+    /* Specific Alignments for Desktop */
+    .data-table th[data-label*="Price"], .data-table td[data-label*="Price"],
+    .data-table th[data-label*="Stock"], .data-table td[data-label*="Stock"],
+    .data-table th[data-label*="Total"], .data-table td[data-label*="Total"],
+    .data-table td.order-total {
        text-align: right;
-       white-space: nowrap;
+       width: 100px; /* Fixed width for price/total */
    }
-   .inline-form { display: inline-block; margin: 0 5px 0 0;}
-   .inline-form > * { margin-bottom: 0; }
-   .action-group { border: none; padding: 0; margin: 0; display: inline-block; vertical-align: middle; margin-right: 10px;}
-   .action-group-title { display: none; }
-   .actions-cell > form, .actions-cell > div > form { display: inline-block; }
-   .actions-cell > a { display: inline-block; margin-right: 5px; vertical-align: middle;}
-
-   .data-table th[data-label*="Price"],
-   .data-table td[data-label*="Price"],
-   .data-table th[data-label*="Stock"],
-   .data-table td[data-label*="Stock"],
-   .data-table th[data-label*="Rating"],
-   .data-table td[data-label*="Rating"],
-   .data-table th[data-label*="Sold"],
-   .data-table td[data-label*="Sold"] {
+   .data-table th[data-label="Status"], .data-table td[data-label="Status"],
+   .data-table td.order-status-cell {
        text-align: center;
+       width: 150px; /* Width for status + reason */
    }
-   .data-table th[data-label="Status"],
-   .data-table td[data-label="Status"] {
-        text-align: center;
+   .data-table td[data-label="Status"] .status-badge,
+   .order-status-cell .status-badge { float: none; display: inline-block; } /* Center badge */
+   .order-status-cell small { text-align: center; } /* Center reason/date */
+
+   /* Desktop Actions Cell */
+   .data-table th.actions-cell, .data-table td.actions-cell {
+        text-align: right !important;
+        width: 250px; /* Adjust width as needed for actions */
+        white-space: normal; /* Allow wrapping if needed */
     }
-   .data-table th[data-label*="Total"],
-   .data-table td[data-label*="Total"] {
+    .actions-cell .action-group {
+        border: none;
+        padding: 0;
+        margin: 0 0 calc(var(--spacing-unit) * 0.5) 0; /* Space below group */
+        display: block; /* Stack groups */
         text-align: right;
-        font-weight: 500;
-   }
-   .data-table th.actions-cell,
-   .data-table td.actions-cell { text-align: right !important; }
+    }
+    .actions-cell .action-group:last-child { margin-bottom: 0; }
+    .actions-cell .action-group-title { display: none; } /* Hide title */
+    .actions-cell form, .actions-cell .btn {
+        display: inline-block; /* Inline elements */
+        width: auto; /* Auto width */
+        margin: 0 0 0 calc(var(--spacing-unit) * 0.3); /* Space between elements */
+        vertical-align: middle;
+    }
+    .actions-cell .inline-form {
+        display: inline-flex; /* Inline flex for OTP */
+        width: auto;
+    }
+    .actions-cell .verify-otp-form input { max-width: 100px; } /* Smaller OTP input */
+    .actions-cell select.form-control-sm { width: auto; display: inline-block; margin-right: 5px;}
+    .actions-cell .no-actions-text { display: inline-block; }
+    /* Utility for desktop width control */
+    .w-md-auto { width: auto !important; }
 
-   .actions-cell form, .actions-cell .btn { display: inline-block; width: auto; margin: 0 0 0 5px;}
-   .actions-cell .btn-block { display: inline-block; width: auto; }
+    /* Desktop Order Table Items */
+    .order-table td[data-label="Items"] .order-items-summary {
+        margin-left: 0; /* No indent needed */
+        text-align: left;
+    }
+    .order-table .order-items-images {
+        justify-content: flex-start; /* Align images left */
+        margin-left: 0;
+    }
+    .order-item-thumbnail, .order-item-thumbnail-placeholder {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Desktop Delivery OTP */
+    .delivery-otp-display {
+        margin-left: 0;
+        margin-top: 5px;
+        padding: 5px 8px;
+        font-size: 0.85rem;
+        display: inline-block; /* Make it inline */
+        width: auto;
+        text-align: center; /* Center text */
+    }
+    .delivery-otp-display p { margin-bottom: 0 !important; }
+    .delivery-otp-display small { display: none; } /* Hide details on desktop? Optional */
 
 
-   .table-img { max-width: 60px; margin-left: 0; }
-   .data-table td:has(img) { text-align: left; }
+   /* --- End Desktop Table Refinements --- */
 
     .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
 
@@ -1505,7 +1671,7 @@ select:focus {
         padding: calc(var(--spacing-unit) * 2);
     }
 
-}
+} /* End @media (min-width: 768px) */
 
 
 @media (min-width: 1024px) {
@@ -1517,59 +1683,7 @@ select:focus {
 
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
 
-}
+  /* Potentially increase action cell width if needed */
+  
 
-/* public/css/style.css */
-
-/* ... (keep existing styles) ... */
-
-
-/* --- NEW Styles for Order Item Images --- */
-.order-items-images {
-  display: flex; /* Arrange images horizontally */
-  flex-wrap: wrap; /* Allow wrapping to next line if needed */
-  gap: 8px; /* Space between images */
-  margin-top: 8px; /* Space above the image row */
-  padding-left: 5px; /* Small indent */
-}
-
-.order-item-thumbnail {
-  display: inline-block;
-  width: 50px; /* Adjust size as needed */
-  height: 50px; /* Adjust size as needed */
-  object-fit: cover; /* Ensures image covers the area without distortion */
-  border-radius: 4px; /* Rounded corners */
-  border: 1px solid var(--border-color); /* Subtle border */
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
-  vertical-align: middle; /* Align vertically if wrapped next to text/placeholders */
-}
-
-.order-item-thumbnail:hover {
-  opacity: 0.85; /* Slight fade on hover */
-  transform: scale(1.05); /* Slight zoom effect */
-}
-
-/* Style for the placeholder shown when image is missing */
-.order-item-thumbnail-placeholder {
-  display: inline-flex; /* Use flex to center text vertically/horizontally */
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  border-radius: 4px;
-  border: 1px dashed var(--secondary-color); /* Dashed border */
-  background-color: var(--light-color); /* Light background */
-  color: var(--secondary-color); /* Muted text color */
-  font-size: 0.7rem;
-  font-weight: bold;
-  text-align: center;
-  text-decoration: none; /* Remove underline from link */
-  transition: background-color 0.2s ease-in-out;
-  vertical-align: middle;
-}
-.order-item-thumbnail-placeholder:hover {
-   background-color: #e2e6ea; /* Slightly darker background on hover */
-   text-decoration: none;
-}
-
-/* ... (rest of existing styles) ... */
+} /* End @media (min-width: 1024px) */

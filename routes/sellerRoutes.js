@@ -14,23 +14,23 @@ router.use(isAuthenticated, isSeller);
 router.get('/dashboard', sellerController.getSellerDashboard);
 
 // Seller Product Management
-router.get('/products/upload', sellerController.getUploadProductPage); // Page to show upload form
-router.post('/products/upload', sellerController.uploadProduct); // Handle product submission (triggers review)
-router.get('/products', sellerController.getManageProductsPage); // List *only* this seller's products (incl. status)
+router.get('/products/upload', sellerController.getUploadProductPage);
+router.post('/products/upload', sellerController.uploadProduct);
+router.get('/products', sellerController.getManageProductsPage);
 
 // Actions requiring ownership of the specific product ID
-// isProductOwner middleware runs AFTER isAuthenticated and isSeller
-router.get('/products/edit/:id', isProductOwner, sellerController.getEditProductPage); // Get edit form for OWN product
-router.post('/products/update/:id', isProductOwner, sellerController.updateProduct); // Handle update of OWN product (triggers re-review)
-router.post('/products/remove/:id', isProductOwner, sellerController.removeProduct); // Handle removal of OWN product
+router.get('/products/edit/:id', isProductOwner, sellerController.getEditProductPage);
+router.post('/products/update/:id', isProductOwner, sellerController.updateProduct);
+router.post('/products/remove/:id', isProductOwner, sellerController.removeProduct);
 
 // Seller Order Management
-router.get('/orders', sellerController.getManageOrdersPage); // List orders containing *any* of this seller's products
+router.get('/orders', sellerController.getManageOrdersPage);
 
 // Actions requiring relevance to the specific order ID
-// isOrderRelevantToSeller middleware runs AFTER isAuthenticated and isSeller
-router.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, sellerController.sendDirectDeliveryOtpBySeller); // Seller sends OTP for relevant orders
-router.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, sellerController.confirmDirectDeliveryBySeller); // Seller confirms delivery for relevant orders
-// Note: Seller cancellation logic is not included by default.
+router.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, sellerController.sendDirectDeliveryOtpBySeller);
+router.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, sellerController.confirmDirectDeliveryBySeller);
+
+// --- NEW: Seller Cancel Order Route ---
+router.post('/orders/:orderId/cancel', isOrderRelevantToSeller, sellerController.cancelOrderBySeller); // Add this line
 
 module.exports = router;

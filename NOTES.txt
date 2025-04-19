@@ -81,14 +81,13 @@ const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const { sendEmail } = require('../config/mailer');
-const { reviewProductWithGemini } = require('../services/geminiService'); // *** IMPORT Gemini service ***
+const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-} = require('./orderController');
+} = require('./orderController'); // Assuming these functions handle OTP logic correctly
 const mongoose = require('mongoose');
 
-// Admin cancellation reasons (unchanged)
 const cancellationReasons = [
     "📞 Unable to contact the customer",
     "❗ Out of stock/unavailable item",
@@ -102,30 +101,28 @@ exports.getAdminDashboard = (req, res) => {
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
 
-// --- *** ADDED BACK: Admin Product Upload Page *** ---
+// --- Admin Product Upload Page ---
 exports.getUploadProductPage = (req, res) => {
-    res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {} }); // Pass empty product for form consistency
+    res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {} });
 };
 
-// --- *** ADDED BACK & ADAPTED: Admin Product Upload Action *** ---
+// --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
     const { name, category, price, stock, imageUrl, specifications } = req.body;
-    const adminUserId = req.session.user._id; // The logged-in admin
-    const adminUserEmail = req.session.user.email; // Admin's email
+    const adminUserId = req.session.user._id;
+    const adminUserEmail = req.session.user.email;
 
-     // Basic Validation
-     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
+    // Basic Validation (keep existing)
+    if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-        // Render with existing data for correction
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
     }
-     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
+    if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
-     }
+    }
 
     try {
-        // Create Product - Assign Admin's ID to sellerId for ownership tracking
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
@@ -133,58 +130,52 @@ exports.uploadProduct = async (req, res, next) => {
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerId: adminUserId, // *** Set Admin's ID as sellerId ***
-            sellerEmail: adminUserEmail, // *** Set Admin's email ***
-            reviewStatus: 'pending' // Start as pending for review
+            sellerId: adminUserId,
+            sellerEmail: adminUserEmail,
+            reviewStatus: 'pending'
         });
 
-        // Save the product first
         await newProduct.save();
         console.log(`Product ${newProduct._id} saved initially by ADMIN ${adminUserEmail}.`);
 
-        // Send for Gemini Review (Asynchronous)
+        // Send for Gemini Review (Asynchronous - keep existing)
         reviewProductWithGemini(newProduct).then(async reviewResult => {
-             try {
-                 const productToUpdate = await Product.findById(newProduct._id);
-                 if (productToUpdate) {
+            try {
+                const productToUpdate = await Product.findById(newProduct._id);
+                if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
                     productToUpdate.rejectionReason = reviewResult.reason;
                     await productToUpdate.save();
                     console.log(`Product ${newProduct._id} (Admin Upload) review status updated to ${reviewResult.status}.`);
-                 }
-             } catch (updateError) {
+                }
+            } catch (updateError) {
                 console.error(`Error updating product ${newProduct._id} (Admin Upload) after Gemini review:`, updateError);
-             }
+            }
         }).catch(reviewError => {
-             console.error(`Error in Gemini review promise chain for product ${newProduct._id} (Admin Upload):`, reviewError);
-             // Optionally update status back to pending with error reason
-              Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark admin-uploaded product as pending after review error:", err));
+            console.error(`Error in Gemini review promise chain for product ${newProduct._id} (Admin Upload):`, reviewError);
+            Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark admin-uploaded product as pending after review error:", err));
         });
 
-        // Immediate feedback to admin
         req.flash('success_msg', `Product "${newProduct.name}" uploaded and submitted for review.`);
-        // Redirect to admin manage products page after upload
         res.redirect('/admin/manage-products');
 
     } catch (error) {
-        // Handle Validation errors
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
            return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
        }
-        // Handle other errors
         console.error("Error uploading product by Admin:", error);
-        next(error); // Pass to generic error handler
+        next(error);
     }
 };
 
 
-// --- Manage Products (Admin sees ALL) ---
+// --- Manage Products (Admin sees ALL - keep existing) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({})
-                                    .populate('sellerId', 'name email') // Populate seller info
+                                    .populate('sellerId', 'name email')
                                     .sort({ createdAt: -1 })
                                     .lean();
         res.render('admin/manage-products', {
@@ -196,144 +187,148 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product (Admin edits ANY) ---
+// --- Edit Product (Admin edits ANY - keep existing) ---
 exports.getEditProductPage = async (req, res, next) => {
-     try {
+    try {
         const product = await Product.findById(req.params.id)
-                                      .populate('sellerId', 'name email') // Get seller info
-                                      .lean(); // Use lean for read-only
-
-         if (!product) {
+                                     .populate('sellerId', 'name email')
+                                     .lean();
+        if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
         res.render('admin/edit-product', {
             title: `Admin Edit: ${product.name}`,
             product: product,
-            isAdminView: true // Flag can be used in EJS if needed
+            isAdminView: true
         });
     } catch (error) {
-         if (error.name === 'CastError') {
-           req.flash('error_msg', 'Invalid product ID format.');
+        if (error.name === 'CastError') {
+            req.flash('error_msg', 'Invalid product ID format.');
             return res.redirect('/admin/manage-products');
-       }
+        }
         next(error);
-     }
- };
+    }
+};
 
-// --- Update Product (Admin updates ANY) ---
+// --- Update Product (Admin updates ANY - keep existing) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    // Include reviewStatus and rejectionReason as admin can override them
     const { name, category, price, stock, imageUrl, specifications, reviewStatus, rejectionReason } = req.body;
 
-     // Validation (ensure required fields, number types, valid status)
-     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
+    // Validation (keep existing)
+    if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
     }
-     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
+    if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
+        req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
     }
-     const allowedStatus = ['pending', 'approved', 'rejected'];
-     if (reviewStatus && !allowedStatus.includes(reviewStatus)) {
-         req.flash('error_msg', 'Invalid review status selected.');
+    const allowedStatus = ['pending', 'approved', 'rejected'];
+    if (reviewStatus && !allowedStatus.includes(reviewStatus)) {
+        req.flash('error_msg', 'Invalid review status selected.');
         return res.redirect(`/admin/manage-products/edit/${productId}`);
-     }
-      // Require rejectionReason if status is 'rejected'
-     if (reviewStatus === 'rejected' && !rejectionReason?.trim()) {
-         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
-          return res.redirect(`/admin/manage-products/edit/${productId}`);
-      }
+    }
+    if (reviewStatus === 'rejected' && !rejectionReason?.trim()) {
+        req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
+        return res.redirect(`/admin/manage-products/edit/${productId}`);
+    }
 
     try {
-        const product = await Product.findById(productId); // Fetch full object to save
+        const product = await Product.findById(productId);
         if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.status(404).redirect('/admin/manage-products');
-         }
+        }
 
-         product.name = name.trim();
-         product.category = category.trim();
-         product.price = Number(price);
-         product.stock = Number(stock);
-         product.imageUrl = imageUrl.trim();
-         product.specifications = specifications ? specifications.trim() : '';
+        product.name = name.trim();
+        product.category = category.trim();
+        product.price = Number(price);
+        product.stock = Number(stock);
+        product.imageUrl = imageUrl.trim();
+        product.specifications = specifications ? specifications.trim() : '';
 
-         // Admin directly sets review status and reason
-         if (reviewStatus && allowedStatus.includes(reviewStatus)) {
-             product.reviewStatus = reviewStatus;
-             product.rejectionReason = (reviewStatus === 'rejected')
-                                      ? rejectionReason.trim() // Use provided reason if rejected
-                                      : undefined;             // Clear reason otherwise
-         }
+        if (reviewStatus && allowedStatus.includes(reviewStatus)) {
+            product.reviewStatus = reviewStatus;
+            product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined;
+        }
 
-         await product.save();
-         req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
-         res.redirect('/admin/manage-products');
+        await product.save();
+        req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
+        res.redirect('/admin/manage-products');
 
     } catch (error) {
-         if (error.name === 'ValidationError') {
+        if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
-             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-             return res.redirect(`/admin/manage-products/edit/${productId}`);
-         }
-         if (error.name === 'CastError') {
-             req.flash('error_msg', 'Invalid product ID format.');
-             return res.status(400).redirect('/admin/manage-products');
-         }
-         console.error("Error updating product by Admin:", error);
-        next(error);
-     }
- };
-
-
-// --- Remove Product (Admin removes ANY) ---
-exports.removeProduct = async (req, res, next) => {
-    const productId = req.params.id;
-    try {
-         const product = await Product.findByIdAndDelete(productId);
-        if (!product) {
-             req.flash('error_msg', 'Product not found.');
-            return res.status(404).redirect('/admin/manage-products');
-         }
-         req.flash('success_msg', `Product "${product.name}" removed successfully by admin.`);
-         res.redirect('/admin/manage-products');
-    } catch (error) {
+            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
+            return res.redirect(`/admin/manage-products/edit/${productId}`);
+        }
         if (error.name === 'CastError') {
-             req.flash('error_msg', 'Invalid product ID format.');
-             return res.status(400).redirect('/admin/manage-products');
-         }
-         console.error("Error removing product by Admin:", error);
+            req.flash('error_msg', 'Invalid product ID format.');
+            return res.status(400).redirect('/admin/manage-products');
+        }
+        console.error("Error updating product by Admin:", error);
         next(error);
     }
 };
 
 
-// --- Manage Orders (Admin sees ALL) ---
+// --- Remove Product (Admin removes ANY - keep existing) ---
+exports.removeProduct = async (req, res, next) => {
+    const productId = req.params.id;
+    try {
+        const product = await Product.findByIdAndDelete(productId);
+        if (!product) {
+            req.flash('error_msg', 'Product not found.');
+            return res.status(404).redirect('/admin/manage-products');
+        }
+        req.flash('success_msg', `Product "${product.name}" removed successfully by admin.`);
+        res.redirect('/admin/manage-products');
+    } catch (error) {
+        if (error.name === 'CastError') {
+            req.flash('error_msg', 'Invalid product ID format.');
+            return res.status(400).redirect('/admin/manage-products');
+        }
+        console.error("Error removing product by Admin:", error);
+        next(error);
+    }
+};
+
+
+// --- *** UPDATED: Manage Orders (Admin sees ALL) *** ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price sellerId') // Incl sellerId
-                                   .populate('userId', 'name email') // User info optional but helpful
+                                   // Select necessary fields including OTP for display logic
+                                   .select('-__v -products.__v -shippingAddress._id') // Exclude some verbose fields if needed
+                                   .populate('products.productId', 'name imageUrl _id price sellerId')
+                                   .populate('userId', 'name email')
                                    .lean();
 
+        const now = Date.now(); // Get current time once
+
         orders.forEach(order => {
+            // Existing flags
             order.canBeCancelledByAdmin = order.status === 'Pending';
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
 
+            // *** ADDED: Logic to determine if OTP hint should be shown ***
+            order.showDeliveryOtp = order.status === 'Pending' &&
+                                    !!order.orderOTP &&          // OTP must exist
+                                    !!order.orderOTPExpires &&   // Expiry must exist
+                                    new Date(order.orderOTPExpires).getTime() > now; // Must not be expired
+
+            // Existing item summary logic
             if (order.products && order.products.length > 0) {
-                 order.itemsSummary = order.products.map(p => {
+                order.itemsSummary = order.products.map(p => {
                     const productName = p.productId?.name || p.name || '[Product Missing]';
                     const price = p.priceAtOrder ?? 0;
-                    // Optional: Indicate owner
-                    // const ownerEmail = p.productId?.sellerId?.email || '[Seller Unknown]';
-                    return `${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}`; // Simpler summary for now
-                 }).join('<br>');
+                    return `${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}`;
+                }).join('<br>');
             } else {
-                 order.itemsSummary = 'No items found';
+                order.itemsSummary = 'No items found';
             }
         });
 
@@ -341,22 +336,24 @@ exports.getManageOrdersPage = async (req, res, next) => {
             title: 'Manage All Orders',
             orders: orders,
             cancellationReasons: cancellationReasons
+            // The formatDateIST helper is available via res.locals
         });
     } catch (error) {
         next(error);
     }
 };
 
-// --- Admin Order Actions (OTP Send/Confirm, Cancel - Unchanged) ---
+// --- Admin Order Actions (OTP Send/Confirm, Cancel - keep existing) ---
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
+        // This function should save the OTP to the DB
         const result = await generateAndSendDirectDeliveryOTPByAdmin(orderId);
         req.flash('success_msg', result.message + ' Ask customer for OTP.');
     } catch (error) {
         req.flash('error_msg', `Admin OTP Send Failed: ${error.message}`);
     }
-    res.redirect('/admin/manage-orders');
+    res.redirect('/admin/manage-orders'); // Redirect causes page reload, getManageOrdersPage runs again
 };
 
 exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
@@ -407,38 +404,37 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
         }
 
-        // Restore Stock and Decrement Order Count
+        // Restore Stock (keep existing logic)
         const productStockRestorePromises = order.products.map(item => {
-             const quantityToRestore = Number(item.quantity);
-             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
+            const quantityToRestore = Number(item.quantity);
+            if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
                 console.warn(`Admin Cancel: Invalid item P.ID ${item.productId?._id} or Qty ${item.quantity} in O.ID ${orderId}. Skipping restore.`);
                 return Promise.resolve();
-             }
-             return Product.updateOne(
+            }
+            return Product.updateOne(
                 { _id: item.productId._id },
                 { $inc: { stock: quantityToRestore, orderCount: -1 } },
                 { session: sessionDB }
             ).catch(err => {
                console.error(`Admin Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
-               // Allow process to continue
             });
         });
         await Promise.allSettled(productStockRestorePromises);
 
         order.status = 'Cancelled';
-        order.cancellationReason = reason; // Admin reason
+        order.cancellationReason = reason;
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // Send Email Notification
+        // Send Email Notification (keep existing logic)
         try {
             const customerEmail = order.userEmail || order.userId?.email;
-             if(customerEmail) {
-                 const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
+            if(customerEmail) {
+                const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
                 const htmlCust = `<p>Your order (${order._id}) has been cancelled by administration.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>Contact support for questions.</p>`;
-                 await sendEmail(customerEmail, subjectCust, `Order ${order._id} cancelled. Reason: ${order.cancellationReason}`, htmlCust);
-             }
+                await sendEmail(customerEmail, subjectCust, `Order ${order._id} cancelled. Reason: ${order.cancellationReason}`, htmlCust);
+            }
         } catch (emailError) {
             console.error(`Failed sending cancellation email for order ${order._id}:`, emailError);
         }
@@ -457,7 +453,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 };
 
 
-// --- Manage Users (Admin - Unchanged) ---
+// --- Manage Users (Admin - keep existing) ---
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -473,84 +469,84 @@ exports.getManageUsersPage = async (req, res, next) => {
     }
 };
 
-// --- Update User Role (Admin - Unchanged) ---
+// --- Update User Role (Admin - keep existing) ---
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;
-     const allowedRoles = ['user', 'admin', 'seller'];
+    const allowedRoles = ['user', 'admin', 'seller'];
 
-     if (!role || !allowedRoles.includes(role)) {
+    if (!role || !allowedRoles.includes(role)) {
         req.flash('error_msg', 'Invalid role selected.');
-         return res.status(400).redirect('/admin/manage-users');
-     }
-     if (userId === req.session.user._id.toString()) {
-          req.flash('error_msg', 'You cannot change your own role.');
-          return res.redirect('/admin/manage-users');
-      }
+        return res.status(400).redirect('/admin/manage-users');
+    }
+    if (userId === req.session.user._id.toString()) {
+         req.flash('error_msg', 'You cannot change your own role.');
+         return res.redirect('/admin/manage-users');
+    }
 
     try {
         const user = await User.findById(userId);
-         if (!user) {
+        if (!user) {
             req.flash('error_msg', 'User not found.');
-             return res.status(404).redirect('/admin/manage-users');
-         }
-         user.role = role;
+            return res.status(404).redirect('/admin/manage-users');
+        }
+        user.role = role;
         await user.save();
         req.flash('success_msg', `User ${user.email}'s role updated to ${role}.`);
         res.redirect('/admin/manage-users');
 
     } catch (error) {
-         if (error.name === 'CastError') {
-             req.flash('error_msg', 'Invalid user ID format.');
-             return res.status(400).redirect('/admin/manage-users');
-         }
-         console.error(`Error updating role for user ${userId}:`, error);
-         req.flash('error_msg', 'Error updating user role.');
-         res.redirect('/admin/manage-users');
+        if (error.name === 'CastError') {
+            req.flash('error_msg', 'Invalid user ID format.');
+            return res.status(400).redirect('/admin/manage-users');
+        }
+        console.error(`Error updating role for user ${userId}:`, error);
+        req.flash('error_msg', 'Error updating user role.');
+        res.redirect('/admin/manage-users');
     }
 };
 
-// --- Remove User (Admin - Unchanged) ---
+// --- Remove User (Admin - keep existing) ---
 exports.removeUser = async (req, res, next) => {
     const userId = req.params.id;
 
-     if (userId === req.session.user._id.toString()) {
+    if (userId === req.session.user._id.toString()) {
         req.flash('error_msg', 'You cannot remove yourself.');
         return res.redirect('/admin/manage-users');
     }
 
     try {
-         const user = await User.findById(userId);
-         if (!user) {
+        const user = await User.findById(userId);
+        if (!user) {
             req.flash('error_msg', 'User not found.');
-             return res.status(404).redirect('/admin/manage-users');
-         }
+            return res.status(404).redirect('/admin/manage-users');
+        }
 
-         if (user.role === 'admin') {
-             const adminCount = await User.countDocuments({ role: 'admin' });
-             if (adminCount <= 1) {
-                 req.flash('error_msg', 'Cannot remove the last admin account.');
+        if (user.role === 'admin') {
+            const adminCount = await User.countDocuments({ role: 'admin' });
+            if (adminCount <= 1) {
+                req.flash('error_msg', 'Cannot remove the last admin account.');
                 return res.redirect('/admin/manage-users');
-             }
-         }
+            }
+        }
 
-         // Consider implications for seller's products upon removal (orphan or disable)
-         // e.g., await Product.updateMany({ sellerId: userId }, { reviewStatus: 'rejected', rejectionReason: 'Seller Removed' });
-         
+        // Consider implications for seller's products upon removal (orphan or disable)
+        // e.g., await Product.updateMany({ sellerId: userId }, { reviewStatus: 'rejected', rejectionReason: 'Seller Removed' });
+
         await User.deleteOne({ _id: userId });
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
 
     } catch (error) {
-         if (error.name === 'CastError') {
-             req.flash('error_msg', 'Invalid user ID format.');
-             return res.status(400).redirect('/admin/manage-users');
-         }
-         console.error(`Error removing user ${userId}:`, error);
-         req.flash('error_msg', 'Error removing user.');
-         res.redirect('/admin/manage-users');
-     }
- };
+        if (error.name === 'CastError') {
+            req.flash('error_msg', 'Invalid user ID format.');
+            return res.status(400).redirect('/admin/manage-users');
+        }
+        console.error(`Error removing user ${userId}:`, error);
+        req.flash('error_msg', 'Error removing user.');
+        res.redirect('/admin/manage-users');
+    }
+};
 
 controllers/authController.js:
 // controllers/authController.js
@@ -2384,7 +2380,7 @@ const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const { reviewProductWithGemini } = require('../services/geminiService');
-// Make sure these are correctly exported/adapted if needed
+const { sendEmail } = require('../config/mailer'); // Import sendEmail
 const {
     generateAndSendDirectDeliveryOTPBySeller,
     confirmDirectDeliveryBySeller
@@ -2392,13 +2388,13 @@ const {
 const mongoose = require('mongoose');
 
 // Seller Dashboard
+// ... (getSellerDashboard, getUploadProductPage, etc. - Keep existing functions) ...
 exports.getSellerDashboard = (req, res) => {
     res.render('seller/dashboard', { title: 'Seller Dashboard' });
 };
 
 // Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    // Pass an empty product object or defaults if needed for rendering sticky form
     res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
 };
 
@@ -2421,16 +2417,14 @@ exports.getManageProductsPage = async (req, res, next) => {
 exports.getEditProductPage = async (req, res, next) => {
      try {
         // isProductOwner middleware ensures ownership
-        const product = await Product.findById(req.params.id).lean(); // Use lean here
+        const product = await Product.findById(req.params.id).lean();
         if (!product) {
            req.flash('error_msg', 'Product not found.');
            return res.redirect('/seller/products');
        }
-       // Ownership check already done by middleware
-
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
-           product: product // Pass lean object
+           product: product
        });
    } catch (error) {
         if (error.name === 'CastError') {
@@ -2442,6 +2436,7 @@ exports.getEditProductPage = async (req, res, next) => {
 };
 
 // Product Management Actions
+// ... (uploadProduct, updateProduct, removeProduct - Keep existing functions) ...
 exports.uploadProduct = async (req, res, next) => {
     const { name, category, price, stock, imageUrl, specifications } = req.body;
     const sellerId = req.session.user._id;
@@ -2475,11 +2470,10 @@ exports.uploadProduct = async (req, res, next) => {
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(newProduct).then(async reviewResult => {
              try {
-                 // Fetch the latest version of the product to update
                  const productToUpdate = await Product.findById(newProduct._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
-                    productToUpdate.rejectionReason = reviewResult.reason; // Might be null/undefined
+                    productToUpdate.rejectionReason = reviewResult.reason;
                     await productToUpdate.save();
                     console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
                  } else {
@@ -2490,8 +2484,6 @@ exports.uploadProduct = async (req, res, next) => {
              }
         }).catch(reviewError => {
              console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
-             // Consider setting status back to 'pending' or a specific 'error' state
-             // Example: Mark as pending with a reason if review fails completely
               Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
         });
 
@@ -2511,12 +2503,11 @@ exports.uploadProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id; // For validation, though middleware handles access
+    const sellerId = req.session.user._id;
     const { name, category, price, stock, imageUrl, specifications } = req.body;
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        // Need to fetch product again to render edit page correctly
         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
@@ -2525,7 +2516,6 @@ exports.updateProduct = async (req, res, next) => {
      }
 
     try {
-        // Find product ensuring it belongs to the seller (redundant with middleware, but safe)
         const product = await Product.findOne({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2545,10 +2535,9 @@ exports.updateProduct = async (req, res, next) => {
          await product.save();
          console.log(`Product ${productId} updated by seller, set to pending review.`);
 
-        // Trigger Gemini review asynchronously
         reviewProductWithGemini(product).then(async reviewResult => {
              try {
-                 const productToUpdate = await Product.findById(product._id); // Fetch again to update
+                 const productToUpdate = await Product.findById(product._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
                     productToUpdate.rejectionReason = reviewResult.reason;
@@ -2582,7 +2571,6 @@ exports.removeProduct = async (req, res, next) => {
     const sellerId = req.session.user._id;
 
     try {
-         // Middleware verifies ownership, find and delete in one step
          const product = await Product.findOneAndDelete({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2602,80 +2590,72 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-// --- CORRECTED Seller Order Management Page ---
+// Seller Order Management Page (Add cancellation flag)
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
-
-        // 1. Find product IDs sold by this seller
         const sellerProductRefs = await Product.find({ sellerId: sellerId }).select('_id').lean();
         const sellerProductIds = sellerProductRefs.map(p => p._id);
 
-        // Handle case where seller has no products
         if (sellerProductIds.length === 0) {
              return res.render('seller/manage-orders', {
                  title: 'Manage Your Orders',
                  orders: [],
-                 message: 'You have no products listed, so no orders to manage yet.' // Pass the message here
+                 message: 'You have no products listed, so no orders to manage yet.'
              });
         }
 
-        // 2. Find orders containing any of these products
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
-                                   // Populate product fields needed for display/checks
                                    .populate('products.productId', 'name imageUrl _id price sellerId')
+                                   .populate('userId', 'email') // Populate userId email for notification fallback
                                    .lean();
 
-        // 3. Add flags specific to seller actions and format items summary
         const now = Date.now();
         orders.forEach(order => {
-             order.isRelevantToSeller = true; // Already filtered
+             order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             order.canBeCancelledBySeller = false; // Sellers don't cancel in this logic
+             // *** ADD CANCELLATION FLAG ***
+             order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
 
-            // Check if OTP should be shown on this page (useful for seller)
-            // This check was originally in getMyOrders, duplicated here for seller view context
              order.showDeliveryOtp = order.status === 'Pending' &&
                                      !!order.orderOTP &&
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
-             // Format Items Summary (Highlight seller's items)
-            if (order.products && order.products.length > 0) {
+             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
-                    // Safely access price
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
-                    const productName = p.productId?.name || p.name || '[Product Name Missing]'; // Use populated name if available
-
+                    const productName = p.productId?.name || p.name || '[Product Name Missing]';
                     return `${isSellerItem ? '<strong>' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? '</strong> (Your Item)' : ''}`;
                 }).join('<br>');
             } else {
                  order.itemsSummary = 'No items found';
             }
+            // Ensure userEmail is available for notifications
+            order.userEmail = order.userEmail || order.userId?.email;
         });
 
-        // *** Render the template, PASSING message as null ***
         res.render('seller/manage-orders', {
             title: 'Manage Your Orders',
             orders: orders,
-            message: null // Pass null when orders exist
+            message: null
         });
     } catch (error) {
         next(error);
     }
 };
 
-
-// --- Seller Order Actions ---
+// Seller Order Actions
+// ... (sendDirectDeliveryOtpBySeller, confirmDirectDeliveryBySeller - Keep existing) ...
 exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const sellerId = req.session.user._id;
 
     try {
-        // isOrderRelevantToSeller middleware should have already checked relevance
-        const order = await Order.findById(orderId); // Fetch order again if needed
+        // isOrderRelevantToSeller middleware ensures relevance
+        const order = await Order.findById(orderId); // Fetch again if needed
         if (!order) throw new Error("Order not found.");
         if (order.status !== 'Pending') throw new Error(`Cannot send OTP for order status ${order.status}.`);
 
@@ -2705,6 +2685,101 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
         req.flash('error_msg', `Delivery confirmation failed: ${error.message}`);
     }
     res.redirect('/seller/orders');
+};
+
+
+// --- NEW: Seller Cancel Order Action ---
+exports.cancelOrderBySeller = async (req, res, next) => {
+    const { orderId } = req.params;
+    const sellerId = req.session.user._id; // Authenticated seller ID
+    const sellerEmail = req.session.user.email; // For reason string
+
+    const sessionDB = await mongoose.startSession();
+    sessionDB.startTransaction();
+
+    try {
+        // Middleware `isOrderRelevantToSeller` already verified basic relevance
+        // Fetch order within transaction, populate needed fields
+        const order = await Order.findById(orderId)
+                                .populate('products.productId', 'name _id sellerId') // Need sellerId for final check, _id for stock
+                                .populate('userId', 'email') // For notification fallback
+                                .session(sessionDB);
+
+        if (!order) {
+            await sessionDB.abortTransaction(); sessionDB.endSession();
+            req.flash('error_msg', 'Order not found.');
+            return res.status(404).redirect('/seller/orders');
+        }
+
+        // --- Double Checks within Transaction ---
+        if (order.status !== 'Pending') {
+            await sessionDB.abortTransaction(); sessionDB.endSession();
+            req.flash('error_msg', `Cannot cancel order with status '${order.status}'. Only 'Pending' orders can be cancelled.`);
+            return res.redirect('/seller/orders');
+        }
+
+        // Re-verify relevance *explicitly* within transaction (optional but safer)
+        const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
+        if (!isRelevant) {
+            await sessionDB.abortTransaction(); sessionDB.endSession();
+            console.warn(`Seller ${sellerId} cancellation attempt for non-relevant order ${orderId} (failed tx check).`);
+            req.flash('error_msg', 'Permission denied: Order does not contain your products.');
+            return res.status(403).redirect('/seller/orders');
+        }
+        // --- End Double Checks ---
+
+        // Restore Stock for ALL items in the order (Consistent with Admin/User cancellation)
+        const productStockRestorePromises = order.products.map(item => {
+            const quantityToRestore = Number(item.quantity);
+            if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
+                console.warn(`Seller Cancel (${sellerId}): Invalid item P.ID ${item.productId?._id} or Qty ${item.quantity} in O.ID ${orderId}. Skipping restore.`);
+                return Promise.resolve();
+            }
+            return Product.updateOne(
+                { _id: item.productId._id },
+                { $inc: { stock: quantityToRestore, orderCount: -1 } },
+                { session: sessionDB }
+            ).catch(err => {
+               console.error(`Seller Cancel (${sellerId}): Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
+            });
+        });
+        await Promise.allSettled(productStockRestorePromises);
+        console.log(`Seller Cancel (${sellerId}): Stock restoration attempted for order ${orderId}.`);
+
+        // Update Order Status and Reason
+        order.status = 'Cancelled';
+        order.cancellationReason = `Cancelled by Seller (${sellerEmail})`; // Specific reason
+        await order.save({ session: sessionDB });
+
+        // Commit Transaction
+        await sessionDB.commitTransaction();
+
+        // Send Email Notification (Outside Transaction)
+        try {
+            const customerEmail = order.userEmail || order.userId?.email;
+            if (customerEmail) {
+                const subjectCust = `Your Order (${order._id}) Has Been Cancelled by the Seller`;
+                const htmlCust = `<p>Your order (${order._id}) has been cancelled by the seller.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>If you have questions, please contact support.</p>`;
+                await sendEmail(customerEmail, subjectCust, `Order ${order._id} cancelled. Reason: ${order.cancellationReason}`, htmlCust);
+            } else {
+                 console.warn(`Seller Cancel: Could not find customer email for order ${orderId} notification.`);
+            }
+        } catch (emailError) {
+            console.error(`Seller Cancel (${sellerId}): Failed sending cancellation email for order ${order._id}:`, emailError);
+            // Don't fail the request if email fails, but log it.
+        }
+
+        req.flash('success_msg', `Order ${orderId} cancelled successfully.`);
+        res.redirect('/seller/orders');
+
+    } catch (error) {
+        await sessionDB.abortTransaction(); // Ensure abort on any error
+        console.error(`Error cancelling order ${orderId} by seller ${sellerId}:`, error);
+        req.flash('error_msg', 'Failed to cancel order due to an internal error.');
+        res.redirect('/seller/orders');
+    } finally {
+        sessionDB.endSession(); // Always end the session
+    }
 };
 
 middleware/authMiddleware.js:
@@ -3268,11 +3343,11 @@ public/css/style.css:
   --dark-color: #343a40;
   --text-color: #333;
   --link-color: var(--primary-color);
-  --bg-color: #fff;
-  --border-color: #dee2e6;
+  --bg-color: #f0f2f5; /* Slightly off-white background */
   --card-bg: #ffffff;
   --card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --border-radius: 0.25rem;
+  --border-color: #dee2e6;
+  --border-radius: 0.3rem; /* Slightly larger radius */
   --spacing-unit: 1rem;
 }
 
@@ -3338,6 +3413,7 @@ ul, ol {
 .mt-3 { margin-top: var(--spacing-unit) !important; }
 .d-block { display: block !important; }
 .small { font-size: 0.875em; }
+.w-100 { width: 100% !important; } /* Utility class */
 
 .inline-form {
     display: block;
@@ -4311,53 +4387,60 @@ select:focus {
     padding-bottom: calc(var(--spacing-unit) * 0.5);
 }
 
+/* --- REFINED TABLE STYLES START --- */
 .table-container {
     overflow-x: auto;
     margin-bottom: var(--spacing-unit);
-    border: 1px solid var(--border-color);
-    border-radius: var(--border-radius);
-    background-color: var(--card-bg);
-    box-shadow: var(--card-shadow);
+    /* No border/bg here, apply to table itself or rows */
 }
+
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate; /* Use separate for border-spacing */
+  border-spacing: 0; /* Reset default spacing */
   font-size: 0.9rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden; /* Clip corners */
 }
 
 .data-table thead {
-  display: none;
+  display: none; /* Keep hidden on mobile */
+  background-color: #f8f9fa;
+  font-weight: 500;
+  color: var(--dark-color);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.data-table th {
+    padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 0.6);
+    text-align: left;
+    border-bottom: 1px solid var(--border-color); /* Lighter border */
 }
 
 .data-table tbody tr {
   display: block;
-  margin-bottom: calc(var(--spacing-unit) * 1.5);
+  margin-bottom: calc(var(--spacing-unit) * 1); /* Space between cards on mobile */
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  padding: calc(var(--spacing-unit) * 0.75);
+  padding: calc(var(--spacing-unit) * 0.8);
   background-color: var(--card-bg);
   box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease-in-out;
 }
-.table-container .data-table tbody tr {
-    margin-bottom: 0;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: calc(var(--spacing-unit) * 0.5);
-    border-bottom: 1px solid var(--border-color);
+.data-table tbody tr:hover {
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1); /* Enhance hover shadow */
 }
-.table-container .data-table tbody tr:last-child {
-    border-bottom: none;
-}
-
 
 .data-table td {
   display: block;
-  text-align: right;
-  padding: calc(var(--spacing-unit) * 0.5) 0;
+  text-align: right; /* Value aligns right */
+  padding: calc(var(--spacing-unit) * 0.4) 0; /* Reduced vertical padding */
   position: relative;
-  border-bottom: 1px dashed #eee;
-  transition: background-color 0.2s ease-in-out;
+  border-bottom: 1px dashed #eee; /* Keep subtle separator */
 }
 .data-table td:last-child {
     border-bottom: none;
@@ -4367,73 +4450,174 @@ select:focus {
   content: attr(data-label);
   position: absolute;
   left: 0;
-  font-weight: bold;
+  font-weight: 500; /* Slightly bolder label */
   text-align: left;
   padding-right: 10px;
-  color: #555;
-  width: 40%;
+  color: var(--secondary-color); /* Muted label color */
+  width: 40%; /* Adjust as needed */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.85em; /* Smaller label */
 }
 
 .table-img {
   max-width: 50px;
   border-radius: 4px;
   display: inline-block;
-  margin-left: 45%;
+  margin-left: 45%; /* Align with label end */
   vertical-align: middle;
 }
 
 .data-table td:has(img) { text-align: right; padding: 5px 0; }
-.data-table td:has(form), .actions-cell { padding: 10px 0;}
-.data-table td:has(form) { margin-left: 45%; }
 
-.actions-cell form, .actions-cell .btn {
-    margin: calc(var(--spacing-unit) * 0.2) 0;
-    display: block;
-    width: 100%;
+/* Actions Cell specific mobile */
+.data-table td.actions-cell {
+    padding-top: calc(var(--spacing-unit) * 0.6);
 }
-.actions-cell .inline-form { margin-bottom: calc(var(--spacing-unit) * 0.5); }
-.action-group {
-    border-top: 1px dashed #ccc;
-    padding-top: calc(var(--spacing-unit) * 0.5);
-    margin-top: calc(var(--spacing-unit) * 0.5);
-    text-align: left;
+.data-table td.actions-cell::before {
+    /* Hide label for actions on mobile? Optional */
+     display: none;
 }
-.action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-.action-group-title {
+.actions-cell .action-group {
+    border-top: 1px solid #eee;
+    padding-top: calc(var(--spacing-unit) * 0.6);
+    margin-top: calc(var(--spacing-unit) * 0.6);
+    text-align: left; /* Align content left */
+}
+.actions-cell .action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.actions-cell .action-group-title {
     font-size: 0.8em;
     font-weight: bold;
     color: var(--secondary-color);
-    margin-bottom: calc(var(--spacing-unit) * 0.3);
+    margin-bottom: calc(var(--spacing-unit) * 0.4);
     display: block;
     text-align: left;
 }
-
+.actions-cell form, .actions-cell .btn {
+    margin: calc(var(--spacing-unit) * 0.25) 0; /* Slightly more space */
+    display: block; /* Stack elements */
+    width: 100%; /* Full width buttons */
+}
+.actions-cell .inline-form {
+    display: flex; /* Use flex for better alignment */
+    flex-wrap: wrap; /* Allow wrapping if needed */
+    gap: calc(var(--spacing-unit) * 0.4);
+    align-items: center;
+}
+.actions-cell .inline-form input,
+.actions-cell .inline-form button {
+    width: auto; /* Allow natural width */
+    flex-grow: 1; /* Input takes available space */
+}
+.actions-cell .inline-form button {
+    flex-grow: 0; /* Button takes only needed space */
+    flex-shrink: 0;
+}
 .actions-cell select.form-control-sm {
     margin-bottom: 5px;
     font-size: 0.9rem;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
     height: auto;
+    width: 100%; /* Full width select */
 }
-.data-table td:has(label) { text-align: left; }
-.data-table td:has(label) > * { margin-left: 45%; }
+.actions-cell .no-actions-text {
+    display: block;
+    text-align: left;
+    margin-top: calc(var(--spacing-unit) * 0.5);
+}
 
-.verify-otp-form { display: flex; align-items: center; gap: 5px; }
+
+/* --- Order Table Specific Styles --- */
+.order-table td[data-label="Items"] .order-items-summary {
+    font-size: 0.85em;
+    line-height: 1.5;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    text-align: left; /* Align summary left */
+    margin-left: 45%; /* Indent summary like image */
+}
+.order-table td[data-label="Items"] .order-items-summary strong {
+    color: var(--dark-color);
+}
+
+.order-table .order-items-images {
+  margin-top: calc(var(--spacing-unit) * 0.4);
+  justify-content: flex-end; /* Align images right */
+  margin-left: 45%; /* Align with label end */
+}
+.order-item-thumbnail, .order-item-thumbnail-placeholder {
+  width: 35px; /* Smaller thumbnails for mobile card view */
+  height: 35px;
+  font-size: 0.5rem; /* Smaller placeholder text */
+}
+
+.order-table td[data-label="Total"].order-total strong {
+    font-size: 1.1em;
+    color: var(--success-color);
+}
+.order-table td[data-label="Status"].order-status-cell {
+    /* Align status badge right */
+}
+.order-table td[data-label="Status"] .status-badge {
+    float: right; /* Push badge to right */
+    margin-bottom: 5px; /* Space below badge if text wraps */
+}
+.order-table td[data-label="Status"] small {
+    clear: both; /* Ensure text appears below badge */
+    display: block;
+    text-align: right; /* Align reason/date right */
+    margin-top: calc(var(--spacing-unit) * 0.3);
+}
+
+/* Delivery OTP Display (copied from user view, adjust if needed) */
+.delivery-otp-display {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background-color: #e6ffed;
+    border: 1px solid #b7e4c7;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem; /* Slightly smaller */
+    text-align: left; /* Align text left */
+    clear: both;
+    margin-left: 45%; /* Align with label */
+}
+.delivery-otp-display p { margin-bottom: 3px !important; }
+.delivery-otp-code {
+    font-weight: bold;
+    color: #2b9348;
+    font-size: 1.1em; /* Slightly smaller */
+    margin: 0 3px;
+    letter-spacing: 1px;
+    background-color: #fff;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+.delivery-otp-display small { display: block; margin-top: 3px; color: #555; }
+
+/* OTP Verification Form Refinement */
+.verify-otp-form {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    width: 100%; /* Make form take full width */
+}
 .verify-otp-form input[name="otp"] {
-    flex-grow: 1;
-    max-width: 120px;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    flex-grow: 1; /* Input takes available space */
+    max-width: 150px; /* Limit max width */
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
     font-size: 0.9rem;
     text-align: center;
+    border-radius: var(--border-radius);
 }
 .verify-otp-form button {
-    flex-shrink: 0;
+    flex-shrink: 0; /* Prevent button shrinking */
     width: auto;
-    padding: calc(var(--spacing-unit)*0.3) calc(var(--spacing-unit)*0.5);
+    padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6);
+    font-size: 0.9rem;
+    line-height: 1.4; /* Adjust line height */
 }
-.cancel-delivery-form select { width: 100%; }
+/* --- REFINED TABLE STYLES END --- */
+
 
 .admin-actions-grid {
     display: grid;
@@ -4552,33 +4736,57 @@ select:focus {
     min-width: 120px;
 }
 
-.delivery-otp-display {
-    margin-top: 10px;
-    padding: 8px 12px;
-    background-color: #e6ffed;
-    border: 1px solid #b7e4c7;
-    border-radius: var(--border-radius);
-    font-size: 0.95rem;
-}
-.delivery-otp-display p {
-    margin-bottom: 3px !important;
+
+/* --- Styles for Order Item Images (Admin/Seller/User) --- */
+.order-items-images {
+  display: flex; /* Arrange images horizontally */
+  flex-wrap: wrap; /* Allow wrapping to next line if needed */
+  gap: 8px; /* Space between images */
+  /* margin-top: 8px; */ /* Controlled by context */
+  padding-left: 0; /* Remove default padding if any */
 }
 
-.delivery-otp-code {
-    font-weight: bold;
-    color: #2b9348;
-    font-size: 1.15em;
-    margin: 0 5px;
-    letter-spacing: 1px;
-    background-color: #fff;
-    padding: 1px 4px;
-    border-radius: 3px;
+.order-item-thumbnail {
+  display: inline-block;
+  width: 40px; /* Adjust size as needed for tables */
+  height: 40px; /* Adjust size as needed for tables */
+  object-fit: cover; /* Ensures image covers the area without distortion */
+  border-radius: 4px; /* Rounded corners */
+  border: 1px solid var(--border-color); /* Subtle border */
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
+  vertical-align: middle; /* Align vertically if wrapped next to text/placeholders */
+  background-color: #f8f9fa; /* Light bg for placeholders or while loading */
 }
 
-.delivery-otp-display small {
-    display: block;
-    margin-top: 3px;
-    color: #555;
+.order-item-thumbnail:hover {
+  opacity: 0.85; /* Slight fade on hover */
+  transform: scale(1.05); /* Slight zoom effect */
+  z-index: 10; /* Ensure it appears above others on hover */
+}
+
+/* Style for the placeholder shown when image is missing */
+.order-item-thumbnail-placeholder {
+  display: inline-flex; /* Use flex to center text vertically/horizontally */
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  border: 1px dashed var(--secondary-color); /* Dashed border */
+  background-color: var(--light-color); /* Light background */
+  color: var(--secondary-color); /* Muted text color */
+  font-size: 0.6rem; /* Smaller font for placeholder */
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none; /* Remove underline from link */
+  transition: background-color 0.2s ease-in-out;
+  vertical-align: middle;
+  line-height: 1; /* Adjust line height for centering */
+  padding: 2px; /* Small padding */
+}
+.order-item-thumbnail-placeholder:hover {
+   background-color: #e2e6ea; /* Slightly darker background on hover */
+   text-decoration: none;
 }
 
 
@@ -4648,80 +4856,113 @@ select:focus {
     .checkout-address { flex: 1 1 55%; }
     .checkout-summary { flex: 1 1 45%; }
 
-   .table-container { border: none; border-radius: 0; background: none; box-shadow: none; }
-   .data-table { border: 1px solid var(--border-color); border-radius: var(--border-radius); }
-   .data-table thead {
-       display: table-header-group;
-       background-color: #f8f9fa;
-       font-weight: 500;
+   /* --- Desktop Table Refinements --- */
+    .data-table thead {
+       display: table-header-group; /* Show header */
     }
-    .data-table th {
-        padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.5);
-        text-align: left;
-        border-bottom: 2px solid var(--border-color);
-    }
-
-   .data-table tbody tr {
-       display: table-row;
+    .data-table tbody tr {
+       display: table-row; /* Standard table rows */
        margin-bottom: 0;
        border: none;
        padding: 0;
        box-shadow: none;
        background-color: transparent;
-       border-bottom: 1px solid var(--border-color);
-   }
-   .data-table tbody tr:last-child { border-bottom: none; }
-   .data-table tbody tr:hover { background-color: #f8f9fa; }
+       border-bottom: 1px solid var(--border-color); /* Row separator */
+    }
+    .data-table tbody tr:last-child { border-bottom: none; }
+    .data-table tbody tr:hover { background-color: #f8f9fa; } /* Standard hover */
 
    .data-table td {
        display: table-cell;
-       text-align: left;
-       padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.5);
-       vertical-align: middle;
+       text-align: left; /* Default left align */
+       padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
+       vertical-align: middle; /* Better vertical alignment */
        border-bottom: none;
        position: static;
        margin-left: 0 !important;
    }
-    .data-table td::before { content: none; }
-    .data-table td:has(form), .actions-cell {
+    .data-table td::before { content: none; } /* Remove mobile labels */
+
+    .table-img { max-width: 60px; margin-left: 0; }
+    .data-table td:has(img) { text-align: left; width: 80px; } /* Give image col fixed width */
+
+    /* Specific Alignments for Desktop */
+    .data-table th[data-label*="Price"], .data-table td[data-label*="Price"],
+    .data-table th[data-label*="Stock"], .data-table td[data-label*="Stock"],
+    .data-table th[data-label*="Total"], .data-table td[data-label*="Total"],
+    .data-table td.order-total {
        text-align: right;
-       white-space: nowrap;
+       width: 100px; /* Fixed width for price/total */
    }
-   .inline-form { display: inline-block; margin: 0 5px 0 0;}
-   .inline-form > * { margin-bottom: 0; }
-   .action-group { border: none; padding: 0; margin: 0; display: inline-block; vertical-align: middle; margin-right: 10px;}
-   .action-group-title { display: none; }
-   .actions-cell > form, .actions-cell > div > form { display: inline-block; }
-   .actions-cell > a { display: inline-block; margin-right: 5px; vertical-align: middle;}
-
-   .data-table th[data-label*="Price"],
-   .data-table td[data-label*="Price"],
-   .data-table th[data-label*="Stock"],
-   .data-table td[data-label*="Stock"],
-   .data-table th[data-label*="Rating"],
-   .data-table td[data-label*="Rating"],
-   .data-table th[data-label*="Sold"],
-   .data-table td[data-label*="Sold"] {
+   .data-table th[data-label="Status"], .data-table td[data-label="Status"],
+   .data-table td.order-status-cell {
        text-align: center;
+       width: 150px; /* Width for status + reason */
    }
-   .data-table th[data-label="Status"],
-   .data-table td[data-label="Status"] {
-        text-align: center;
+   .data-table td[data-label="Status"] .status-badge,
+   .order-status-cell .status-badge { float: none; display: inline-block; } /* Center badge */
+   .order-status-cell small { text-align: center; } /* Center reason/date */
+
+   /* Desktop Actions Cell */
+   .data-table th.actions-cell, .data-table td.actions-cell {
+        text-align: right !important;
+        width: 250px; /* Adjust width as needed for actions */
+        white-space: normal; /* Allow wrapping if needed */
     }
-   .data-table th[data-label*="Total"],
-   .data-table td[data-label*="Total"] {
+    .actions-cell .action-group {
+        border: none;
+        padding: 0;
+        margin: 0 0 calc(var(--spacing-unit) * 0.5) 0; /* Space below group */
+        display: block; /* Stack groups */
         text-align: right;
-        font-weight: 500;
-   }
-   .data-table th.actions-cell,
-   .data-table td.actions-cell { text-align: right !important; }
+    }
+    .actions-cell .action-group:last-child { margin-bottom: 0; }
+    .actions-cell .action-group-title { display: none; } /* Hide title */
+    .actions-cell form, .actions-cell .btn {
+        display: inline-block; /* Inline elements */
+        width: auto; /* Auto width */
+        margin: 0 0 0 calc(var(--spacing-unit) * 0.3); /* Space between elements */
+        vertical-align: middle;
+    }
+    .actions-cell .inline-form {
+        display: inline-flex; /* Inline flex for OTP */
+        width: auto;
+    }
+    .actions-cell .verify-otp-form input { max-width: 100px; } /* Smaller OTP input */
+    .actions-cell select.form-control-sm { width: auto; display: inline-block; margin-right: 5px;}
+    .actions-cell .no-actions-text { display: inline-block; }
+    /* Utility for desktop width control */
+    .w-md-auto { width: auto !important; }
 
-   .actions-cell form, .actions-cell .btn { display: inline-block; width: auto; margin: 0 0 0 5px;}
-   .actions-cell .btn-block { display: inline-block; width: auto; }
+    /* Desktop Order Table Items */
+    .order-table td[data-label="Items"] .order-items-summary {
+        margin-left: 0; /* No indent needed */
+        text-align: left;
+    }
+    .order-table .order-items-images {
+        justify-content: flex-start; /* Align images left */
+        margin-left: 0;
+    }
+    .order-item-thumbnail, .order-item-thumbnail-placeholder {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Desktop Delivery OTP */
+    .delivery-otp-display {
+        margin-left: 0;
+        margin-top: 5px;
+        padding: 5px 8px;
+        font-size: 0.85rem;
+        display: inline-block; /* Make it inline */
+        width: auto;
+        text-align: center; /* Center text */
+    }
+    .delivery-otp-display p { margin-bottom: 0 !important; }
+    .delivery-otp-display small { display: none; } /* Hide details on desktop? Optional */
 
 
-   .table-img { max-width: 60px; margin-left: 0; }
-   .data-table td:has(img) { text-align: left; }
+   /* --- End Desktop Table Refinements --- */
 
     .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
 
@@ -4748,7 +4989,7 @@ select:focus {
         padding: calc(var(--spacing-unit) * 2);
     }
 
-}
+} /* End @media (min-width: 768px) */
 
 
 @media (min-width: 1024px) {
@@ -4760,62 +5001,10 @@ select:focus {
 
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
 
-}
+  /* Potentially increase action cell width if needed */
+  
 
-/* public/css/style.css */
-
-/* ... (keep existing styles) ... */
-
-
-/* --- NEW Styles for Order Item Images --- */
-.order-items-images {
-  display: flex; /* Arrange images horizontally */
-  flex-wrap: wrap; /* Allow wrapping to next line if needed */
-  gap: 8px; /* Space between images */
-  margin-top: 8px; /* Space above the image row */
-  padding-left: 5px; /* Small indent */
-}
-
-.order-item-thumbnail {
-  display: inline-block;
-  width: 50px; /* Adjust size as needed */
-  height: 50px; /* Adjust size as needed */
-  object-fit: cover; /* Ensures image covers the area without distortion */
-  border-radius: 4px; /* Rounded corners */
-  border: 1px solid var(--border-color); /* Subtle border */
-  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out; /* Smooth hover effect */
-  vertical-align: middle; /* Align vertically if wrapped next to text/placeholders */
-}
-
-.order-item-thumbnail:hover {
-  opacity: 0.85; /* Slight fade on hover */
-  transform: scale(1.05); /* Slight zoom effect */
-}
-
-/* Style for the placeholder shown when image is missing */
-.order-item-thumbnail-placeholder {
-  display: inline-flex; /* Use flex to center text vertically/horizontally */
-  align-items: center;
-  justify-content: center;
-  width: 50px;
-  height: 50px;
-  border-radius: 4px;
-  border: 1px dashed var(--secondary-color); /* Dashed border */
-  background-color: var(--light-color); /* Light background */
-  color: var(--secondary-color); /* Muted text color */
-  font-size: 0.7rem;
-  font-weight: bold;
-  text-align: center;
-  text-decoration: none; /* Remove underline from link */
-  transition: background-color 0.2s ease-in-out;
-  vertical-align: middle;
-}
-.order-item-thumbnail-placeholder:hover {
-   background-color: #e2e6ea; /* Slightly darker background on hover */
-   text-decoration: none;
-}
-
-/* ... (rest of existing styles) ... */
+} /* End @media (min-width: 1024px) */
 
 public/js/main.js:
 console.log("Main JS loaded.");
@@ -5275,24 +5464,24 @@ router.use(isAuthenticated, isSeller);
 router.get('/dashboard', sellerController.getSellerDashboard);
 
 // Seller Product Management
-router.get('/products/upload', sellerController.getUploadProductPage); // Page to show upload form
-router.post('/products/upload', sellerController.uploadProduct); // Handle product submission (triggers review)
-router.get('/products', sellerController.getManageProductsPage); // List *only* this seller's products (incl. status)
+router.get('/products/upload', sellerController.getUploadProductPage);
+router.post('/products/upload', sellerController.uploadProduct);
+router.get('/products', sellerController.getManageProductsPage);
 
 // Actions requiring ownership of the specific product ID
-// isProductOwner middleware runs AFTER isAuthenticated and isSeller
-router.get('/products/edit/:id', isProductOwner, sellerController.getEditProductPage); // Get edit form for OWN product
-router.post('/products/update/:id', isProductOwner, sellerController.updateProduct); // Handle update of OWN product (triggers re-review)
-router.post('/products/remove/:id', isProductOwner, sellerController.removeProduct); // Handle removal of OWN product
+router.get('/products/edit/:id', isProductOwner, sellerController.getEditProductPage);
+router.post('/products/update/:id', isProductOwner, sellerController.updateProduct);
+router.post('/products/remove/:id', isProductOwner, sellerController.removeProduct);
 
 // Seller Order Management
-router.get('/orders', sellerController.getManageOrdersPage); // List orders containing *any* of this seller's products
+router.get('/orders', sellerController.getManageOrdersPage);
 
 // Actions requiring relevance to the specific order ID
-// isOrderRelevantToSeller middleware runs AFTER isAuthenticated and isSeller
-router.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, sellerController.sendDirectDeliveryOtpBySeller); // Seller sends OTP for relevant orders
-router.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, sellerController.confirmDirectDeliveryBySeller); // Seller confirms delivery for relevant orders
-// Note: Seller cancellation logic is not included by default.
+router.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, sellerController.sendDirectDeliveryOtpBySeller);
+router.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, sellerController.confirmDirectDeliveryBySeller);
+
+// --- NEW: Seller Cancel Order Route ---
+router.post('/orders/:orderId/cancel', isOrderRelevantToSeller, sellerController.cancelOrderBySeller); // Add this line
 
 module.exports = router;
 
@@ -5663,85 +5852,97 @@ views/admin/manage-orders.ejs:
 <%# views/admin/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container">
-    <h1><%= title %></h1> <%# Title now passed from controller %>
+<div class="admin-manage-container order-manage-page"> <%# Added 'order-manage-page' class %>
+    <h1><%= title %></h1>
 
     <% if (orders.length > 0) { %>
-        <div class="table-container card">
-            <table class="data-table">
+        <div class="table-container">
+            <table class="data-table order-table">
                 <thead>
                     <tr>
-                        <%# Simplified headers for mobile-first data-label %>
                         <th>Details</th>
                         <th>Customer</th>
                         <th>Items</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <th class="actions-cell" style="text-align: right;">Actions</th>
+                        <th class="actions-cell">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
                         <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
-                             <td data-label="Details">
-                                 <strong>ID:</strong> <%= order._id %><br>
-                                 <small><%= formatDateIST(order.orderDate) %></small><br>
-                                 <%# Minimal info about seller involvement %>
-                                 <% if (order.products && order.products.length > 0 && order.products[0].productId && order.products[0].productId.sellerId) { %>
+                            <td data-label="Details">
+                                <strong>ID:</strong> <%= order._id %><br>
+                                <small class="text-muted"><%= formatDateIST(order.orderDate) %></small><br>
+                                <% if (order.products && order.products.length > 0 && order.products[0].productId && order.products[0].productId.sellerId) { %>
                                     <small class="text-muted">Contains items from seller(s)</small>
-                                 <% } %>
+                                <% } %>
                             </td>
                             <td data-label="Customer">
-                                <%= order.shippingAddress.name %>
-                                <br><small class="text-muted"><%= order.userEmail || order.userId?.email %></small> <%# Safer email access %>
-                                <br><small><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small>
-                                <br><small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
+                                <strong><%= order.shippingAddress.name %></strong><br>
+                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br>
+                                <small><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
+                                <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
-                             <td data-label="Items">
-                                 <%# Existing text summary %>
-                                 <%- order.itemsSummary %>
-
-                                 <%# --- NEW: Display Product Images --- %>
-                                 <% if (order.products && order.products.length > 0) { %>
-                                     <div class="order-items-images mt-2"> <%# Container for images %>
-                                         <% order.products.forEach(item => { %>
-                                             <%# Safely check if product info (especially ID and image) exists %>
-                                             <% if (item.productId && item.productId._id && item.productId.imageUrl) { %>
-                                                 <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
-                                                     <img src="<%= item.productId.imageUrl %>"
-                                                          alt="<%= item.productId.name || 'Product Image' %>"
-                                                          class="order-item-thumbnail">
-                                                 </a>
-                                             <% } else if (item.productId && item.productId._id) { %>
-                                                  <%# Fallback if image URL is missing but product exists %>
-                                                  <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
-                                             <% } else { %>
-                                                  <%# Basic fallback if product link is broken %>
-                                                  <span class="order-item-thumbnail-placeholder" title="Product data missing">[N/A]</span>
-                                             <% } %>
-                                         <% }) %>
-                                     </div>
-                                 <% } %>
-                                 <%# --- End: Display Product Images --- %>
-                             </td>
-                            <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
-                            <td data-label="Status">
+                            <td data-label="Items">
+                                <div class="order-items-summary">
+                                    <%- order.itemsSummary %>
+                                </div>
+                                <% if (order.products && order.products.length > 0) { %>
+                                    <div class="order-items-images">
+                                        <% order.products.forEach(item => { %>
+                                            <% if (item.productId && item.productId._id && item.productId.imageUrl) { %>
+                                                <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
+                                                    <img src="<%= item.productId.imageUrl %>"
+                                                         alt="<%= item.productId.name || 'Product Image' %>"
+                                                         class="order-item-thumbnail" loading="lazy">
+                                                </a>
+                                            <% } else if (item.productId && item.productId._id) { %>
+                                                <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
+                                            <% } else { %>
+                                                <span class="order-item-thumbnail-placeholder" title="Product data missing">[N/A]</span>
+                                            <% } %>
+                                        <% }) %>
+                                    </div>
+                                <% } %>
+                            </td>
+                            <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
+                            <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger">Reason: <%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
+                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger mt-1 d-block">Reason: <%= order.cancellationReason %></small><% } %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
+
+                                <%# --- NEW: Display OTP Hint conditionally --- %>
+                                <% if (order.showDeliveryOtp) { %>
+                                  <div class="delivery-otp-display mt-1">
+                                    <p>Customer OTP Sent</p>
+                                    <%# Display partial OTP for security hint %>
+                                    <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
+                                     <%# Display expiry time %>
+                                     <% if (order.orderOTPExpires) { %>
+                                         <small class="text-muted d-block">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
+                                     <% } %>
+                                  </div>
+                                <% } %>
+                                <%# --- End: Display OTP Hint --- %>
+
                             </td>
                             <td data-label="Actions" class="actions-cell">
                                 <%# Admin Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
-                                    <div class="action-group">
-                                        <p class="action-group-title">Admin Direct Delivery:</p>
-                                        <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner mb-1">
-                                            <button type="submit" class="btn btn-warning btn-sm" title="Send OTP to customer for admin delivery">
-                                                <i class="fas fa-mobile-alt"></i> Send OTP
-                                            </button>
-                                        </form>
+                                    <div class="action-group mb-2">
+                                        <p class="action-group-title">Direct Delivery:</p>
+                                        <%# Send OTP Button - Hide if OTP is already active? Optional, depends on desired UX %>
+                                        <% if (!order.showDeliveryOtp) { %>
+                                            <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner mb-1">
+                                                <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer for admin delivery">
+                                                    <i class="fas fa-mobile-alt"></i> Send OTP
+                                                </button>
+                                            </form>
+                                        <% } %>
+                                        <%# Confirm OTP Form (Always show if deliverable?) %>
                                         <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
-                                            <input type="text" name="otp" placeholder="Enter OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
+                                            <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
                                                 <i class="fas fa-check-double"></i> Confirm
                                             </button>
@@ -5752,22 +5953,22 @@ views/admin/manage-orders.ejs:
                                 <%# Admin Order Cancellation %>
                                 <% if (order.canBeCancelledByAdmin) { %>
                                     <div class="action-group">
-                                        <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="inline-form cancel-delivery-form form-submit-spinner" onsubmit="return confirm('ADMIN ACTION: Are you sure you want to cancel order <%= order._id %>? This cannot be undone.');">
+                                        <form action="/admin/orders/<%= order._id %>/cancel" method="POST" class="cancel-delivery-form form-submit-spinner" onsubmit="return confirm('ADMIN ACTION: Are you sure you want to cancel order <%= order._id %>? This cannot be undone.');">
                                             <label for="reason-<%= order._id %>" class="action-group-title">Cancel Order:</label>
-                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1"> <%# Style select better %>
+                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1">
                                                 <option value="" disabled selected>Select Admin Reason...</option>
                                                 <% cancellationReasons.forEach(reason => { %>
                                                     <option value="<%= reason %>"><%= reason %></option>
                                                 <% }) %>
                                             </select>
-                                            <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-ban"></i> Cancel Order</button>
+                                            <button type="submit" class="btn btn-danger btn-sm w-100 w-md-auto"><i class="fas fa-ban"></i> Cancel Order</button>
                                         </form>
                                     </div>
                                 <% } %>
 
                                 <%# Fallback for no actions %>
                                 <% if (!order.canBeDirectlyDeliveredByAdmin && !order.canBeCancelledByAdmin) { %>
-                                    <small class="text-muted">
+                                    <small class="text-muted no-actions-text">
                                         <% if (order.status === 'Delivered') { %>Completed<% } else if (order.status === 'Cancelled') { %>Cancelled<% } else { %>No admin actions<% } %>
                                     </small>
                                 <% } %>
@@ -5778,7 +5979,7 @@ views/admin/manage-orders.ejs:
             </table>
         </div>
     <% } else { %>
-        <p>No orders received yet.</p>
+        <p class="alert alert-info">No orders received yet.</p>
     <% } %>
 </div>
 
@@ -6581,19 +6782,20 @@ seller/edit-product.ejs:
  <%- include('../partials/footer') %>
 
 seller/manage-orders.ejs:
+<%# views/seller/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container"> <%# Reuse admin style %>
+<div class="admin-manage-container order-manage-page">
     <h1>Manage Your Orders</h1>
     <p class="text-muted small mb-3">Showing orders that contain one or more of your products.</p>
 
-    <% if (message) { %> <%# Display specific message if no products/orders %>
-      <p class="alert alert-info"><%= message %></p>
+    <% if (message) { %>
+        <p class="alert alert-info"><%= message %></p>
     <% } %>
 
     <% if (orders.length > 0) { %>
-        <div class="table-container card">
-            <table class="data-table">
+        <div class="table-container">
+            <table class="data-table order-table">
                 <thead>
                     <tr>
                         <th>Order ID / Date</th>
@@ -6601,7 +6803,7 @@ seller/manage-orders.ejs:
                         <th>Items (Your items highlighted)</th>
                         <th>Total</th>
                         <th>Status</th>
-                        <th class="actions-cell" style="text-align: right;">Actions</th>
+                        <th class="actions-cell">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -6612,21 +6814,38 @@ seller/manage-orders.ejs:
                                 <small class="text-muted"><%= formatDateIST(order.orderDate) %></small>
                             </td>
                             <td data-label="Customer / Address">
-                                <%= order.shippingAddress.name %><br>
+                                <strong><%= order.shippingAddress.name %></strong><br>
                                 <small class="text-muted"><%= order.userEmail %></small><br>
                                 <small class="text-muted"><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
                                 <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
                             <td data-label="Items">
-                                <%- order.itemsSummary %> <%# Use pre-formatted summary %>
+                                <div class="order-items-summary">
+                                    <%- order.itemsSummary %>
+                                </div>
+                                <% if (order.products && order.products.length > 0) { %>
+                                    <div class="order-items-images">
+                                        <% order.products.forEach(item => { %>
+                                            <% if (item.productId && item.productId._id && item.productId.imageUrl) { %>
+                                                <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
+                                                    <img src="<%= item.productId.imageUrl %>"
+                                                         alt="<%= item.productId.name || 'Product Image' %>"
+                                                         class="order-item-thumbnail" loading="lazy">
+                                                </a>
+                                            <% } else if (item.productId && item.productId._id) { %>
+                                                <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
+                                            <% } else { %>
+                                                <span class="order-item-thumbnail-placeholder" title="Product data missing">[N/A]</span>
+                                            <% } %>
+                                        <% }) %>
+                                    </div>
+                                <% } %>
                             </td>
-                            <td data-label="Total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
-                            <td data-label="Status">
+                            <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
+                            <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger" title="Cancellation Reason"><%= order.cancellationReason %></small><% } %>
-                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
-
-                                <%# Show customer OTP here if needed by Seller? User sees it on their page. %>
+                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger mt-1 d-block">Reason: <%= order.cancellationReason %></small><% } %>
+                                <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
                                 <% if (order.showDeliveryOtp && order.status === 'Pending') { %>
                                   <div class="delivery-otp-display mt-1">
                                     <p>Customer OTP Sent</p>
@@ -6637,24 +6856,35 @@ seller/manage-orders.ejs:
                             <td data-label="Actions" class="actions-cell">
                                 <%# Seller Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredBySeller) { %>
-                                    <div class="action-group">
+                                    <div class="action-group mb-2"> <%# Add margin bottom %>
                                         <p class="action-group-title">Confirm Delivery:</p>
-                                        <%# Button to Trigger OTP Generation %>
                                         <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
-                                            <button type="submit" class="btn btn-warning btn-sm" title="Send OTP to customer to confirm delivery">
+                                            <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery">
                                                 <i class="fas fa-mobile-alt"></i> Send OTP
                                             </button>
                                         </form>
-                                        <%# Form to Enter OTP and Confirm %>
                                         <form action="/seller/orders/<%= order._id %>/confirm-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
-                                            <input type="text" name="otp" placeholder="Enter OTP" required size="8" pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
+                                            <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm delivery using customer's OTP">
                                                 <i class="fas fa-check-double"></i> Confirm
                                             </button>
                                         </form>
                                     </div>
-                                <% } else { %>
-                                     <small class="text-muted">
+                                <% } %>
+
+                                <%# --- NEW: Seller Cancel Order Form --- %>
+                                <% if (order.canBeCancelledBySeller) { %>
+                                    <div class="action-group">
+                                        <form action="/seller/orders/<%= order._id %>/cancel" method="POST" class="cancel-order-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order (<%= order._id %>)? This cannot be undone.');">
+                                            <button type="submit" class="btn btn-danger btn-sm w-100 w-md-auto"><i class="fas fa-ban"></i> Cancel Order</button>
+                                        </form>
+                                    </div>
+                                <% } %>
+                                <%# --- End: Seller Cancel Order Form --- %>
+
+                                <%# Fallback for no actions %>
+                                <% if (!order.canBeDirectlyDeliveredBySeller && !order.canBeCancelledBySeller) { %>
+                                     <small class="text-muted no-actions-text">
                                          <% if (order.status === 'Delivered') { %>Completed<% } else if (order.status === 'Cancelled') { %>Cancelled<% } else { %>No actions available<% } %>
                                     </small>
                                 <% } %>
@@ -6664,8 +6894,8 @@ seller/manage-orders.ejs:
                 </tbody>
             </table>
         </div>
-    <% } else if (!message) { %> <%# Show only if no orders and no specific message %>
-        <p>No orders containing your products found.</p>
+    <% } else if (!message) { %>
+        <p class="alert alert-info">No orders containing your products found.</p>
     <% } %>
 </div>
 
