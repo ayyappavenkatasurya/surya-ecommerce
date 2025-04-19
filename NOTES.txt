@@ -1690,50 +1690,61 @@ controllers/productController.js:
 const Product = require('../models/Product');
 const User = require('../models/User'); // Keep for user rating logic
 
-// --- UPDATE Get Products (Show ONLY Approved) ---
+/**
+ * Escapes special characters in a string for use in a regular expression.
+ * @param {string} string - The input string.
+ * @returns {string} The escaped string.
+ */
+function escapeRegex(string) {
+  return string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
+
+// --- Get Products (Handles both listing and search results with sequential matching) ---
 exports.getProducts = async (req, res, next) => {
   try {
-    const searchTerm = req.query.search || '';
+    const searchTerm = req.query.search || ''; // Get search term from query param 'search'
     let query = {
-        // *** ADDED: Filter by approved status and stock ***
-        reviewStatus: 'approved',
-        stock: { $gt: 0 }
+        reviewStatus: 'approved', // Always filter by approved
+        stock: { $gt: 0 }         // Always filter by in-stock
     };
+    let sort = { createdAt: -1 }; // Default sort
+    const projection = {}; // No text score projection needed for regex
 
+    // --- NEW: Use Regex for sequential matching if searchTerm exists ---
     if (searchTerm) {
-      // Using text index for search
-      query.$text = { $search: searchTerm };
-      // If not using text index, use regex:
-      // const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-      // const regex = new RegExp(escapedSearchTerm, 'i');
-      // query.$or = [
-      //    { name: regex },
-      //    { category: regex },
-      //    { specifications: regex }
-      // ];
+      const escapedSearchTerm = escapeRegex(searchTerm); // Escape special characters
+      const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+
+      query.$or = [ // Match name OR category sequentially
+        { name: regex },
+        { category: regex }
+        // Add { specifications: regex } here if you want to search specs sequentially too
+      ];
+      // Optional: Change sort for search results, e.g., alphabetical
+      // sort = { name: 1 };
+      console.log(`Regex Search Query: ${JSON.stringify(query)}`); // Log the query
     }
+    // --- End Regex modification ---
 
-    // Define projection for text search score if using $text
-    const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
-    const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
+    const products = await Product.find(query, projection) // Projection is now empty
+                                    .sort(sort)
+                                    .lean(); // Use lean for read-only performance
 
-
-    const products = await Product.find(query, projection) // Add projection
-                                    .sort(sort)        // Sort by score or date
-                                    .lean();             // Use lean for performance
-
+    // Render the same index page, passing search term for display
     res.render('products/index', {
-      title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
+      title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home', // Dynamic title
       products: products,
-      searchTerm: searchTerm
+      searchTerm: searchTerm // Pass term back to view
+      // currentUser is available via res.locals
     });
   } catch (error) {
-    next(error);
+    console.error("Error fetching products:", error);
+    next(error); // Pass error to central handler
   }
 };
 
 
-// --- UPDATE Get Product Details (Check Status/Ownership) ---
+// --- Get Product Details (No changes needed) ---
 exports.getProductDetails = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
@@ -1741,17 +1752,15 @@ exports.getProductDetails = async (req, res, next) => {
                                     .lean(); // Use lean()
 
     if (!product) {
-       // Handles CastError implicitly if ID is invalid format for findById
        const error = new Error('Product not found');
        error.status = 404;
        return next(error); // Use central error handler
     }
 
-    // *** ADDED: Check if product is viewable ***
+    // Check if product is viewable
     const isApproved = product.reviewStatus === 'approved';
     const user = req.session.user;
     const isAdmin = user?.role === 'admin';
-    // Check if user is explicitly the seller comparing ObjectIds as strings
     const isOwner = user && product.sellerId?._id && user._id.toString() === product.sellerId._id.toString();
 
 
@@ -1762,47 +1771,40 @@ exports.getProductDetails = async (req, res, next) => {
          return next(error);
     }
 
-
-    // User rating logic (no change needed here)
+    // User rating logic
     let userRating = null;
     if (user) {
-       // Note: lean() means product.ratings doesn't have Mongoose methods. Need manual find.
        const ratingData = product.ratings?.find(r => r.userId?.toString() === user._id.toString());
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // Rating stats calculation (no change needed here)
+    // Rating stats calculation
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
         totalRatings = product.ratings.length;
         product.ratings.forEach(r => {
-            // Check rating value exists and is within expected range
             if (r.rating && ratingCounts.hasOwnProperty(r.rating)) {
                 ratingCounts[r.rating]++;
             }
         });
     }
-
     const displayTotalRatings = product.numReviews || totalRatings;
 
 
     res.render('products/detail', {
       title: product.name,
       product: product,
-      // Pass status flags to view for conditional rendering (e.g., banners)
       isApproved: isApproved,
       isAdminView: isAdmin,
       isOwnerView: isOwner,
       userRating: userRating,
-      // Allow rating only if product is approved (or maybe always for owner/admin?)
-      userCanRate: user ? true : false, // Existing logic: logged in = can rate
-      // Pass rating data
+      userCanRate: user ? true : false,
       ratingCounts: ratingCounts,
       totalRatings: displayTotalRatings
+      // Add other necessary variables like fullUrl etc. if needed by header partial
     });
   } catch (error) {
-       // Mongoose CastError (invalid ID format) should be caught by findById -> null
        if (error.name === 'CastError') {
            const notFoundError = new Error('Product not found (Invalid ID)');
            notFoundError.status = 404;
@@ -1813,55 +1815,39 @@ exports.getProductDetails = async (req, res, next) => {
 };
 
 
-// --- Rate Product (No fundamental change, but check product exists) ---
+// --- Rate Product (No changes needed) ---
  exports.rateProduct = async (req, res, next) => {
      const { rating } = req.body;
     const productId = req.params.id;
     const userId = req.session.user._id;
 
-     if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) { // Added NaN check
+     if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) {
          req.flash('error_msg', 'Please provide a valid rating between 1 and 5.');
-        // Redirect back is safer than assuming specific path
         return res.redirect('back'); // Redirect to previous page
      }
 
     try {
-        // Find the product *without* lean() to use save() method
-        const product = await Product.findById(productId);
+        const product = await Product.findById(productId); // Not lean()
 
          if (!product) {
              req.flash('error_msg', 'Product not found.');
-             // Redirecting to home might be better than back if product disappeared
              return res.status(404).redirect('/');
          }
 
-         // --- OPTIONAL: Prevent rating non-approved products? ---
-         // if (product.reviewStatus !== 'approved') {
-         //     req.flash('error_msg', 'This product cannot be rated currently.');
-         //     return res.redirect('back');
-         // }
-
-
-         // Find existing rating index
          const existingRatingIndex = product.ratings.findIndex(r => r.userId?.toString() === userId.toString());
 
          if (existingRatingIndex > -1) {
-             // Update existing rating
             product.ratings[existingRatingIndex].rating = Number(rating);
-             // Optionally update timestamp if RatingSchema tracks it
          } else {
-            // Add new rating
             product.ratings.push({ userId, rating: Number(rating) });
          }
 
-        // Mongoose pre-save hook will recalculate averageRating and numReviews
-        await product.save();
+        await product.save(); // Triggers pre-save hook for averageRating/numReviews
 
          req.flash('success_msg', 'Thank you for your rating!');
          res.redirect(`/products/${productId}`); // Redirect back to product page
 
      } catch (error) {
-        // Handle CastError for productId
         if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid product ID.');
             return res.status(400).redirect('/');
@@ -1869,6 +1855,45 @@ exports.getProductDetails = async (req, res, next) => {
         console.error("Error rating product:", error);
         next(error); // Central error handler
      }
+ };
+
+ // --- Get Product Suggestions (Updated for sequential matching) ---
+ exports.getProductSuggestions = async (req, res, next) => {
+    const searchTerm = req.query.q; // Get query from 'q' parameter
+    const limit = 8; // Max number of suggestions
+
+    if (!searchTerm || searchTerm.trim().length < 2) {
+        return res.json([]); // Return empty if no/short query
+    }
+
+    try {
+        // --- NEW: Use Regex for sequential matching ---
+        const escapedSearchTerm = escapeRegex(searchTerm); // Escape special chars
+        const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+
+        const query = {
+            $or: [ // Match name OR category sequentially
+                { name: regex },
+                { category: regex }
+            ],
+            reviewStatus: 'approved', // Only suggest approved products
+            stock: { $gt: 0 }         // Only suggest products in stock
+        };
+        // --- End Regex modification ---
+
+        const suggestions = await Product.find(query)
+            .select('_id name imageUrl') // Select only needed fields
+            .limit(limit)
+            .sort({ name: 1 }) // Sort suggestions alphabetically
+            .lean(); // Use lean for performance
+
+        res.json(suggestions); // Send results as JSON
+
+    } catch (error) {
+        console.error("Error fetching product suggestions:", error);
+        // Avoid sending full error details to client
+        res.status(500).json({ error: 'Failed to fetch suggestions' });
+    }
  };
 
 controllers/userController.js:
@@ -3441,6 +3466,7 @@ ul, ol {
 }
 
 .hidden { display: none !important; }
+.hide { display: none !important; } /* Added alias */
 .text-center { text-align: center; }
 .text-danger { color: var(--danger-color) !important; }
 .text-success { color: var(--success-color) !important; }
@@ -3453,9 +3479,25 @@ ul, ol {
 .mt-1 { margin-top: calc(var(--spacing-unit) * 0.25) !important; }
 .mt-2 { margin-top: calc(var(--spacing-unit) * 0.5) !important; }
 .mt-3 { margin-top: var(--spacing-unit) !important; }
+.ms-1 { margin-left: calc(var(--spacing-unit) * 0.25) !important; } /* Added margin start */
+.me-2 { margin-right: calc(var(--spacing-unit) * 0.5) !important; } /* Added margin end */
 .d-block { display: block !important; }
+.d-inline-block { display: inline-block !important; } /* Added */
 .small { font-size: 0.875em; }
 .w-100 { width: 100% !important; } /* Utility class */
+.visually-hidden { /* Added */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.fw-bold { font-weight: bold !important; } /* Added */
+
 
 .inline-form {
     display: block;
@@ -3572,6 +3614,8 @@ select:focus {
 
 .btn-outline-secondary { color: var(--secondary-color); border-color: var(--secondary-color); background-color: transparent;}
 .btn-outline-secondary:hover { color: #fff; background-color: var(--secondary-color); }
+.btn-outline-primary { color: var(--primary-color); border-color: var(--primary-color); background-color: transparent;} /* Added */
+.btn-outline-primary:hover { color: #fff; background-color: var(--primary-color); } /* Added */
 
 .btn-text {
     background-color: transparent;
@@ -3645,8 +3689,9 @@ select:focus {
   opacity: 1;
 }
 
+/* Header Styles */
 .app-header {
-  background-color: var( --primary-color);
+  background-color: var(--primary-color); /* Darker Blue */
   color: var(--light-color);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   position: sticky;
@@ -3663,11 +3708,13 @@ select:focus {
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
+  gap: calc(var(--spacing-unit) * 0.5); /* Gap between sections */
 }
 
 .nav-left, .nav-right {
   display: flex;
   align-items: center;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 .nav-right {
     gap: calc(var(--spacing-unit) * 0.5);
@@ -3698,6 +3745,8 @@ select:focus {
   align-items: center;
   font-size: 0.75rem;
   text-decoration: none;
+  background: none; /* Ensure no default button background */
+  border: none; /* Ensure no default button border */
 }
 .nav-link span {
   display: none;
@@ -3729,6 +3778,8 @@ select:focus {
   font-weight: bold;
   line-height: 1;
 }
+.cart-badge.hide { display: none; } /* Ensure hidden works */
+
 
 .btn-login-register {
     font-size: 0.9rem;
@@ -3762,6 +3813,7 @@ select:focus {
     line-height: 1;
 }
 
+/* Container and Footer */
 .container {
   width: 100%;
   padding: var(--spacing-unit);
@@ -3777,31 +3829,15 @@ select:focus {
   background-color: var(--light-color);
   border-top: 1px solid var(--border-color);
   margin-top: auto;
-  display: none;
 }
 
+/* Product Index Styles */
 .product-index-container h1 {
     font-size: 1.5rem;
 }
+/* Hide old search bar */
 .search-bar-container {
-    margin-bottom: var(--spacing-unit);
-}
-.search-form {
-    display: flex;
-    align-items: center;
-}
-.search-form input[type="text"] {
-    flex-grow: 1;
-    border-radius: var(--border-radius) 0 0 var(--border-radius);
-    border-right: none;
-}
-.search-form button {
-    border-radius: 0 var(--border-radius) var(--border-radius) 0;
-    padding: calc(var(--spacing-unit) * 0.6);
-}
-.btn-clear-search {
-    margin-left: calc(var(--spacing-unit) * 0.5);
-    font-size: 0.9rem;
+    display: none;
 }
 
 .product-grid {
@@ -3854,9 +3890,13 @@ select:focus {
   font-weight: 500;
   margin-bottom: calc(var(--spacing-unit) * 0.25);
   line-height: 1.3;
+  /* Mobile height limit */
   height: 2.6em;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .product-price {
@@ -3875,6 +3915,7 @@ select:focus {
 .product-rating .fa-star, .product-rating .fa-star-half-alt {
     color: #f8d347;
 }
+.product-rating .fa-star-regular { color: #e4e5e9; } /* Added for empty star */
 
 .add-to-cart-form {
     padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
@@ -3888,6 +3929,7 @@ select:focus {
     margin-right: calc(var(--spacing-unit) * 0.25);
 }
 
+/* Product Detail Styles */
 .product-detail-container {
   background-color: var(--card-bg);
   padding: var(--spacing-unit);
@@ -3937,6 +3979,7 @@ select:focus {
     color: var(--secondary-color);
 }
 .detail-rating i { color: #f8d347; }
+.detail-rating .fa-star-regular { color: #e4e5e9; } /* Added for empty star */
 
 .product-actions {
     margin: calc(var(--spacing-unit) * 1.2) 0;
@@ -3981,6 +4024,7 @@ select:focus {
     overflow-y: auto;
 }
 
+/* Rating Section */
 .product-rating-section {
     margin-top: var(--spacing-unit);
     border-top: 1px solid var(--border-color);
@@ -4093,6 +4137,9 @@ select:focus {
   border-radius: 4px;
   overflow: hidden;
 }
+.progress { /* Bootstrap compatibility */ background-color: #e9ecef; border-radius: .25rem; display: flex; height: 1rem; overflow: hidden; font-size: .75rem;}
+.progress-bar { /* Bootstrap compatibility */ background-color: var(--primary-color); color: #fff; display: flex; flex-direction: column; justify-content: center; overflow: hidden; text-align: center; white-space: nowrap; transition: width .6s ease;}
+
 
 .rating-bar-fill {
   height: 100%;
@@ -4100,11 +4147,12 @@ select:focus {
   border-radius: 4px;
   transition: width 0.3s ease-in-out;
 }
-.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; }
-.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; }
-.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; }
-.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; }
-.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; }
+/* Different colors for rating bars */
+.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; } /* 5 stars */
+.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; } /* 4 stars */
+.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; } /* 3 stars */
+.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; } /* 2 stars */
+.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; } /* 1 star */
 
 .rating-bar-count {
   width: 40px;
@@ -4114,6 +4162,7 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* Auth Container */
 .auth-container {
   max-width: 450px;
   margin: var(--spacing-unit) auto;
@@ -4146,6 +4195,7 @@ select:focus {
 .auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--spacing-unit); }
 #otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; }
 
+/* Cart Container */
 .cart-container h1 {
     font-size: 1.5rem;
     margin-bottom: var(--spacing-unit);
@@ -4227,6 +4277,9 @@ select:focus {
     font-size: 0.9rem;
     white-space: nowrap;
 }
+.cart-item-subtotal .item-subtotal-value { /* Added for targeting */
+    font-weight: 500;
+}
 
 .cart-item-remove .btn {
     padding: 0.1rem 0.4rem;
@@ -4253,6 +4306,7 @@ select:focus {
     font-size: 1.1rem;
 }
 
+/* Checkout Container */
 .checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit);}
 
 .checkout-grid {
@@ -4325,6 +4379,7 @@ select:focus {
     padding: calc(var(--spacing-unit) * 0.7);
 }
 
+/* My Orders Container */
 .my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
 .order-list {
     display: flex;
@@ -4400,6 +4455,7 @@ select:focus {
     text-align: right;
 }
 
+/* Status Badge */
 .status-badge {
     font-weight: bold;
     padding: 0.2em 0.5em;
@@ -4419,6 +4475,7 @@ select:focus {
 .order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; }
 
 
+/* Admin/Seller Container */
 .admin-manage-container, .admin-dashboard-container {
     padding: var(--spacing-unit);
 }
@@ -4611,7 +4668,7 @@ select:focus {
     margin-top: calc(var(--spacing-unit) * 0.3);
 }
 
-/* Delivery OTP Display (copied from user view, adjust if needed) */
+/* Delivery OTP Display (Mobile) */
 .delivery-otp-display {
     margin-top: 10px;
     padding: 8px 12px;
@@ -4636,7 +4693,7 @@ select:focus {
 }
 .delivery-otp-display small { display: block; margin-top: 3px; color: #555; }
 
-/* OTP Verification Form Refinement */
+/* OTP Verification Form Refinement (Mobile Table) */
 .verify-otp-form {
     display: flex;
     align-items: center;
@@ -4661,6 +4718,7 @@ select:focus {
 /* --- REFINED TABLE STYLES END --- */
 
 
+/* Admin Actions Grid */
 .admin-actions-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -4699,6 +4757,7 @@ select:focus {
     margin-bottom: 0.5rem;
 }
 
+/* Error Container */
 .error-container { text-align: center; padding-top: 2rem; }
 .error-container h1 { color: var(--danger-color); margin-bottom: 0.5rem; }
 .error-container .lead { font-size: 1.1rem; }
@@ -4707,6 +4766,7 @@ select:focus {
 .error-container details pre { white-space: pre-wrap; font-size: 0.8em; margin-top: 0.5rem; }
 
 
+/* Profile Container */
 .profile-container {
     max-width: 800px;
     margin: var(--spacing-unit) auto;
@@ -4753,7 +4813,7 @@ select:focus {
 #saved-address-display strong {
     font-weight: 500;
 }
-#edit-address-btn {
+#edit-address-btn, #add-address-btn { /* Target both */
     margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
@@ -4784,7 +4844,6 @@ select:focus {
   display: flex; /* Arrange images horizontally */
   flex-wrap: wrap; /* Allow wrapping to next line if needed */
   gap: 8px; /* Space between images */
-  /* margin-top: 8px; */ /* Controlled by context */
   padding-left: 0; /* Remove default padding if any */
 }
 
@@ -4831,7 +4890,198 @@ select:focus {
    text-decoration: none;
 }
 
+/* ============================ */
+/* Dynamic Search Bar Styles    */
+/* ============================ */
 
+/* Container positioning within navbar */
+.search-container-dynamic {
+  position: relative; /* Needed for absolute positioning of dropdown */
+  flex-grow: 1; /* Allows it to take space on larger screens */
+  display: flex; /* Use flex for alignment */
+  justify-content: center; /* Center the search form initially */
+  margin: 0 calc(var(--spacing-unit) * 0.5); /* Spacing around */
+  max-width: 500px; /* Max width on larger screens */
+}
+
+/* The form itself */
+.search-form-dynamic {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.15); /* Slightly transparent background */
+  border-radius: var(--border-radius);
+  transition: background-color 0.3s ease, width 0.3s ease;
+  overflow: hidden; /* Prevents content spill during transition */
+  height: 38px; /* Match other nav elements */
+  border: 1px solid transparent; /* Add border for focus state */
+}
+
+/* Input field */
+#search-input-dynamic {
+  flex-grow: 1;
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  border: none;
+  background-color: transparent;
+  color: var(--light-color); /* Text color */
+  font-size: 0.9rem;
+  height: 100%;
+  outline: none;
+}
+#search-input-dynamic::placeholder {
+  color: rgba(255, 255, 255, 0.7); /* Lighter placeholder */
+  opacity: 1; /* Ensure placeholder is visible */
+}
+
+/* Submit button */
+.search-submit-btn-dynamic {
+  background: none;
+  border: none;
+  color: var(--light-color);
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  font-size: 1rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.search-submit-btn-dynamic:hover {
+  opacity: 0.8;
+}
+
+/* Suggestions Dropdown */
+.suggestions-dropdown {
+  display: none; /* Hidden by default */
+  position: absolute;
+  top: 100%; /* Position below the search bar */
+  left: 0;
+  right: 0;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-top: none; /* Avoid double border */
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  max-height: 400px; /* Limit height */
+  overflow-y: auto;
+  z-index: 1010; /* Ensure it's above other content */
+}
+.suggestions-dropdown.active {
+  display: block; /* Show when active */
+}
+
+/* Individual Suggestion Item */
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  color: var(--text-color);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-color);
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+.suggestion-item:hover {
+  background-color: var(--light-color);
+  text-decoration: none;
+}
+.suggestion-item img {
+  width: 35px;
+  height: 35px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0; /* Prevent image shrinking */
+}
+.suggestion-item span {
+  font-size: 0.9rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* Prevent wrapping */
+}
+.suggestion-item i { /* Style for loading/error */
+    font-style: normal;
+    color: var(--secondary-color);
+}
+
+/* Search Toggle Button (Icon Button) */
+.search-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* Inherits nav-link styles, add specifics if needed */
+}
+
+/* ============================ */
+/* Media Queries                */
+/* ============================ */
+
+@media (max-width: 767px) {
+  /* Mobile specific: Hide form initially, only show icon */
+  .search-container-dynamic {
+    /* Initially take minimal space, letting icon control it */
+    flex-grow: 0;
+    max-width: none;
+    order: -1; /* Move it left near the logo */
+    margin-right: auto; /* Push other icons right */
+    position: static; /* Remove relative positioning */
+  }
+  .search-form-dynamic {
+    position: absolute;
+    top: calc(100% + 5px); /* Position below header */
+    left: 5px;
+    right: 5px;
+    width: calc(100% - 10px); /* Full width minus padding */
+    background-color: var(--card-bg); /* White background */
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s, transform 0.3s ease;
+    z-index: 1005; /* Below dropdown but above content */
+  }
+  #search-input-dynamic {
+    color: var(--text-color); /* Dark text on white background */
+  }
+  #search-input-dynamic::placeholder {
+     color: var(--secondary-color);
+  }
+  .search-submit-btn-dynamic {
+     color: var(--secondary-color);
+  }
+
+  /* Active state for mobile search form */
+  .search-container-dynamic.active .search-form-dynamic {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.3s ease, visibility 0s linear 0s, transform 0.3s ease;
+  }
+
+  /* Adjust suggestions dropdown position on mobile when active */
+  .search-container-dynamic.active .suggestions-dropdown {
+      position: absolute; /* Ensure it's absolute */
+      top: calc(100% + 5px + 38px + 5px); /* Header + padding + form height + padding */
+      left: 5px;
+      right: 5px;
+      width: calc(100% - 10px);
+      z-index: 1010; /* Above the form */
+  }
+
+  .search-toggle-btn {
+      /* Ensure it's visible and clickable */
+      padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.6);
+      display: flex; /* Make sure it's displayed */
+  }
+
+  .app-footer { display: none; } /* Hide footer on small screens */
+
+}
+
+/* Desktop and Larger */
 @media (min-width: 768px) {
   .container {
     max-width: 960px;
@@ -4846,7 +5096,13 @@ select:focus {
   .app-footer { display: block; }
 
   .product-grid { grid-template-columns: repeat(3, 1fr); }
-  .product-name { height: auto; white-space: normal; }
+  .product-name {
+       height: auto; /* Remove fixed height */
+       white-space: normal; /* Allow wrapping */
+       display: block; /* Reset webkit box */
+       -webkit-line-clamp: unset;
+       -webkit-box-orient: unset;
+  }
 
 
   .product-detail-main {
@@ -5031,6 +5287,46 @@ select:focus {
         padding: calc(var(--spacing-unit) * 2);
     }
 
+   /* Desktop Dynamic Search Bar Styles */
+   .search-toggle-btn {
+     display: none; /* Hide toggle icon on desktop */
+   }
+   .search-container-dynamic {
+      position: relative; /* Keep relative for dropdown */
+   }
+   .search-form-dynamic {
+       /* Reset mobile absolute positioning */
+       position: static;
+       opacity: 1;
+       visibility: visible;
+       transform: none;
+       box-shadow: none;
+       background-color: rgba(255, 255, 255, 0.15); /* Back to header color */
+       border: 1px solid transparent;
+       width: 100%; /* Expand within container */
+   }
+    .search-form-dynamic:focus-within {
+       background-color: rgba(255, 255, 255, 0.25);
+       border-color: rgba(255, 255, 255, 0.5);
+    }
+    #search-input-dynamic {
+        color: var(--light-color); /* Back to light text */
+    }
+    #search-input-dynamic::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+    .search-submit-btn-dynamic {
+        color: var(--light-color);
+    }
+    .suggestions-dropdown {
+        /* Reset mobile absolute positions */
+         position: absolute;
+         top: 100%;
+         left: 0;
+         right: 0;
+         width: auto; /* Let it size naturally based on container */
+    }
+
 } /* End @media (min-width: 768px) */
 
 
@@ -5043,9 +5339,6 @@ select:focus {
 
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
 
-  /* Potentially increase action cell width if needed */
-  
-
 } /* End @media (min-width: 1024px) */
 
 public/js/main.js:
@@ -5053,54 +5346,25 @@ console.log("Main JS loaded.");
 
 document.addEventListener('DOMContentLoaded', () => {
 
-
-    const updateQtyButtons = document.querySelectorAll('.btn-update-qty');
-    updateQtyButtons.forEach(button => {
-        button.addEventListener('click', (e) => {
-            const productId = button.dataset.productId;
-            const quantityInput = document.getElementById(`quantity-${productId}`);
-            const newQuantity = parseInt(quantityInput.value, 10);
-
-            if (isNaN(newQuantity) || newQuantity < 0) {
-                 alert('Invalid quantity');
-                return;
-             }
-            const maxStock = parseInt(quantityInput.max, 10);
-            if(newQuantity > maxStock){
-                alert(`Only ${maxStock} items available in stock.`);
-                quantityInput.value = maxStock;
-                 return;
-             }
-
-            updateCartItemQuantityAJAX(productId, newQuantity, button);
-        });
-    });
-
-
-
+    // --- Keep Existing Button Spinner Logic ---
     document.querySelectorAll('form.form-submit-spinner').forEach(form => {
         form.addEventListener('submit', (event) => {
             const submitButton = form.querySelector('button[type="submit"]');
             if (submitButton && !submitButton.disabled) {
-
+                // Basic HTML5 validation check
                 if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
-
+                    // If form is invalid, don't disable button or show spinner
                     return;
                 }
-
                 const originalText = submitButton.innerHTML;
-
-                submitButton.dataset.originalText = originalText;
+                submitButton.dataset.originalText = originalText; // Store original HTML
                 submitButton.disabled = true;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-
-
             }
         });
     });
 
-
-
+    // --- Keep Existing Responsive Table Logic ---
     function responsiveTables() {
         const tables = document.querySelectorAll('.data-table');
         tables.forEach(table => {
@@ -5112,7 +5376,7 @@ document.addEventListener('DOMContentLoaded', () => {
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, index) => {
-
+                    // Add data-label only if it doesn't exist and header exists
                     if (!cell.hasAttribute('data-label') && headers[index] !== undefined && headers[index] !== '') {
                          cell.setAttribute('data-label', headers[index]);
                     }
@@ -5120,17 +5384,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-
      if (document.querySelector('.data-table')) {
          responsiveTables();
-
      }
 
-
-
+    // --- Keep Existing Share Button Logic ---
     const shareButton = document.getElementById('share-product-btn');
     const fallbackLinks = document.getElementById('fallback-share-links');
-
     if (shareButton && fallbackLinks) {
         shareButton.addEventListener('click', async () => {
             const title = shareButton.dataset.title;
@@ -5144,190 +5404,411 @@ document.addEventListener('DOMContentLoaded', () => {
                 } catch (error) {
                     console.error('Error sharing:', error);
                     if (error.name !== 'AbortError') {
-                         fallbackLinks.classList.remove('hidden');
+                         fallbackLinks.classList.remove('hidden'); // Use hidden consistently
                     }
                 }
             } else {
                 console.log('Web Share API not supported, showing fallback links.');
-                fallbackLinks.classList.remove('hidden');
+                fallbackLinks.classList.remove('hidden'); // Use hidden consistently
             }
         });
     }
 
-
-    const editBtn = document.getElementById('edit-address-btn');
-    const cancelBtn = document.getElementById('cancel-edit-btn');
-    const addressForm = document.getElementById('address-form');
-    const savedAddressDiv = document.querySelector('.saved-address');
+    // --- Keep Existing Profile Address Toggle Logic ---
+    const profileEditBtn = document.getElementById('edit-address-btn');
+    const profileAddBtn = document.getElementById('add-address-btn');
+    const profileCancelBtn = document.getElementById('cancel-edit-btn');
+    const profileAddressForm = document.getElementById('address-form'); // Use ID on profile page too
     const profileSavedAddressDiv = document.getElementById('saved-address-display');
-    const placeOrderBtn = document.querySelector('.btn-place-order');
-    const formTitle = addressForm?.querySelector('h3');
-    const addressSourceInput = addressForm?.querySelector('input[name="source"]');
-    let isProfilePage = addressSourceInput?.value === 'profile';
 
-    let initialAddressDiv = isProfilePage ? profileSavedAddressDiv : savedAddressDiv;
-    const hasInitialAddress = initialAddressDiv && !initialAddressDiv.classList.contains('hidden');
-
-    if (editBtn && addressForm && initialAddressDiv) {
-        editBtn.addEventListener('click', () => {
-            addressForm.classList.remove('hidden');
-            initialAddressDiv.classList.add('hidden');
-            if(placeOrderBtn) placeOrderBtn.disabled = true;
-            if(formTitle) formTitle.textContent = 'Edit Address';
-        });
-    }
-
-    if (cancelBtn && addressForm && initialAddressDiv) {
-        cancelBtn.addEventListener('click', () => {
-            addressForm.classList.add('hidden');
-            if (hasInitialAddress) {
-                initialAddressDiv.classList.remove('hidden');
-
-                if(placeOrderBtn && !isProfilePage) placeOrderBtn.disabled = false;
-            } else {
-                 if(placeOrderBtn && !isProfilePage) placeOrderBtn.disabled = true;
+    if (document.body.contains(profileAddressForm)) { // Check if on a page with the address form
+        const showProfileForm = () => {
+            profileAddressForm.classList.remove('hidden');
+            profileAddressForm.querySelector('h3').textContent = profileSavedAddressDiv.querySelector('strong') ? 'Edit Address' : 'Add Address';
+            profileSavedAddressDiv?.classList.add('hidden'); // Optional chaining for safety
+            if (profileCancelBtn && profileSavedAddressDiv?.querySelector('strong')) {
+                profileCancelBtn.classList.remove('hidden');
+            } else if (profileCancelBtn) {
+                 profileCancelBtn.classList.add('hidden');
             }
+        };
 
+        const hideProfileForm = () => {
+            profileAddressForm.classList.add('hidden');
+            if (profileSavedAddressDiv) {
+                 if (profileSavedAddressDiv.querySelector('strong')) { // Check if address actually exists
+                     profileSavedAddressDiv.classList.remove('hidden');
+                 } else {
+                    // If no address exists, keep the "No address saved" section visible potentially
+                    // This part depends on whether savedAddressDiv contains the "No address" message
+                    profileSavedAddressDiv.classList.remove('hidden'); // Re-evaluate if this should be hidden
+                 }
+            }
+             if (profileCancelBtn) profileCancelBtn.classList.add('hidden'); // Always hide cancel when form is hidden
+        };
+
+        if (profileEditBtn) {
+            profileEditBtn.addEventListener('click', showProfileForm);
+        }
+        if (profileAddBtn) {
+             profileAddBtn.addEventListener('click', () => {
+                profileAddressForm.reset(); // Clear form fields when adding new
+                showProfileForm();
+             });
+        }
+        if (profileCancelBtn) {
+            profileCancelBtn.addEventListener('click', hideProfileForm);
+        }
+
+        // Initial state for profile page add button
+        if (profileSavedAddressDiv && !profileSavedAddressDiv.querySelector('strong') && profileAddressForm.classList.contains('hidden') && profileAddBtn) {
+           profileAddBtn.classList.remove('hidden'); // Ensure add button is visible if no address
+        } else if (profileAddBtn) {
+             profileAddBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
+        }
+    }
+
+    // --- Keep Existing Checkout Address Toggle Logic ---
+    const checkoutEditBtn = document.querySelector('.checkout-address #edit-address-btn'); // More specific selector
+    const checkoutCancelBtn = document.querySelector('.checkout-address #cancel-edit-btn');
+    const checkoutAddressForm = document.querySelector('.checkout-address #address-form');
+    const checkoutSavedAddressDiv = document.querySelector('.checkout-address .saved-address');
+    const placeOrderBtn = document.querySelector('.btn-place-order');
+
+    if (document.body.contains(checkoutAddressForm)) { // Check if on checkout page
+        const hasInitialAddress = checkoutSavedAddressDiv && !checkoutSavedAddressDiv.classList.contains('hidden');
+
+        if (checkoutEditBtn) {
+            checkoutEditBtn.addEventListener('click', () => {
+                checkoutAddressForm.classList.remove('hidden');
+                checkoutSavedAddressDiv.classList.add('hidden');
+                if(placeOrderBtn) placeOrderBtn.disabled = true;
+                checkoutAddressForm.querySelector('h3').textContent = 'Edit Address';
+            });
+        }
+
+        if (checkoutCancelBtn) {
+            checkoutCancelBtn.addEventListener('click', () => {
+                checkoutAddressForm.classList.add('hidden');
+                if (hasInitialAddress) {
+                    checkoutSavedAddressDiv.classList.remove('hidden');
+                    if(placeOrderBtn) placeOrderBtn.disabled = false;
+                } else {
+                    // If there was no initial address, cancelling means keep form hidden and button disabled
+                    if(placeOrderBtn) placeOrderBtn.disabled = true;
+                }
+            });
+        }
+
+        // Initial state for checkout page
+        if (!hasInitialAddress && checkoutAddressForm && placeOrderBtn) {
+            checkoutAddressForm.classList.remove('hidden'); // Show form if no address saved
+            placeOrderBtn.disabled = true; // Disable place order
+            checkoutAddressForm.querySelector('h3').textContent = 'Add Address';
+            if(checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden'); // Hide cancel btn if adding new
+        } else if (hasInitialAddress && placeOrderBtn) {
+            placeOrderBtn.disabled = false; // Enable if address exists
+            if(checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden'); // Ensure cancel is hidden initially
+        }
+    }
+
+    // --- Keep Existing Cart Update AJAX Logic ---
+    const updateQtyButtons = document.querySelectorAll('.btn-update-qty');
+    updateQtyButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent potential form submission if it's somehow in a form
+            const productId = button.dataset.productId;
+            const quantityInput = document.getElementById(`quantity-${productId}`);
+            if (!quantityInput) return;
+
+            const newQuantity = parseInt(quantityInput.value, 10);
+
+            if (isNaN(newQuantity) || newQuantity < 0) {
+                 alert('Invalid quantity.');
+                // Restore original value maybe?
+                // quantityInput.value = quantityInput.dataset.originalValue || 1;
+                return;
+             }
+            const maxStock = parseInt(quantityInput.max, 10);
+            if (!isNaN(maxStock) && newQuantity > maxStock) {
+                alert(`Only ${maxStock} items available in stock.`);
+                quantityInput.value = maxStock;
+                 return; // Don't proceed with AJAX call
+             }
+
+            updateCartItemQuantityAJAX(productId, newQuantity, button);
+        });
+    });
+
+
+    // ========================================
+    // Dynamic Search Bar Logic (NEW)
+    // ========================================
+    const searchContainer = document.getElementById('dynamic-search-container');
+    const searchToggleBtn = document.getElementById('search-toggle-btn');
+    const searchForm = document.getElementById('dynamic-search-form');
+    const searchInput = document.getElementById('search-input-dynamic');
+    const suggestionsDropdown = document.getElementById('suggestions-dropdown');
+    let suggestionFetchTimeout; // For debouncing
+
+    // --- Toggle Search Bar (Mobile) ---
+    if (searchToggleBtn && searchContainer) {
+        searchToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering document click listener immediately
+            searchContainer.classList.toggle('active');
+            if (searchContainer.classList.contains('active')) {
+                // Only focus if search form is actually becoming visible (check opacity/visibility)
+                // Use setTimeout to allow transition to potentially complete
+                setTimeout(() => { searchInput.focus(); }, 50);
+            } else {
+                suggestionsDropdown.classList.remove('active'); // Hide suggestions when closing
+            }
         });
     }
 
+    // --- Handle Search Input ---
+    if (searchInput && suggestionsDropdown) {
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.trim();
 
-     if (!isProfilePage && !hasInitialAddress && addressForm && placeOrderBtn) {
-         addressForm.classList.remove('hidden');
-         placeOrderBtn.disabled = true;
-         if (formTitle) formTitle.textContent = 'Add Address';
-     } else if (!isProfilePage && hasInitialAddress && placeOrderBtn) {
-         placeOrderBtn.disabled = false;
+            // Clear previous debounce timeout
+            clearTimeout(suggestionFetchTimeout);
+
+            if (query.length >= 2) { // Only search if query is long enough
+                suggestionsDropdown.innerHTML = '<div class="suggestion-item"><i>Loading...</i></div>'; // Basic loading indicator
+                suggestionsDropdown.classList.add('active');
+
+                // Debounce the fetch request (e.g., 300ms delay)
+                suggestionFetchTimeout = setTimeout(() => {
+                    fetchSuggestions(query);
+                }, 300);
+
+            } else {
+                suggestionsDropdown.innerHTML = '';
+                suggestionsDropdown.classList.remove('active');
+            }
+        });
+
+        // Keep suggestions open when focusing input (if suggestions exist)
+        searchInput.addEventListener('focus', () => {
+             const query = searchInput.value.trim();
+              // Check if there are actual suggestion items, not just loading/error message
+              const hasActualSuggestions = suggestionsDropdown.querySelector('a.suggestion-item');
+              if (query.length >= 2 && hasActualSuggestions) {
+                 suggestionsDropdown.classList.add('active');
+             }
+        });
+    }
+
+     // --- Fetch Suggestions from Backend ---
+     async function fetchSuggestions(query) {
+         try {
+             // Use encodeURIComponent to handle special characters in query
+             const response = await fetch(`/products/suggestions?q=${encodeURIComponent(query)}`);
+             if (!response.ok) {
+                 // Try to parse error message from backend if available
+                 let errorMsg = `HTTP error! status: ${response.status}`;
+                 try {
+                     const errorData = await response.json();
+                     errorMsg = errorData.error || errorMsg;
+                 } catch (parseError) {
+                     // Ignore if response body is not JSON
+                 }
+                 throw new Error(errorMsg);
+             }
+             const suggestions = await response.json();
+             displaySuggestions(suggestions);
+         } catch (error) {
+             console.error('Error fetching suggestions:', error);
+             suggestionsDropdown.innerHTML = `<div class="suggestion-item text-danger">Error: ${error.message}</div>`;
+             suggestionsDropdown.classList.add('active'); // Keep open to show error
+         }
      }
 
-      if (isProfilePage && !hasInitialAddress && addressForm) {
-         addressForm.classList.remove('hidden');
-         if (formTitle) formTitle.textContent = 'Add Address';
+     // --- Display Suggestions ---
+     function displaySuggestions(suggestions) {
+         suggestionsDropdown.innerHTML = ''; // Clear previous/loading
+         if (suggestions.length > 0) {
+             suggestions.forEach(product => {
+                 const item = document.createElement('a');
+                 item.classList.add('suggestion-item');
+                 item.href = `/products/${product._id}`; // Link to product detail page
+
+                 // Add image
+                 const img = document.createElement('img');
+                 // Provide a default/placeholder if imageUrl is missing
+                 img.src = product.imageUrl || '/images/placeholder.png'; // Adjust placeholder path if needed
+                 img.alt = product.name;
+                 img.loading = 'lazy'; // Add lazy loading
+                 item.appendChild(img);
+
+                 // Add name
+                 const nameSpan = document.createElement('span');
+                 nameSpan.textContent = product.name;
+                 item.appendChild(nameSpan);
+
+                 suggestionsDropdown.appendChild(item);
+             });
+             suggestionsDropdown.classList.add('active');
+         } else {
+             // Show "No results" message
+              suggestionsDropdown.innerHTML = '<div class="suggestion-item text-muted">No matching products found.</div>';
+              suggestionsDropdown.classList.add('active'); // Keep open to show message
+         }
      }
 
+     // --- Close Search/Suggestions on Outside Click ---
+     document.addEventListener('click', (e) => {
+         if (searchContainer && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
+             // Clicked outside the search container AND outside the toggle button
+             searchContainer.classList.remove('active'); // Deactivate container (hides form on mobile)
+             suggestionsDropdown.classList.remove('active'); // Always hide suggestions
+         }
+     });
+
+     // Prevent closing when clicking inside suggestions dropdown
+     if(suggestionsDropdown) {
+         suggestionsDropdown.addEventListener('click', (e) => {
+             // Allow clicks on links within the dropdown to navigate
+             // but stop propagation otherwise to keep it open
+             if (!e.target.closest('a')) {
+                 e.stopPropagation();
+             }
+         });
+     }
+
+    // ========================================
+    // End Dynamic Search Bar Logic
+    // ========================================
+
+}); // End DOMContentLoaded
 
 
-
-});
-
-
+// --- Keep Existing Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement) {
-     const originalButtonText = 'Update';
-     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
+     const originalButtonText = 'Update'; // Keep original text simple
+     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>'; // Spinner icon
      const quantityInput = document.getElementById(`quantity-${productId}`);
+     const cartItemDiv = buttonElement.closest('.cart-item');
 
      buttonElement.disabled = true;
      buttonElement.innerHTML = loadingButtonText;
-     if(quantityInput) quantityInput.readOnly = true;
-
+     if(quantityInput) quantityInput.readOnly = true; // Disable input during update
 
     try {
         const response = await fetch('/user/cart/update', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-
+                // Add CSRF token header if you implement CSRF protection
             },
             body: JSON.stringify({ productId, quantity })
          });
 
+        // Always try to parse JSON, even for errors, to get backend message
+        const data = await response.json();
+
         if (!response.ok) {
-             const errorData = await response.json().catch(() => ({ message: 'Failed to update cart. Server error.' }));
-            throw new Error(errorData.message || `Update failed (Status: ${response.status})`);
+            // Throw error with message from backend if available
+            throw new Error(data.message || `Update failed (Status: ${response.status})`);
         }
 
-         const data = await response.json();
-
+         // Success case (response.ok is true)
          if (data.success) {
-            const cartItemDiv = buttonElement.closest('.cart-item');
-
+             // Handle item removal (quantity is 0)
              if (quantity === 0) {
                 if (cartItemDiv) {
-                    cartItemDiv.style.transition = 'opacity 0.3s ease';
+                    cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease';
                     cartItemDiv.style.opacity = '0';
+                    cartItemDiv.style.height = '0'; // Collapse height
+                    cartItemDiv.style.padding = '0';
+                    cartItemDiv.style.margin = '0';
+                    cartItemDiv.style.border = 'none';
                     setTimeout(() => {
                         cartItemDiv.remove();
-
-                        updateCartTotalAndBadge(data.cartTotal);
-                        handleEmptyCartDisplay();
-                    }, 300);
-                     return;
+                        updateCartTotalAndBadge(data.cartTotal); // Update after removing
+                        handleEmptyCartDisplay(); // Check if cart is now empty
+                    }, 300); // Wait for animation
+                     return; // Exit early as element is being removed
                 }
              } else {
+                 // Update quantity input and subtotal for existing item
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
-                 if (subtotalSpan) subtotalSpan.textContent = data.itemSubtotal.toFixed(2);
+                 if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2); // Use data from response
                 if(quantityInput) {
-                     quantityInput.value = data.newQuantity;
+                     quantityInput.value = data.newQuantity; // Update input value from response
                  }
-
              }
-
+             // Update total and badge for both add/update cases (except removal handled above)
              updateCartTotalAndBadge(data.cartTotal);
-
          } else {
-
+             // Handle cases where response is ok, but backend indicates failure (e.g., validation)
              alert(`Update failed: ${data.message}`);
+             // Optional: Restore original quantity in input?
+             // if (quantityInput) quantityInput.value = quantityInput.dataset.originalValue || 1;
          }
 
     } catch (error) {
-
          console.error('Error updating cart quantity:', error);
          alert(`Error: ${error.message}`);
+          // Optional: Restore original quantity in input on error?
+          // if (quantityInput) quantityInput.value = quantityInput.dataset.originalValue || 1;
     } finally {
-
-         buttonElement.disabled = false;
-         buttonElement.innerHTML = originalButtonText;
-         if(quantityInput) quantityInput.readOnly = false;
+         // Re-enable button and input regardless of success/error (unless item removed)
+         if (!cartItemDiv || quantity !== 0) { // Check if item wasn't removed
+             buttonElement.disabled = false;
+             buttonElement.innerHTML = originalButtonText;
+             if(quantityInput) quantityInput.readOnly = false;
+         }
      }
 }
 
-
+// --- Keep Existing Helper Functions ---
 function updateCartTotalAndBadge(newCartTotal) {
-
      const cartTotalSpan = document.getElementById('cart-total-value');
-     if (cartTotalSpan) cartTotalSpan.textContent = newCartTotal.toFixed(2);
+     if (cartTotalSpan) cartTotalSpan.textContent = (newCartTotal !== undefined ? newCartTotal : 0).toFixed(2);
 
-
+     // Recalculate count from current cart items on page
      const newCartItemCount = calculateNewCartCount();
      const cartBadge = document.querySelector('.cart-badge');
      if (cartBadge) {
          if (newCartItemCount > 0) {
              cartBadge.textContent = newCartItemCount;
-             cartBadge.style.display = 'inline-block';
+             cartBadge.classList.remove('hide'); // Use 'hide' class
          } else {
             cartBadge.textContent = '0';
-            cartBadge.style.display = 'none';
+            cartBadge.classList.add('hide'); // Use 'hide' class
          }
      } else {
-         console.warn("Cart badge element not found in header.");
+         // console.warn("Cart badge element not found in header.");
      }
 }
 
-
-
 function calculateNewCartCount() {
-    const quantityInputs = document.querySelectorAll('.cart-item .quantity-input');
+    // Calculate based on visible cart items (more reliable after potential removals)
+    const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
-    quantityInputs.forEach(input => {
-        const value = parseInt(input.value, 10);
-
-        if (!isNaN(value) && value > 0) {
-
-          count += value;
+    cartItems.forEach(item => {
+        const quantityInput = item.querySelector('.quantity-input');
+        if (quantityInput) {
+            const value = parseInt(quantityInput.value, 10);
+            if (!isNaN(value) && value > 0) {
+              count += 1; // Count items, not total quantity for badge usually
+              // If badge should show total quantity: count += value;
+            }
         }
     });
     return count;
 }
 
-
 function handleEmptyCartDisplay() {
     const cartItemsContainer = document.querySelector('.cart-items');
      const cartContainer = document.querySelector('.cart-container');
+     const cartSummary = document.querySelector('.cart-summary');
 
-     if (calculateNewCartCount() === 0 && cartContainer && cartItemsContainer) {
-
+     if (cartItemsContainer && cartItemsContainer.children.length === 0 && cartContainer) {
          cartContainer.innerHTML = '<h1>Your Shopping Cart</h1><p>Your cart is empty. <a href="/">Continue Shopping</a></p>';
-
+         if(cartSummary) cartSummary.remove(); // Remove summary if cart is empty
      }
 }
 
@@ -5452,8 +5933,12 @@ const productController = require('../controllers/productController');
 
 const router = express.Router();
 
+// --- NEW: Route for product suggestions ---
+// Needs to be defined BEFORE the '/:id' route
+router.get('/suggestions', productController.getProductSuggestions);
+
 // Public routes - controllers ensure visibility rules (e.g., only 'approved')
-router.get('/', productController.getProducts);         // List approved, in-stock products
+router.get('/', productController.getProducts);         // List/Search approved, in-stock products
 router.get('/:id', productController.getProductDetails); // Show product details (controller checks status/permissions)
 
 // Rating requires user to be logged in
@@ -6395,7 +6880,7 @@ views/partials/header.ejs:
   <meta name="twitter:description" content="<%= currentMetaDesc %>">
   <meta name="twitter:image" content="<%= currentMetaImage %>">
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-..." crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
@@ -6411,7 +6896,34 @@ views/partials/header.ejs:
           <span class="app-name">miniapp</span>
         </a>
       </div>
+
+      <%# --- NEW Dynamic Search Bar Container --- %>
+      <div class="search-container-dynamic" id="dynamic-search-container">
+          <form action="/products" method="GET" class="search-form-dynamic" id="dynamic-search-form">
+              <input type="search"
+                     id="search-input-dynamic"
+                     name="search"
+                     placeholder="Search products..."
+                     aria-label="Search Products"
+                     autocomplete="off">
+              <button type="submit" class="search-submit-btn-dynamic" aria-label="Submit Search">
+                  <i class="fas fa-search"></i>
+              </button>
+          </form>
+           <div class="suggestions-dropdown" id="suggestions-dropdown">
+              <%# Suggestions will be populated here by JS %>
+          </div>
+      </div>
+      <%# --- END Dynamic Search Bar Container --- %>
+
       <div class="nav-right">
+          <%# Search Icon Toggle (controls the container above) %>
+          <button class="nav-link search-toggle-btn" id="search-toggle-btn" aria-label="Toggle Search Bar">
+              <i class="fas fa-search"></i>
+              <span>Search</span>
+          </button>
+
+        <%# Rest of the nav items %>
         <% if (currentUser) { %>
           <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home">
             <i class="fas fa-home"></i> <span>Home</span>

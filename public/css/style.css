@@ -81,6 +81,7 @@ ul, ol {
 }
 
 .hidden { display: none !important; }
+.hide { display: none !important; } /* Added alias */
 .text-center { text-align: center; }
 .text-danger { color: var(--danger-color) !important; }
 .text-success { color: var(--success-color) !important; }
@@ -93,9 +94,25 @@ ul, ol {
 .mt-1 { margin-top: calc(var(--spacing-unit) * 0.25) !important; }
 .mt-2 { margin-top: calc(var(--spacing-unit) * 0.5) !important; }
 .mt-3 { margin-top: var(--spacing-unit) !important; }
+.ms-1 { margin-left: calc(var(--spacing-unit) * 0.25) !important; } /* Added margin start */
+.me-2 { margin-right: calc(var(--spacing-unit) * 0.5) !important; } /* Added margin end */
 .d-block { display: block !important; }
+.d-inline-block { display: inline-block !important; } /* Added */
 .small { font-size: 0.875em; }
 .w-100 { width: 100% !important; } /* Utility class */
+.visually-hidden { /* Added */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.fw-bold { font-weight: bold !important; } /* Added */
+
 
 .inline-form {
     display: block;
@@ -212,6 +229,8 @@ select:focus {
 
 .btn-outline-secondary { color: var(--secondary-color); border-color: var(--secondary-color); background-color: transparent;}
 .btn-outline-secondary:hover { color: #fff; background-color: var(--secondary-color); }
+.btn-outline-primary { color: var(--primary-color); border-color: var(--primary-color); background-color: transparent;} /* Added */
+.btn-outline-primary:hover { color: #fff; background-color: var(--primary-color); } /* Added */
 
 .btn-text {
     background-color: transparent;
@@ -285,8 +304,9 @@ select:focus {
   opacity: 1;
 }
 
+/* Header Styles */
 .app-header {
-  background-color: var( --primary-color);
+  background-color: var(--primary-color); /* Darker Blue */
   color: var(--light-color);
   padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
   position: sticky;
@@ -303,11 +323,13 @@ select:focus {
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
+  gap: calc(var(--spacing-unit) * 0.5); /* Gap between sections */
 }
 
 .nav-left, .nav-right {
   display: flex;
   align-items: center;
+  flex-shrink: 0; /* Prevent shrinking */
 }
 .nav-right {
     gap: calc(var(--spacing-unit) * 0.5);
@@ -338,6 +360,8 @@ select:focus {
   align-items: center;
   font-size: 0.75rem;
   text-decoration: none;
+  background: none; /* Ensure no default button background */
+  border: none; /* Ensure no default button border */
 }
 .nav-link span {
   display: none;
@@ -369,6 +393,8 @@ select:focus {
   font-weight: bold;
   line-height: 1;
 }
+.cart-badge.hide { display: none; } /* Ensure hidden works */
+
 
 .btn-login-register {
     font-size: 0.9rem;
@@ -402,6 +428,7 @@ select:focus {
     line-height: 1;
 }
 
+/* Container and Footer */
 .container {
   width: 100%;
   padding: var(--spacing-unit);
@@ -417,31 +444,15 @@ select:focus {
   background-color: var(--light-color);
   border-top: 1px solid var(--border-color);
   margin-top: auto;
-  display: none;
 }
 
+/* Product Index Styles */
 .product-index-container h1 {
     font-size: 1.5rem;
 }
+/* Hide old search bar */
 .search-bar-container {
-    margin-bottom: var(--spacing-unit);
-}
-.search-form {
-    display: flex;
-    align-items: center;
-}
-.search-form input[type="text"] {
-    flex-grow: 1;
-    border-radius: var(--border-radius) 0 0 var(--border-radius);
-    border-right: none;
-}
-.search-form button {
-    border-radius: 0 var(--border-radius) var(--border-radius) 0;
-    padding: calc(var(--spacing-unit) * 0.6);
-}
-.btn-clear-search {
-    margin-left: calc(var(--spacing-unit) * 0.5);
-    font-size: 0.9rem;
+    display: none;
 }
 
 .product-grid {
@@ -494,9 +505,13 @@ select:focus {
   font-weight: 500;
   margin-bottom: calc(var(--spacing-unit) * 0.25);
   line-height: 1.3;
+  /* Mobile height limit */
   height: 2.6em;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .product-price {
@@ -515,6 +530,7 @@ select:focus {
 .product-rating .fa-star, .product-rating .fa-star-half-alt {
     color: #f8d347;
 }
+.product-rating .fa-star-regular { color: #e4e5e9; } /* Added for empty star */
 
 .add-to-cart-form {
     padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
@@ -528,6 +544,7 @@ select:focus {
     margin-right: calc(var(--spacing-unit) * 0.25);
 }
 
+/* Product Detail Styles */
 .product-detail-container {
   background-color: var(--card-bg);
   padding: var(--spacing-unit);
@@ -577,6 +594,7 @@ select:focus {
     color: var(--secondary-color);
 }
 .detail-rating i { color: #f8d347; }
+.detail-rating .fa-star-regular { color: #e4e5e9; } /* Added for empty star */
 
 .product-actions {
     margin: calc(var(--spacing-unit) * 1.2) 0;
@@ -621,6 +639,7 @@ select:focus {
     overflow-y: auto;
 }
 
+/* Rating Section */
 .product-rating-section {
     margin-top: var(--spacing-unit);
     border-top: 1px solid var(--border-color);
@@ -733,6 +752,9 @@ select:focus {
   border-radius: 4px;
   overflow: hidden;
 }
+.progress { /* Bootstrap compatibility */ background-color: #e9ecef; border-radius: .25rem; display: flex; height: 1rem; overflow: hidden; font-size: .75rem;}
+.progress-bar { /* Bootstrap compatibility */ background-color: var(--primary-color); color: #fff; display: flex; flex-direction: column; justify-content: center; overflow: hidden; text-align: center; white-space: nowrap; transition: width .6s ease;}
+
 
 .rating-bar-fill {
   height: 100%;
@@ -740,11 +762,12 @@ select:focus {
   border-radius: 4px;
   transition: width 0.3s ease-in-out;
 }
-.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; }
-.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; }
-.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; }
-.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; }
-.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; }
+/* Different colors for rating bars */
+.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; } /* 5 stars */
+.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; } /* 4 stars */
+.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; } /* 3 stars */
+.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; } /* 2 stars */
+.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; } /* 1 star */
 
 .rating-bar-count {
   width: 40px;
@@ -754,6 +777,7 @@ select:focus {
   flex-shrink: 0;
 }
 
+/* Auth Container */
 .auth-container {
   max-width: 450px;
   margin: var(--spacing-unit) auto;
@@ -786,6 +810,7 @@ select:focus {
 .auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--spacing-unit); }
 #otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; }
 
+/* Cart Container */
 .cart-container h1 {
     font-size: 1.5rem;
     margin-bottom: var(--spacing-unit);
@@ -867,6 +892,9 @@ select:focus {
     font-size: 0.9rem;
     white-space: nowrap;
 }
+.cart-item-subtotal .item-subtotal-value { /* Added for targeting */
+    font-weight: 500;
+}
 
 .cart-item-remove .btn {
     padding: 0.1rem 0.4rem;
@@ -893,6 +921,7 @@ select:focus {
     font-size: 1.1rem;
 }
 
+/* Checkout Container */
 .checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit);}
 
 .checkout-grid {
@@ -965,6 +994,7 @@ select:focus {
     padding: calc(var(--spacing-unit) * 0.7);
 }
 
+/* My Orders Container */
 .my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
 .order-list {
     display: flex;
@@ -1040,6 +1070,7 @@ select:focus {
     text-align: right;
 }
 
+/* Status Badge */
 .status-badge {
     font-weight: bold;
     padding: 0.2em 0.5em;
@@ -1059,6 +1090,7 @@ select:focus {
 .order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; }
 
 
+/* Admin/Seller Container */
 .admin-manage-container, .admin-dashboard-container {
     padding: var(--spacing-unit);
 }
@@ -1251,7 +1283,7 @@ select:focus {
     margin-top: calc(var(--spacing-unit) * 0.3);
 }
 
-/* Delivery OTP Display (copied from user view, adjust if needed) */
+/* Delivery OTP Display (Mobile) */
 .delivery-otp-display {
     margin-top: 10px;
     padding: 8px 12px;
@@ -1276,7 +1308,7 @@ select:focus {
 }
 .delivery-otp-display small { display: block; margin-top: 3px; color: #555; }
 
-/* OTP Verification Form Refinement */
+/* OTP Verification Form Refinement (Mobile Table) */
 .verify-otp-form {
     display: flex;
     align-items: center;
@@ -1301,6 +1333,7 @@ select:focus {
 /* --- REFINED TABLE STYLES END --- */
 
 
+/* Admin Actions Grid */
 .admin-actions-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -1339,6 +1372,7 @@ select:focus {
     margin-bottom: 0.5rem;
 }
 
+/* Error Container */
 .error-container { text-align: center; padding-top: 2rem; }
 .error-container h1 { color: var(--danger-color); margin-bottom: 0.5rem; }
 .error-container .lead { font-size: 1.1rem; }
@@ -1347,6 +1381,7 @@ select:focus {
 .error-container details pre { white-space: pre-wrap; font-size: 0.8em; margin-top: 0.5rem; }
 
 
+/* Profile Container */
 .profile-container {
     max-width: 800px;
     margin: var(--spacing-unit) auto;
@@ -1393,7 +1428,7 @@ select:focus {
 #saved-address-display strong {
     font-weight: 500;
 }
-#edit-address-btn {
+#edit-address-btn, #add-address-btn { /* Target both */
     margin-top: calc(var(--spacing-unit) * 0.5);
 }
 
@@ -1424,7 +1459,6 @@ select:focus {
   display: flex; /* Arrange images horizontally */
   flex-wrap: wrap; /* Allow wrapping to next line if needed */
   gap: 8px; /* Space between images */
-  /* margin-top: 8px; */ /* Controlled by context */
   padding-left: 0; /* Remove default padding if any */
 }
 
@@ -1471,7 +1505,198 @@ select:focus {
    text-decoration: none;
 }
 
+/* ============================ */
+/* Dynamic Search Bar Styles    */
+/* ============================ */
 
+/* Container positioning within navbar */
+.search-container-dynamic {
+  position: relative; /* Needed for absolute positioning of dropdown */
+  flex-grow: 1; /* Allows it to take space on larger screens */
+  display: flex; /* Use flex for alignment */
+  justify-content: center; /* Center the search form initially */
+  margin: 0 calc(var(--spacing-unit) * 0.5); /* Spacing around */
+  max-width: 500px; /* Max width on larger screens */
+}
+
+/* The form itself */
+.search-form-dynamic {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.15); /* Slightly transparent background */
+  border-radius: var(--border-radius);
+  transition: background-color 0.3s ease, width 0.3s ease;
+  overflow: hidden; /* Prevents content spill during transition */
+  height: 38px; /* Match other nav elements */
+  border: 1px solid transparent; /* Add border for focus state */
+}
+
+/* Input field */
+#search-input-dynamic {
+  flex-grow: 1;
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  border: none;
+  background-color: transparent;
+  color: var(--light-color); /* Text color */
+  font-size: 0.9rem;
+  height: 100%;
+  outline: none;
+}
+#search-input-dynamic::placeholder {
+  color: rgba(255, 255, 255, 0.7); /* Lighter placeholder */
+  opacity: 1; /* Ensure placeholder is visible */
+}
+
+/* Submit button */
+.search-submit-btn-dynamic {
+  background: none;
+  border: none;
+  color: var(--light-color);
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  font-size: 1rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+.search-submit-btn-dynamic:hover {
+  opacity: 0.8;
+}
+
+/* Suggestions Dropdown */
+.suggestions-dropdown {
+  display: none; /* Hidden by default */
+  position: absolute;
+  top: 100%; /* Position below the search bar */
+  left: 0;
+  right: 0;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-top: none; /* Avoid double border */
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  max-height: 400px; /* Limit height */
+  overflow-y: auto;
+  z-index: 1010; /* Ensure it's above other content */
+}
+.suggestions-dropdown.active {
+  display: block; /* Show when active */
+}
+
+/* Individual Suggestion Item */
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  color: var(--text-color);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-color);
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+.suggestion-item:hover {
+  background-color: var(--light-color);
+  text-decoration: none;
+}
+.suggestion-item img {
+  width: 35px;
+  height: 35px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0; /* Prevent image shrinking */
+}
+.suggestion-item span {
+  font-size: 0.9rem;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* Prevent wrapping */
+}
+.suggestion-item i { /* Style for loading/error */
+    font-style: normal;
+    color: var(--secondary-color);
+}
+
+/* Search Toggle Button (Icon Button) */
+.search-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* Inherits nav-link styles, add specifics if needed */
+}
+
+/* ============================ */
+/* Media Queries                */
+/* ============================ */
+
+@media (max-width: 767px) {
+  /* Mobile specific: Hide form initially, only show icon */
+  .search-container-dynamic {
+    /* Initially take minimal space, letting icon control it */
+    flex-grow: 0;
+    max-width: none;
+    order: -1; /* Move it left near the logo */
+    margin-right: auto; /* Push other icons right */
+    position: static; /* Remove relative positioning */
+  }
+  .search-form-dynamic {
+    position: absolute;
+    top: calc(100% + 5px); /* Position below header */
+    left: 5px;
+    right: 5px;
+    width: calc(100% - 10px); /* Full width minus padding */
+    background-color: var(--card-bg); /* White background */
+    border: 1px solid var(--border-color);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-10px);
+    transition: opacity 0.3s ease, visibility 0s linear 0.3s, transform 0.3s ease;
+    z-index: 1005; /* Below dropdown but above content */
+  }
+  #search-input-dynamic {
+    color: var(--text-color); /* Dark text on white background */
+  }
+  #search-input-dynamic::placeholder {
+     color: var(--secondary-color);
+  }
+  .search-submit-btn-dynamic {
+     color: var(--secondary-color);
+  }
+
+  /* Active state for mobile search form */
+  .search-container-dynamic.active .search-form-dynamic {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition: opacity 0.3s ease, visibility 0s linear 0s, transform 0.3s ease;
+  }
+
+  /* Adjust suggestions dropdown position on mobile when active */
+  .search-container-dynamic.active .suggestions-dropdown {
+      position: absolute; /* Ensure it's absolute */
+      top: calc(100% + 5px + 38px + 5px); /* Header + padding + form height + padding */
+      left: 5px;
+      right: 5px;
+      width: calc(100% - 10px);
+      z-index: 1010; /* Above the form */
+  }
+
+  .search-toggle-btn {
+      /* Ensure it's visible and clickable */
+      padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.6);
+      display: flex; /* Make sure it's displayed */
+  }
+
+  .app-footer { display: none; } /* Hide footer on small screens */
+
+}
+
+/* Desktop and Larger */
 @media (min-width: 768px) {
   .container {
     max-width: 960px;
@@ -1486,7 +1711,13 @@ select:focus {
   .app-footer { display: block; }
 
   .product-grid { grid-template-columns: repeat(3, 1fr); }
-  .product-name { height: auto; white-space: normal; }
+  .product-name {
+       height: auto; /* Remove fixed height */
+       white-space: normal; /* Allow wrapping */
+       display: block; /* Reset webkit box */
+       -webkit-line-clamp: unset;
+       -webkit-box-orient: unset;
+  }
 
 
   .product-detail-main {
@@ -1671,6 +1902,46 @@ select:focus {
         padding: calc(var(--spacing-unit) * 2);
     }
 
+   /* Desktop Dynamic Search Bar Styles */
+   .search-toggle-btn {
+     display: none; /* Hide toggle icon on desktop */
+   }
+   .search-container-dynamic {
+      position: relative; /* Keep relative for dropdown */
+   }
+   .search-form-dynamic {
+       /* Reset mobile absolute positioning */
+       position: static;
+       opacity: 1;
+       visibility: visible;
+       transform: none;
+       box-shadow: none;
+       background-color: rgba(255, 255, 255, 0.15); /* Back to header color */
+       border: 1px solid transparent;
+       width: 100%; /* Expand within container */
+   }
+    .search-form-dynamic:focus-within {
+       background-color: rgba(255, 255, 255, 0.25);
+       border-color: rgba(255, 255, 255, 0.5);
+    }
+    #search-input-dynamic {
+        color: var(--light-color); /* Back to light text */
+    }
+    #search-input-dynamic::placeholder {
+        color: rgba(255, 255, 255, 0.7);
+    }
+    .search-submit-btn-dynamic {
+        color: var(--light-color);
+    }
+    .suggestions-dropdown {
+        /* Reset mobile absolute positions */
+         position: absolute;
+         top: 100%;
+         left: 0;
+         right: 0;
+         width: auto; /* Let it size naturally based on container */
+    }
+
 } /* End @media (min-width: 768px) */
 
 
@@ -1682,8 +1953,5 @@ select:focus {
   .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); }
 
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
-
-  /* Potentially increase action cell width if needed */
-  
 
 } /* End @media (min-width: 1024px) */
