@@ -58,10 +58,11 @@
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
+                                <%# Display cancellation reason, whether from admin or seller %>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger mt-1 d-block">Reason: <%= order.cancellationReason %></small><% } %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
 
-                                <%# --- NEW: Display OTP Hint conditionally --- %>
+                                <%# Display OTP Hint conditionally %>
                                 <% if (order.showDeliveryOtp) { %>
                                   <div class="delivery-otp-display mt-1">
                                     <p>Customer OTP Sent</p>
@@ -73,7 +74,7 @@
                                      <% } %>
                                   </div>
                                 <% } %>
-                                <%# --- End: Display OTP Hint --- %>
+                                <%# End: Display OTP Hint %>
 
                             </td>
                             <td data-label="Actions" class="actions-cell">
@@ -81,7 +82,6 @@
                                 <% if (order.canBeDirectlyDeliveredByAdmin) { %>
                                     <div class="action-group mb-2">
                                         <p class="action-group-title">Direct Delivery:</p>
-                                        <%# Send OTP Button - Hide if OTP is already active? Optional, depends on desired UX %>
                                         <% if (!order.showDeliveryOtp) { %>
                                             <form action="/admin/orders/<%= order._id %>/send-direct-delivery-otp" method="POST" class="inline-form form-submit-spinner mb-1">
                                                 <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer for admin delivery">
@@ -89,7 +89,6 @@
                                                 </button>
                                             </form>
                                         <% } %>
-                                        <%# Confirm OTP Form (Always show if deliverable?) %>
                                         <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
                                             <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
@@ -106,9 +105,13 @@
                                             <label for="reason-<%= order._id %>" class="action-group-title">Cancel Order:</label>
                                             <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1">
                                                 <option value="" disabled selected>Select Admin Reason...</option>
-                                                <% cancellationReasons.forEach(reason => { %>
-                                                    <option value="<%= reason %>"><%= reason %></option>
-                                                <% }) %>
+                                                <% if (typeof cancellationReasons !== 'undefined' && cancellationReasons.length > 0) { %>
+                                                    <% cancellationReasons.forEach(reason => { %>
+                                                        <option value="<%= reason %>"><%= reason %></option>
+                                                    <% }) %>
+                                                <% } else { %>
+                                                     <option value="Other (Admin)" selected>Other (Admin)</option> <%# Fallback %>
+                                                <% } %>
                                             </select>
                                             <button type="submit" class="btn btn-danger btn-sm w-100 w-md-auto"><i class="fas fa-ban"></i> Cancel Order</button>
                                         </form>

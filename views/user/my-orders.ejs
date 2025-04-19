@@ -49,6 +49,7 @@
                              <% if (order.status === 'Delivered' && order.receivedByDate) { %>
                                 <p class="text-success mb-1"><small><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></small></p>
                               <% } %>
+                              <%# Display cancellation reason if present %>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger mb-1"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>

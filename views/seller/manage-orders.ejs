@@ -1,7 +1,7 @@
 <%# views/seller/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container order-manage-page">
+<div class="admin-manage-container order-manage-page"> <%# Added 'order-manage-page' class %>
     <h1>Manage Your Orders</h1>
     <p class="text-muted small mb-3">Showing orders that contain one or more of your products.</p>
 
@@ -10,8 +10,8 @@
     <% } %>
 
     <% if (orders.length > 0) { %>
-        <div class="table-container">
-            <table class="data-table order-table">
+        <div class="table-container"> <%# Removed 'card' class %>
+            <table class="data-table order-table"> <%# Added 'order-table' class %>
                 <thead>
                     <tr>
                         <th>Order ID / Date</th>
@@ -31,13 +31,13 @@
                             </td>
                             <td data-label="Customer / Address">
                                 <strong><%= order.shippingAddress.name %></strong><br>
-                                <small class="text-muted"><%= order.userEmail %></small><br>
+                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br> <%# Added null check for email %>
                                 <small class="text-muted"><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
                                 <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
                             <td data-label="Items">
                                 <div class="order-items-summary">
-                                    <%- order.itemsSummary %>
+                                    <%- order.itemsSummary %> <%# Raw HTML summary %>
                                 </div>
                                 <% if (order.products && order.products.length > 0) { %>
                                     <div class="order-items-images">
@@ -46,7 +46,7 @@
                                                 <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
                                                     <img src="<%= item.productId.imageUrl %>"
                                                          alt="<%= item.productId.name || 'Product Image' %>"
-                                                         class="order-item-thumbnail" loading="lazy">
+                                                         class="order-item-thumbnail" loading="lazy"> <%# Added lazy loading %>
                                                 </a>
                                             <% } else if (item.productId && item.productId._id) { %>
                                                 <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
@@ -60,10 +60,13 @@
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger mt-1 d-block">Reason: <%= order.cancellationReason %></small><% } %>
+                                <%# Display cancellation reason including seller prefix %>
+                                <% if(order.status === 'Cancelled' && order.cancellationReason) { %>
+                                    <br><small class="text-danger mt-1 d-block">Reason:<br><%= order.cancellationReason %></small>
+                                <% } %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
                                 <% if (order.showDeliveryOtp && order.status === 'Pending') { %>
-                                  <div class="delivery-otp-display mt-1">
+                                  <div class="delivery-otp-display mt-1"> <%# Reusing user style %>
                                     <p>Customer OTP Sent</p>
                                     <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
                                   </div>
@@ -72,13 +75,15 @@
                             <td data-label="Actions" class="actions-cell">
                                 <%# Seller Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredBySeller) { %>
-                                    <div class="action-group mb-2"> <%# Add margin bottom %>
+                                    <div class="action-group mb-2"> <%# Added mb-2 for spacing %>
                                         <p class="action-group-title">Confirm Delivery:</p>
-                                        <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
-                                            <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery">
-                                                <i class="fas fa-mobile-alt"></i> Send OTP
-                                            </button>
-                                        </form>
+                                        <% if (!order.showDeliveryOtp) { %>
+                                            <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
+                                                <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery"> <%# Control width %>
+                                                    <i class="fas fa-mobile-alt"></i> Send OTP
+                                                </button>
+                                            </form>
+                                        <% } %>
                                         <form action="/seller/orders/<%= order._id %>/confirm-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
                                             <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm delivery using customer's OTP">
@@ -88,15 +93,26 @@
                                     </div>
                                 <% } %>
 
-                                <%# --- NEW: Seller Cancel Order Form --- %>
+                                <%# --- NEW: Seller Order Cancellation Form --- %>
                                 <% if (order.canBeCancelledBySeller) { %>
                                     <div class="action-group">
-                                        <form action="/seller/orders/<%= order._id %>/cancel" method="POST" class="cancel-order-form form-submit-spinner" onsubmit="return confirm('Are you sure you want to cancel this order (<%= order._id %>)? This cannot be undone.');">
-                                            <button type="submit" class="btn btn-danger btn-sm w-100 w-md-auto"><i class="fas fa-ban"></i> Cancel Order</button>
+                                        <form action="/seller/orders/<%= order._id %>/cancel" method="POST" class="cancel-delivery-form form-submit-spinner" onsubmit="return confirm('SELLER ACTION: Are you sure you want to cancel your items in order <%= order._id %>? This action cannot be undone.');">
+                                            <label for="reason-<%= order._id %>" class="action-group-title">Cancel Your Items:</label>
+                                            <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1">
+                                                <option value="" disabled selected>Select Seller Reason...</option>
+                                                <% if (typeof sellerCancellationReasons !== 'undefined' && sellerCancellationReasons.length > 0) { %>
+                                                    <% sellerCancellationReasons.forEach(reason => { %>
+                                                        <option value="<%= reason %>"><%= reason %></option>
+                                                    <% }) %>
+                                                <% } else { %>
+                                                    <option value="Other Reason (Seller)" selected>Other Reason (Seller)</option> <%# Fallback %>
+                                                <% } %>
+                                            </select>
+                                            <button type="submit" class="btn btn-danger btn-sm w-100 w-md-auto"><i class="fas fa-ban"></i> Cancel Items</button>
                                         </form>
                                     </div>
                                 <% } %>
-                                <%# --- End: Seller Cancel Order Form --- %>
+                                <%# --- End: Seller Order Cancellation Form --- %>
 
                                 <%# Fallback for no actions %>
                                 <% if (!order.canBeDirectlyDeliveredBySeller && !order.canBeCancelledBySeller) { %>
