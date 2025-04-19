@@ -4,16 +4,6 @@
 <div class="product-index-container">
     <h1><%= title %></h1>
 
-    <div class="search-bar-container">
-        <form action="/products" method="GET" class="search-form">
-            <input type="text" name="search" placeholder="Search products by name, category..." value="<%= searchTerm %>" aria-label="Search Products">
-            <button type="submit" class="btn" aria-label="Submit Search"><i class="fas fa-search"></i></button>
-             <% if (searchTerm) { %>
-                 <a href="/" class="btn btn-clear-search">Clear</a>
-             <% } %>
-        </form>
-    </div>
-
     <% if (products.length > 0) { %>
         <div class="product-grid">
             <% products.forEach(product => { %>

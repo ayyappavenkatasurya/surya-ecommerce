@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <% const pageTitle = typeof title !== 'undefined' ? title + ' | miniapp' : 'miniapp'; %>
+  <% const pageTitle = typeof title !== 'undefined' ? title + ' - miniapp' : 'miniapp'; %>
   <% const siteName = typeof defaultSiteName !== 'undefined' ? defaultSiteName : 'miniapp'; %>
   <% const currentMetaTitle = typeof metaTitle !== 'undefined' ? metaTitle : pageTitle; %>
   <% const currentMetaDesc = typeof metaDescription !== 'undefined' ? metaDescription : 'Check out our products on ' + siteName; %>
@@ -69,21 +69,21 @@
 
         <%# Rest of the nav items %>
         <% if (currentUser) { %>
-          <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home">
+          <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home Page">
             <i class="fas fa-home"></i> <span>Home</span>
           </a>
-          <a href="/user/cart" class="nav-link nav-link-cart <%= currentUrl === '/user/cart' ? 'active' : '' %>" title="Cart">
+          <a href="/user/cart" class="nav-link nav-link-cart <%= currentUrl === '/user/cart' ? 'active' : '' %>" title="Cart Page">
             <i class="fas fa-shopping-cart"></i>
             <span class="cart-badge <%= cartItemCount > 0 ? '' : 'hide' %>"><%= cartItemCount %></span>
             <span>Cart</span>
           </a>
-          <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders">
+          <a href="/orders/my-orders" class="nav-link <%= currentUrl === '/orders/my-orders' ? 'active' : '' %>" title="My Orders Page">
             <i class="fas fa-box"></i> <span>Orders</span>
           </a>
 
           <%# --- REMOVED Admin and Seller Dashboard Links --- %>
 
-          <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile">
+          <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile Page">
             <span class="profile-avatar-initials"><%= userInitials %></span>
           </a>
         <% } else { %>
