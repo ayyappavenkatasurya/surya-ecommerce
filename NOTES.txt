@@ -7032,7 +7032,7 @@ views/products/detail.ejs:
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
             <p class="detail-stock">
                 <% if (product.stock > 0) { %>
-                    Available Stock: <%= product.stock %>
+                    Available Stock : <%= product.stock %>
                 <% } else { %>
                     <span class="text-danger fw-bold">Out of Stock</span>
                 <% } %>
@@ -7076,7 +7076,7 @@ views/products/detail.ejs:
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
                        <div class="quantity-selector mb-2 d-inline-flex align-items-center"> <%# Added d-inline-flex and align-items-center %>
-                          <label for="quantity" class="me-1 mb-0">Quantity :</label> <%# Removed visually-hidden, added margin %>
+                          <label for="quantity" class="me-1 mb-0">Quantity </label> <%# Removed visually-hidden, added margin %>
                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;"> <%# Removed display: inline-block %>
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
