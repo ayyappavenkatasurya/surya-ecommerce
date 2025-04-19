@@ -54,36 +54,54 @@
                 <% } else { %>
                     <span class="text-danger fw-bold">Out of Stock</span>
                 <% } %>
-            </p>
+            </p> <%# End of stock paragraph %>
+
+            <%# === MOVED SHARE BUTTON HERE === %>
+            <div class="share-section mt-2"> <%# Adjusted margin %>
+                <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
+                        data-title="<%= product.name %>"
+                        data-text="Check out this product: <%= product.name %>"
+                        data-url="<%= fullUrl %>">
+                    <i class="fas fa-share-alt"></i> Share
+                </button>
+                <div id="fallback-share-links" class="fallback-share-links hidden">
+                    <small>Share via:</small>
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
+                    <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
+                    <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
+                    <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
+                </div>
+            </div>
+            <%# === END MOVED SHARE BUTTON === %>
 
            <%# Rating Display %>
-           <% if (product.numReviews > 0) { %>
-                <p class="detail-rating">
-                    Rating:
-                   <% for(let i=1; i<=5; i++) { %><i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i><% } %>
-                    (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
-                </p>
-            <% } else { %>
-                <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
-            <% } %>
-
-            <p class="small text-muted">Sold by: <%= product.sellerId?.name || product.sellerEmail || 'Unknown Seller' %></p>
-
+           <div class="mt-3"> <%# Add some top margin before rating %>
+                <% if (product.numReviews > 0) { %>
+                    <p class="detail-rating">
+                        Rating:
+                       <% for(let i=1; i<=5; i++) { %><i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i><% } %>
+                        (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
+                    </p>
+                <% } else { %>
+                    <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
+                <% } %>
+           </div>
 
            <%# --- Conditional Purchase Actions --- %>
            <% if (isApproved) { %>
                <div class="product-actions">
-                   <%# Add to Cart Form %>
+                   <%# === MODIFIED Add to Cart Form === %>
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
-                       <div class="quantity-selector mb-2"> <%# Added mb-2 %>
-                          <label for="quantity" class="visually-hidden">Quantity:</label> <%# Hide label visually %>
-                           <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px; display: inline-block;">
+                       <div class="quantity-selector mb-2 d-inline-flex align-items-center"> <%# Added d-inline-flex and align-items-center %>
+                          <label for="quantity" class="me-1 mb-0">Quantity :</label> <%# Removed visually-hidden, added margin %>
+                           <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;"> <%# Removed display: inline-block %>
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                        </button>
                   </form>
+                  <%# === END MODIFIED Add to Cart Form === %>
 
                    <%# Buy Now Form %>
                     <% if (product.stock > 0) { %>
@@ -105,32 +123,18 @@
             <% } %>
             <%# --- End Conditional Purchase Actions --- %>
 
+            <%# Specifications %>
+            <div class="product-specifications mt-3">
+                 <h3>Specifications</h3>
+                 <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
+            </div> <%# End of product-specifications div %>
 
-           <!-- Share Functionality -->
-           <div class="share-section mt-3">
-               <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
-                       data-title="<%= product.name %>"
-                       data-text="Check out this product: <%= product.name %>"
-                       data-url="<%= fullUrl %>">
-                   <i class="fas fa-share-alt"></i> Share
-               </button>
-               <div id="fallback-share-links" class="fallback-share-links hidden">
-                   <small>Share via:</small>
-                   <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
-                   <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
-                   <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
-                   <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
-               </div>
-           </div>
-           <!-- End Share Functionality -->
+            <%# === MOVED SELLER INFO HERE === %>
+            <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
+            <%# === END MOVED SELLER INFO === %>
 
-           <%# Specifications %>
-           <div class="product-specifications mt-3">
-                <h3>Specifications</h3>
-                <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
-            </div>
-       </div>
-    </div>
+       </div> <%# End product-detail-info %>
+    </div> <%# End product-detail-main %>
 
    <%# --- Conditional Rating Section --- %>
    <div class="product-rating-section mt-4 border-top pt-3">
