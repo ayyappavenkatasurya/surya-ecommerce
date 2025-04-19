@@ -13,20 +13,17 @@
                     </div>
                     <div class="cart-item-details">
                         <h3 class="cart-item-name"><%= item.name %></h3>
-                        <%# --- CURRENCY UPDATE --- %>
-                        <%# Safely handle potentially missing item price %>
                         <p class="cart-item-price">₹<%= (typeof item.price === 'number' ? item.price : 0).toFixed(2) %></p>
-                        <%# --- END CURRENCY UPDATE --- %>
-                         <p class="cart-item-stock">Stock: <%= item.stock %></p>
+                        <p class="cart-item-stock">Stock: <%= item.stock %></p>
                     </div>
                     <div class="cart-item-quantity">
-                        <label for="quantity-<%= item.productId %>">Qty:</label>
+                        <label for="quantity-<%= item.productId %>" class="visually-hidden">Quantity for <%= item.name %></label> <%# Added visually-hidden label %>
                         <input type="number"
                                id="quantity-<%= item.productId %>"
-                               class="quantity-input"
+                               class="quantity-input" <%# Use class for consistency %>
                                name="quantity"
                                value="<%= item.quantity %>"
-                               min="0" <%# Allow 0 for removal via update %>
+                               min="0"
                                max="<%= item.stock %>"
                                data-product-id="<%= item.productId %>"
                                data-item-price="<%= item.price %>"
@@ -34,13 +31,9 @@
                         <button class="btn btn-secondary btn-sm btn-update-qty" data-product-id="<%= item.productId %>">Update</button> <%# Spinner handled by AJAX logic %>
                      </div>
                      <div class="cart-item-subtotal">
-                         <%# --- CURRENCY UPDATE --- %>
-                         <%# Safely handle potentially missing item subtotal %>
                          Subtotal: ₹<span class="item-subtotal-value"><%= (typeof item.subtotal === 'number' ? item.subtotal : 0).toFixed(2) %></span>
-                         <%# --- END CURRENCY UPDATE --- %>
                     </div>
                     <div class="cart-item-remove">
-                        <%# --- Spinner Class Added --- %>
                         <form action="/user/cart/remove/<%= item.productId %>" method="POST" class="form-submit-spinner">
                             <button type="submit" class="btn btn-danger btn-sm">× Remove</button>
                          </form>
@@ -50,15 +43,18 @@
         </div>
 
          <div class="cart-summary">
-             <%# --- CURRENCY UPDATE --- %>
-             <%# Safely handle potentially missing cart total %>
              <h2>Cart Total: ₹<span id="cart-total-value"><%= (typeof cartTotal === 'number' ? cartTotal : 0).toFixed(2) %></span></h2>
-             <%# --- END CURRENCY UPDATE --- %>
-             <a href="/user/checkout" class="btn btn-success btn-checkout">Proceed to Checkout</a>
+             <%# --- ADDED ID and loading state attributes --- %>
+             <a href="/user/checkout"
+                id="btn-proceed-checkout" <%# ADDED ID %>
+                class="btn btn-success btn-checkout"
+                data-loading-text="<i class='fas fa-spinner fa-spin'></i> Proceeding..." <%# ADDED loading text data attribute %>
+                >Proceed to Checkout</a>
         </div>
 
     <% } else { %>
-        <p>Your cart is empty. <a href="/">Continue Shopping</a></p>
+        <%# Updated empty cart message to use alert style %>
+        <p class="alert alert-info mt-3">Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a></p>
     <% } %>
 </div>
 

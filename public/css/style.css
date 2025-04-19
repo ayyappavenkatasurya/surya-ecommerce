@@ -98,6 +98,8 @@ ul, ol {
 .me-2 { margin-right: calc(var(--spacing-unit) * 0.5) !important; } /* Added margin end */
 .d-block { display: block !important; }
 .d-inline-block { display: inline-block !important; } /* Added */
+.d-inline-flex { display: inline-flex !important; } /* Added */
+.align-items-center { align-items: center !important; } /* Added */
 .small { font-size: 0.875em; }
 .w-100 { width: 100% !important; } /* Utility class */
 .visually-hidden { /* Added */
@@ -174,6 +176,19 @@ select:focus {
   outline: 0;
   box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
+
+/* Form Control Small */
+.form-control-sm {
+  height: calc(1.5em + 0.5rem + 2px);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: 0.2rem;
+}
+select.form-control-sm:not([size]):not([multiple]) {
+  height: calc(1.8125rem + 2px); /* Specific height for select sm */
+}
+
 
 .btn {
   display: inline-block;
@@ -271,38 +286,137 @@ select:focus {
     100% { transform: rotate(360deg); }
 }
 
+/* Alert Styles (Basic - For static non-flash messages if needed) */
 .alert {
   padding: calc(var(--spacing-unit) * 0.8) var(--spacing-unit);
-  margin-bottom: var(--spacing-unit);
+  margin-bottom: var(--spacing-unit); /* Standard margin */
   border: 1px solid transparent;
   border-radius: var(--border-radius);
   position: relative;
-  opacity: 0.95;
-  margin-left: var(--spacing-unit);
-  margin-right: var(--spacing-unit);
-  margin-top: var(--spacing-unit);
-  transition: opacity 0.5s ease-out;
 }
-
 .alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
 .alert-danger { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
 .alert-warning { color: #856404; background-color: #fff3cd; border-color: #ffeeba; }
 .alert-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
 
-.close-alert {
+.close-alert { /* Basic close button for static alerts */
   position: absolute;
-  top: 5px;
+  top: 50%;
   right: 10px;
+  transform: translateY(-50%);
   font-size: 1.2rem;
+  line-height: 1;
   background: none;
   border: none;
   color: inherit;
   opacity: 0.7;
   cursor: pointer;
+  padding: 0.2rem 0.4rem;
 }
-.close-alert:hover {
+.close-alert:hover { opacity: 1; }
+
+
+/* ============================ */
+/* Toast Notification Styles    */
+/* ============================ */
+
+.toast-container {
+  position: fixed; /* Fixed position so it overlays */
+  top: 20px;       /* Distance from top */
+  right: 20px;      /* Distance from right */
+  z-index: 1055;    /* High z-index to appear above most elements */
+  width: auto;      /* Auto width based on content */
+  max-width: 350px; /* Max width for toasts */
+  pointer-events: none; /* Container itself is not interactive */
+}
+
+.toast {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  margin-bottom: var(--spacing-unit);
+  padding: calc(var(--spacing-unit) * 0.75);
+  padding-right: calc(var(--spacing-unit) * 2.5); /* Space for close button */
+  position: relative; /* For close button positioning */
+  opacity: 0; /* Start hidden */
+  transform: translateX(110%); /* Start off-screen right */
+  transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+  width: 100%; /* Take full width of container */
+  pointer-events: auto; /* Individual toasts ARE interactive */
+  min-height: 50px; /* Ensure minimum height */
+  display: flex;
+  align-items: center;
+  overflow: hidden; /* Prevent content spill during animation */
+}
+
+/* State for showing the toast */
+.toast.show {
   opacity: 1;
+  transform: translateX(0);
 }
+
+/* State for hiding the toast (before removal) */
+.toast.hide {
+    opacity: 0;
+    transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.toast-body {
+  flex-grow: 1; /* Allow body text to take space */
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.toast-close-btn {
+  position: absolute;
+  top: 50%;
+  right: 15px; /* Adjust position */
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: bold;
+  color: inherit; /* Inherit color from parent */
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+}
+.toast-close-btn:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+/* Toast Type Specific Styles */
+.toast-success {
+  background-color: #d4edda;
+  color: #155724;
+  border-left: 5px solid var(--success-color);
+}
+.toast-success .toast-close-btn { color: #155724; }
+
+.toast-danger {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-left: 5px solid var(--danger-color);
+}
+.toast-danger .toast-close-btn { color: #721c24; }
+
+.toast-warning {
+  background-color: #fff3cd;
+  color: #856404;
+  border-left: 5px solid var(--warning-color);
+}
+.toast-warning .toast-close-btn { color: #856404; }
+
+.toast-info {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  border-left: 5px solid var(--info-color);
+}
+.toast-info .toast-close-btn { color: #0c5460; }
+
 
 /* Header Styles */
 .app-header {
