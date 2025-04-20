@@ -210,6 +210,7 @@ select {
   font-size: 1rem;
   line-height: 1.5;
   background-color: #fff;
+  color: var(--text-color); /* Ensure text color is applied */
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 /* Alias class for consistency */
@@ -546,43 +547,45 @@ select.form-control-sm {
   position: relative; /* For suggestions dropdown */
 }
 
+/* --- Search Bar Black & White Styling --- */
 .search-form-dynamic {
   display: flex;
   align-items: center;
   width: 100%;
   height: 38px; /* Consistent height */
-  background-color: rgba(255, 255, 255, 0.2); /* Slightly more opaque */
-  border: 1px solid transparent;
+  background-color: #ffffff; /* White background */
+  border: 1px solid #ccc; /* Subtle grey border */
   border-radius: var(--border-radius);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Keep transitions */
   overflow: hidden;
 }
-
-/* Add focus state for desktop search */
+/* Remove focus-within styling if input handles it */
 .search-form-dynamic:focus-within {
-  background-color: rgba(255, 255, 255, 0.3);
-  border-color: rgba(255, 255, 255, 0.5);
+    /* Optional: keep a subtle border change if desired */
+    /* border-color: var(--primary-color); */
+    /* Rely on input focus style for primary indication */
 }
+
 
 #search-input-dynamic {
   flex-grow: 1;
   padding: 0 calc(var(--spacing-unit) * 0.75);
-  border: none;
-  background-color: transparent;
-  color: var(--light-color);
+  border: none; /* No border inside the form */
+  background-color: transparent; /* Inherit form background */
+  color: var(--dark-color); /* Black text color */
   font-size: 0.9rem;
   height: 100%;
-  outline: none;
+  outline: none; /* Use :focus style from general inputs */
 }
 #search-input-dynamic::placeholder {
-  color: rgba(255, 255, 255, 0.7);
+  color: #6c757d; /* Darker gray placeholder */
   opacity: 1;
 }
 
 .search-submit-btn-dynamic {
-  background: none;
+  background: transparent; /* Inherit form background */
   border: none;
-  color: var(--light-color);
+  color: var(--dark-color); /* Black icon color */
   padding: 0 calc(var(--spacing-unit) * 0.75);
   cursor: pointer;
   font-size: 1rem;
@@ -590,10 +593,12 @@ select.form-control-sm {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  transition: background-color 0.15s ease-in-out; /* Add transition for hover */
 }
 .search-submit-btn-dynamic:hover {
-  opacity: 0.8;
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle hover effect */
 }
+/* --- End Search Bar Styling --- */
 
 /* Suggestions Dropdown */
 .suggestions-dropdown {
@@ -1148,7 +1153,7 @@ select.form-control-sm {
 .order-body { padding: calc(var(--spacing-unit) * 0.75); display: flex; flex-direction: column; gap: calc(var(--spacing-unit) * 0.75); }
 
 /* Order Item Images (Shared) */
-.order-items-images { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 0; }
+.order-items-images { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 0; list-style: none; } /* Added list-style: none */
 .order-item-thumbnail {
     display: inline-block;
     width: 40px;
@@ -1495,8 +1500,8 @@ select.form-control-sm {
       left: var(--spacing-unit);
       right: var(--spacing-unit);
       width: calc(100% - (2 * var(--spacing-unit)));
-      background-color: var(--card-bg);
-      border: 1px solid var(--border-color);
+      background-color: var(--card-bg); /* White background */
+      border: 1px solid var(--border-color); /* Standard border */
       box-shadow: 0 3px 6px rgba(0,0,0,0.15);
       opacity: 0;
       visibility: hidden;
@@ -1507,9 +1512,22 @@ select.form-control-sm {
       border-radius: var(--border-radius);
       height: 42px;
   }
-  #search-input-dynamic { color: rgb(36, 36, 36); background-color: white; }
-  #search-input-dynamic::placeholder { color: rgb(139, 139, 139); }
-  .search-submit-btn-dynamic { color: rgb(130, 130, 130); background-color: white; }
+  /* Ensure mobile search input/button also use black/white */
+  #search-input-dynamic {
+      color: var(--dark-color); /* Black text */
+      background-color: transparent; /* Inherit from form */
+  }
+  #search-input-dynamic::placeholder {
+      color: #6c757d; /* Darker gray placeholder */
+  }
+  .search-submit-btn-dynamic {
+      color: var(--dark-color); /* Black icon */
+      background-color: transparent; /* Inherit from form */
+  }
+   .search-submit-btn-dynamic:hover {
+      background-color: rgba(0, 0, 0, 0.05); /* Subtle hover */
+  }
+
 
   .search-container-dynamic.active .search-form-dynamic {
       opacity: 1;
@@ -1520,7 +1538,7 @@ select.form-control-sm {
 
   .suggestions-dropdown {
       position: absolute;
-      top: calc(100% + 8px + 42px + 4px);
+      top: calc(100% + 8px + 42px + 4px); /* Adjust based on search bar position */
       left: var(--spacing-unit);
       right: var(--spacing-unit);
       width: calc(100% - (2 * var(--spacing-unit)));
@@ -1608,8 +1626,35 @@ select.form-control-sm {
   .navbar { gap: var(--spacing-unit); }
   .app-logo .app-name { display: inline; }
   .app-logo { font-size: 1.2rem; }
-  .search-toggle-btn { display: none; }
-  .search-container-dynamic { display: flex; }
+  .search-toggle-btn { display: none; } /* Hide toggle button on desktop */
+  .search-container-dynamic { display: flex; } /* Ensure search container is visible */
+  /* Ensure desktop search form uses black/white */
+  .search-form-dynamic {
+      position: relative; /* Override absolute positioning from mobile */
+      top: auto; left: auto; right: auto; width: 100%; /* Override mobile positioning */
+      background-color: #ffffff; /* White background */
+      border: 1px solid #ccc; /* Subtle grey border */
+      box-shadow: none; /* Remove mobile shadow */
+      opacity: 1; visibility: visible; transform: none; /* Override mobile transitions */
+      transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Keep transitions */
+      height: 38px;
+  }
+  #search-input-dynamic {
+      color: var(--dark-color); /* Black text */
+      background-color: transparent; /* Inherit from form */
+  }
+  #search-input-dynamic::placeholder {
+      color: #6c757d; /* Darker gray placeholder */
+  }
+  .search-submit-btn-dynamic {
+      color: var(--dark-color); /* Black icon */
+      background-color: transparent; /* Inherit from form */
+  }
+  .search-submit-btn-dynamic:hover {
+      background-color: rgba(0, 0, 0, 0.05); /* Subtle hover */
+  }
+  /* --- End Desktop Search Specific Styles --- */
+
   .nav-link { flex-direction: row; font-size: 0.9rem; align-items: center; padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.8); }
   .nav-link span { display: inline; margin-left: calc(var(--spacing-unit) * 0.3); }
   .nav-link i { font-size: 1rem; margin-bottom: 0; margin-right: 0; }
