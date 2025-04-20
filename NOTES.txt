@@ -4952,7 +4952,7 @@ select.form-control-sm {
 .banner-slider-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 25 / 6; /* Default widescreen */
+  aspect-ratio: 24 / 6; /* Default widescreen */
   overflow: hidden;
   border-radius: var(--border-radius);
   background-color: #e0e0e0;
@@ -5056,7 +5056,7 @@ select.form-control-sm {
 /* Mobile Specific Styles (Less than 768px) */
 @media (max-width: 767px) {
   .app-footer { display: none; } /* Hide footer on small screens */
-  .banner-slider-container { aspect-ratio: 2.4 / 1; } /* Taller banner on mobile */
+  .banner-slider-container { aspect-ratio: 2.5 / 1; } /* Taller banner on mobile */
   .banner-nav { width: 35px; height: 35px; font-size: 0.9rem; }
   .banner-dots { bottom: 10px; }
   .banner-dot { width: 8px; height: 8px; }
@@ -7520,19 +7520,23 @@ views/products/index.ejs:
         <div class="banner-slides" data-slides>
             <% homepageBanners.forEach((banner, index) => { %>
                 <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
+                    <%# --- MODIFICATION START --- %>
                     <% if (banner.linkUrl) { %>
-                        <a href="<%= banner.linkUrl %>" target="_blank" rel="noopener noreferrer" class="banner-link">
+                        <%# REMOVED target="_blank" from the next line %>
+                        <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
                             <img src="<%= banner.imageUrl %>"
                                  alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                                  class="banner-image"
                                  loading="lazy">
                         </a>
                     <% } else { %>
+                        <%# Image without a link %>
                         <img src="<%= banner.imageUrl %>"
                              alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                              class="banner-image"
                              loading="lazy">
                     <% } %>
+                    <%# --- MODIFICATION END --- %>
                 </div>
             <% }) %>
         </div>

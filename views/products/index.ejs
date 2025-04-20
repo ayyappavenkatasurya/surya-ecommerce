@@ -7,19 +7,23 @@
         <div class="banner-slides" data-slides>
             <% homepageBanners.forEach((banner, index) => { %>
                 <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
+                    <%# --- MODIFICATION START --- %>
                     <% if (banner.linkUrl) { %>
-                        <a href="<%= banner.linkUrl %>" target="_blank" rel="noopener noreferrer" class="banner-link">
+                        <%# REMOVED target="_blank" from the next line %>
+                        <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
                             <img src="<%= banner.imageUrl %>"
                                  alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                                  class="banner-image"
                                  loading="lazy">
                         </a>
                     <% } else { %>
+                        <%# Image without a link %>
                         <img src="<%= banner.imageUrl %>"
                              alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                              class="banner-image"
                              loading="lazy">
                     <% } %>
+                    <%# --- MODIFICATION END --- %>
                 </div>
             <% }) %>
         </div>
