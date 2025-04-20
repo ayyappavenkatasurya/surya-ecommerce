@@ -1,8 +1,26 @@
+<%# views/user/profile.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="profile-container">
-    <h1>My Profile</h1>
-    <p class="text-muted mb-3">Welcome, <%= user.name %> (<%= user.email %>)</p>
+    <%# --- Combine Welcome and Name Edit --- %>
+    <div class="profile-header mb-4 d-flex align-items-center justify-content-center flex-wrap"> <%# Flex container %>
+        <h1 class="mb-0 me-3">My Profile</h1> <%# Removed bottom margin from h1 %>
+        <div class="d-flex align-items-center">
+             <%# Display current name - initially visible %>
+             <span id="saved-name-display" class="fs-5 me-2">Welcome, <strong id="display-user-name"><%= user.name %></strong></span>
+             <%# Edit button (icon) - initially visible %>
+            <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
+
+             <%# Name edit form - initially hidden %>
+             <form action="/user/profile/update-name" method="POST" id="name-form" class="hidden inline-form align-items-center ms-2 form-submit-spinner">
+                 <label for="name-input" class="visually-hidden">New Name:</label>
+                 <input type="text" id="name-input" name="name" class="form-control form-control-sm me-2" value="<%= user.name %>" required minlength="2" placeholder="Enter new name">
+                 <button type="submit" class="btn btn-primary btn-sm me-1">Save</button>
+                 <button type="button" id="cancel-edit-name-btn" class="btn btn-secondary btn-sm">Cancel</button>
+             </form>
+         </div>
+    </div>
+    <p class="text-muted text-center small mb-3">Email: <%= user.email %></p> <%# Moved email below %>
 
     <%# --- Conditional Dashboards Section --- %>
     <div class="profile-section dashboards-section mb-4">
@@ -75,56 +93,92 @@
 
 </div>
 
-<%# Add JS specifically for profile page address form toggling %>
+<%# --- Consolidated Script for Profile Page --- %>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const editBtn = document.getElementById('edit-address-btn');
-    const addBtn = document.getElementById('add-address-btn'); // Button shown when no address exists
-    const cancelBtn = document.getElementById('cancel-edit-btn');
+    // --- Address Edit Logic (Existing) ---
+    const editAddressBtn = document.getElementById('edit-address-btn');
+    const addAddressBtn = document.getElementById('add-address-btn');
+    const cancelAddressBtn = document.getElementById('cancel-edit-btn');
     const addressForm = document.getElementById('address-form');
     const savedAddressDiv = document.getElementById('saved-address-display');
 
-    const showForm = () => {
+    const showAddressForm = () => {
+        if (!addressForm || !savedAddressDiv) return;
         addressForm.classList.remove('hidden');
         addressForm.querySelector('h3').textContent = savedAddressDiv.querySelector('strong') ? 'Edit Address' : 'Add Address';
         savedAddressDiv.classList.add('hidden');
-        if (cancelBtn) cancelBtn.classList.remove('hidden'); // Show cancel only when editing existing
+        if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden');
     };
 
-    const hideForm = () => {
+    const hideAddressForm = () => {
+        if (!addressForm || !savedAddressDiv) return;
         addressForm.classList.add('hidden');
         if (savedAddressDiv.querySelector('strong')) { // Check if address actually exists
             savedAddressDiv.classList.remove('hidden');
         } else {
             savedAddressDiv.classList.remove('hidden'); // Still show "No address" message
-             if (cancelBtn) cancelBtn.classList.add('hidden'); // Hide cancel if no address was being edited
+            if (cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
         }
     };
 
-    if (editBtn) {
-        editBtn.addEventListener('click', showForm);
+    if (editAddressBtn) {
+        editAddressBtn.addEventListener('click', showAddressForm);
     }
-    if (addBtn) {
-         addBtn.addEventListener('click', () => {
-            addressForm.reset(); // Clear form fields when adding new
-            showForm();
-            if(cancelBtn) cancelBtn.classList.add('hidden'); // Hide cancel when adding new
+    if (addAddressBtn) {
+         addAddressBtn.addEventListener('click', () => {
+            if(addressForm) addressForm.reset();
+            showAddressForm();
+            if(cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
          });
     }
-    if (cancelBtn) {
-        cancelBtn.addEventListener('click', hideForm);
+    if (cancelAddressBtn) {
+        cancelAddressBtn.addEventListener('click', hideAddressForm);
     }
 
-    // Initial state: Show "Add Address" button if no address exists and form is hidden
-    if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden') && addBtn) {
-       addBtn.classList.remove('hidden'); // Ensure add button is visible
-    } else if (addBtn) {
-         addBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
+    // Initial Address State
+    if (savedAddressDiv && addressForm && addAddressBtn) {
+        if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden')) {
+           addAddressBtn.classList.remove('hidden');
+        } else {
+             addAddressBtn.classList.add('hidden');
+        }
     }
 
 
+    // --- Name Edit Logic (New) ---
+    const editNameBtn = document.getElementById('edit-name-btn');
+    const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
+    const nameForm = document.getElementById('name-form');
+    const savedNameDisplaySpan = document.getElementById('saved-name-display'); // The span containing the welcome text
+    const nameInput = document.getElementById('name-input'); // The input field
+    const displayUserNameStrong = document.getElementById('display-user-name'); // The strong tag holding the name
+
+    const showNameForm = () => {
+        if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
+        nameForm.classList.remove('hidden');        // Show the form
+        savedNameDisplaySpan.classList.add('hidden'); // Hide the "Welcome, Name" span
+        editNameBtn.classList.add('hidden');        // Hide the edit icon button
+        nameInput.focus();                          // Focus the input field
+    };
+
+    const hideNameForm = () => {
+        if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
+        nameForm.classList.add('hidden');            // Hide the form
+        savedNameDisplaySpan.classList.remove('hidden'); // Show the "Welcome, Name" span
+        editNameBtn.classList.remove('hidden');      // Show the edit icon button again
+        // Reset input value to the currently displayed name when cancelling
+        nameInput.value = displayUserNameStrong.textContent;
+    };
+
+    if (editNameBtn) {
+        editNameBtn.addEventListener('click', showNameForm);
+    }
+
+    if (cancelNameBtn) {
+        cancelNameBtn.addEventListener('click', hideNameForm);
+    }
 });
 </script>
-
 
 <%- include('../partials/footer') %>

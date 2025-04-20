@@ -10,6 +10,7 @@ router.use(isAuthenticated);
 
 // User Profile
 router.get('/profile', userController.getUserProfilePage);
+router.post('/profile/update-name', userController.updateUserName); // *** ADDED THIS LINE ***
 
 // User Cart Management
 router.get('/cart', userController.getCart);                // View cart (controller filters unapproved)

@@ -32,6 +32,57 @@ exports.getUserProfilePage = async (req, res, next) => {
     }
 };
 
+// --- NEW: Function to update user's name ---
+exports.updateUserName = async (req, res, next) => {
+    const { name } = req.body;
+    const userId = req.session.user._id;
+
+    // --- Input Validation ---
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+        req.flash('error_msg', 'Please enter a valid name (at least 2 characters).');
+        return res.redirect('/user/profile');
+    }
+
+    const trimmedName = name.trim();
+
+    try {
+        // Find user (not lean, need to save)
+        const user = await User.findById(userId);
+        if (!user) {
+            req.flash('error_msg', 'User not found. Please log in again.');
+            return res.redirect('/auth/login');
+        }
+
+        // Update the name
+        user.name = trimmedName;
+        await user.save();
+
+        // --- Update Session ---
+        req.session.user.name = user.name; // Update name in session
+
+        // Note: User initials are recalculated in the middleware on the *next* request
+        // based on the updated session name. No need to recalculate here unless
+        // you need the *new* initials immediately before the redirect (unlikely).
+
+        await req.session.save(); // Wait for session save to complete
+
+        req.flash('success_msg', 'Name updated successfully.');
+        res.redirect('/user/profile'); // Redirect back to profile
+
+    } catch (error) {
+        // Handle Mongoose validation errors specifically
+        if (error.name === 'ValidationError') {
+            let validationErrors = Object.values(error.errors).map(el => el.message);
+            req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
+            return res.redirect('/user/profile');
+        }
+        // Pass other errors to the central handler
+        console.error("Error updating user name:", error);
+        next(error);
+    }
+};
+
+
 exports.saveAddress = async (req, res, next) => {
     const { name, phone, pincode, cityVillage, landmarkNearby, source } = req.body;
     const userId = req.session.user._id;
