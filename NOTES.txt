@@ -80,6 +80,7 @@ controllers/adminController.js:
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
+const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
@@ -296,31 +297,23 @@ exports.removeProduct = async (req, res, next) => {
 };
 
 
-// --- *** UPDATED: Manage Orders (Admin sees ALL) *** ---
+// --- Manage Orders (Admin sees ALL - keep existing) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   // Select necessary fields including OTP for display logic
-                                   .select('-__v -products.__v -shippingAddress._id') // Exclude some verbose fields if needed
+                                   .select('-__v -products.__v -shippingAddress._id')
                                    .populate('products.productId', 'name imageUrl _id price sellerId')
                                    .populate('userId', 'name email')
                                    .lean();
 
-        const now = Date.now(); // Get current time once
+        const now = Date.now();
 
         orders.forEach(order => {
-            // Existing flags
             order.canBeCancelledByAdmin = order.status === 'Pending';
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
+            order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
 
-            // *** ADDED: Logic to determine if OTP hint should be shown ***
-            order.showDeliveryOtp = order.status === 'Pending' &&
-                                    !!order.orderOTP &&          // OTP must exist
-                                    !!order.orderOTPExpires &&   // Expiry must exist
-                                    new Date(order.orderOTPExpires).getTime() > now; // Must not be expired
-
-            // Existing item summary logic
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
                     const productName = p.productId?.name || p.name || '[Product Missing]';
@@ -336,24 +329,22 @@ exports.getManageOrdersPage = async (req, res, next) => {
             title: 'Manage All Orders',
             orders: orders,
             cancellationReasons: cancellationReasons
-            // The formatDateIST helper is available via res.locals
         });
     } catch (error) {
         next(error);
     }
 };
 
-// --- Admin Order Actions (OTP Send/Confirm, Cancel - keep existing) ---
+// --- Admin Order Actions (keep existing) ---
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
-        // This function should save the OTP to the DB
         const result = await generateAndSendDirectDeliveryOTPByAdmin(orderId);
         req.flash('success_msg', result.message + ' Ask customer for OTP.');
     } catch (error) {
         req.flash('error_msg', `Admin OTP Send Failed: ${error.message}`);
     }
-    res.redirect('/admin/manage-orders'); // Redirect causes page reload, getManageOrdersPage runs again
+    res.redirect('/admin/manage-orders');
 };
 
 exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
@@ -404,7 +395,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
         }
 
-        // Restore Stock (keep existing logic)
+        // Restore Stock
         const productStockRestorePromises = order.products.map(item => {
             const quantityToRestore = Number(item.quantity);
             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -427,7 +418,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
         await sessionDB.commitTransaction();
 
-        // Send Email Notification (keep existing logic)
+        // Send Email Notification
         try {
             const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {
@@ -530,9 +521,6 @@ exports.removeUser = async (req, res, next) => {
             }
         }
 
-        // Consider implications for seller's products upon removal (orphan or disable)
-        // e.g., await Product.updateMany({ sellerId: userId }, { reviewStatus: 'rejected', rejectionReason: 'Seller Removed' });
-
         await User.deleteOne({ _id: userId });
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
@@ -548,10 +536,131 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
+// --- *** NEW: Banner Management Controllers *** ---
+
+// GET request to render the banner management page
+exports.getManageBannersPage = async (req, res, next) => {
+    try {
+        // Find the single banner configuration document (using the known key)
+        let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
+
+        // If no config exists yet, create a default structure for the view
+        if (!bannerConfig) {
+            bannerConfig = {
+                configKey: 'mainBanners',
+                banners: [] // Start with an empty array
+            };
+        }
+
+        // Ensure the banners array always has 4 potential slots for the form
+        const displayBanners = Array.from({ length: 4 }).map((_, index) => {
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+         });
+
+        res.render('admin/manage-banners', {
+            title: 'Manage Homepage Banners',
+            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+        });
+    } catch (error) {
+        console.error("Error fetching banner configuration:", error);
+        next(error);
+    }
+};
+
+// POST request to update the banner URLs
+exports.updateBanners = async (req, res, next) => {
+    const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
+    const adminUserId = req.session.user._id;
+
+    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
+    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const bannerInputs = [
+        { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
+        { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
+        { imageUrl: imageUrl3, linkUrl: linkUrl3, title: title3 },
+        { imageUrl: imageUrl4, linkUrl: linkUrl4, title: title4 }
+    ];
+
+    const newBanners = [];
+    let validationError = false;
+    for (let i = 0; i < bannerInputs.length; i++) {
+        const input = bannerInputs[i];
+        const trimmedImageUrl = input.imageUrl?.trim();
+        const trimmedLinkUrl = input.linkUrl?.trim();
+        const trimmedTitle = input.title?.trim();
+
+        // Only add banner if image URL is provided
+        if (trimmedImageUrl) {
+            if (!urlPattern.test(trimmedImageUrl)) {
+                req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
+                validationError = true;
+                // You might choose to break or continue collecting errors
+            }
+            // Also validate link URL if provided
+            if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
+                 req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
+                 validationError = true;
+             }
+             if (!validationError) {
+                newBanners.push({
+                     imageUrl: trimmedImageUrl,
+                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
+                     title: trimmedTitle || undefined    // Store undefined if empty
+                 });
+             }
+        }
+    }
+
+    if (validationError) {
+         // Need to reconstruct the state for the view if validation fails
+         const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
+         return res.render('admin/manage-banners', {
+             title: 'Manage Homepage Banners',
+             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+             // Flash message is already set
+         });
+    }
+
+    try {
+        // Find and update (or create if doesn't exist) the banner config document
+        await BannerConfig.findOneAndUpdate(
+            { configKey: 'mainBanners' }, // Find by the key
+            {
+                banners: newBanners, // Set the new array of banners
+                lastUpdatedBy: adminUserId // Track the update
+            },
+            {
+                new: true, // Return the updated document
+                upsert: true, // Create if document doesn't exist
+                runValidators: true // Ensure arrayLimit validator runs
+            }
+        );
+
+        req.flash('success_msg', 'Homepage banners updated successfully.');
+        res.redirect('/admin/manage-banners');
+
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+             // Handle Mongoose validation errors (like array limit)
+            let errors = Object.values(error.errors).map(el => el.message);
+             req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
+             const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
+             return res.render('admin/manage-banners', {
+                  title: 'Manage Homepage Banners',
+                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+             });
+         }
+        console.error("Error updating banners:", error);
+        req.flash('error_msg', 'Failed to update banners due to a server error.');
+        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
+    }
+};
+
 controllers/authController.js:
 // controllers/authController.js
 const User = require('../models/User');
-const Product = require('../models/Product'); // Keep for getHomePage
+const Product = require('../models/Product');
+const BannerConfig = require('../models/BannerConfig'); // *** <<< ADD THIS LINE ***
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
@@ -1005,7 +1114,6 @@ exports.loginUser = async (req, res, next) => {
 // --- UPDATED logoutUser ---
 exports.logoutUser = (req, res, next) => {
     // --- Step 1: Set the flash message BEFORE destroying the session ---
-    // This message will persist in the session until the *next* request reads it.
     req.flash('success_msg', 'You have been logged out successfully.');
 
     // --- Step 2: Destroy the session ---
@@ -1013,25 +1121,19 @@ exports.logoutUser = (req, res, next) => {
         if (err) {
             // Log the error, but don't try to flash another message.
             console.error('Session destruction error:', err);
-            // Redirecting to login is still appropriate. The original success_msg
-            // might technically survive if destruction failed partially, but that's
-            // less harmful than crashing.
-            // Consider adding a more specific error log/monitoring here.
              return res.redirect('/auth/login');
         }
 
         // --- Step 3: Clear the session cookie from the browser ---
-        // Use the same name configured in your session middleware ('connect.sid' is common default)
         res.clearCookie(req.app.get('session cookie name') || 'connect.sid'); // Safely get name or use default
 
         // --- Step 4: Redirect ---
-        // The flash message set in Step 1 will be available on this next request (/auth/login).
         res.redirect('/auth/login');
     });
 };
 
 
-// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version) ---
+// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version, except getHomePage) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -1081,15 +1183,12 @@ exports.forgotPassword = async (req, res, next) => {
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
             // If email failed, consider rolling back the OTP/token? Or just log and rely on expiry?
-            // Let's log and rely on expiry for simplicity now. User gets generic message anyway.
             console.error(`Failed to send password reset OTP email to ${user.email}`);
-             // User already got the generic message, just redirect back.
             res.redirect('/auth/forgot-password');
         }
 
     } catch (error) {
         console.error("Error in forgotPassword:", error);
-        // Don't reveal specific errors to the user
         req.flash('error_msg', 'An error occurred while processing your request. Please try again later.');
         res.redirect('/auth/forgot-password');
     }
@@ -1112,21 +1211,20 @@ exports.resetPassword = async (req, res, next) => {
     }
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         // Redirect back to the same reset form
          return res.redirect(`/auth/reset-password/${token}`);
     }
 
     // --- Password Reset Logic ---
     try {
-        // Find user by token and ensure it's still valid (not expired)
+        // Find user by token and ensure it's still valid
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() },
-         }).select('+password'); // Select password field to update it
+         }).select('+password');
 
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
-            return res.redirect('/auth/forgot-password'); // Redirect to start the process again
+            return res.redirect('/auth/forgot-password');
         }
 
         // Update password and clear reset/OTP fields
@@ -1143,7 +1241,6 @@ exports.resetPassword = async (req, res, next) => {
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
-                // Inform user password reset worked but login failed
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
@@ -1163,53 +1260,59 @@ exports.resetPassword = async (req, res, next) => {
                  }
                  // Success: Password reset and logged in
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                // Redirect to home page
                 res.redirect('/');
              });
          });
 
     } catch (error) {
-        // Handle validation errors during save (e.g., if password fails schema rules unexpectedly)
+        // Handle validation errors during save
         if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
-            return res.redirect(`/auth/reset-password/${token}`); // Redirect back to reset form
+            return res.redirect(`/auth/reset-password/${token}`);
        }
         next(error); // Pass other errors to handler
     }
 };
 
+
+// --- Modified getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
     let query = {
-        reviewStatus: 'approved', // *** Filter by approved status ***
-        stock: { $gt: 0 }         // *** Filter by stock > 0 ***
+        reviewStatus: 'approved',
+        stock: { $gt: 0 }
     };
 
     if (searchTerm) {
-         query.$text = { $search: searchTerm }; // Use text index
-         // Regex fallback:
-         // const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-         // const regex = new RegExp(escapedSearchTerm, 'i');
-         // query.$or = [ { name: regex }, { category: regex }, { specifications: regex } ];
+         query.$text = { $search: searchTerm };
     }
 
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
-    const products = await Product.find(query, projection)
-                                    .sort(sort)
-                                    .lean(); // Use lean for read-only
+    // Fetch Products and Banners concurrently
+    const [products, bannerConfig] = await Promise.all([
+        Product.find(query, projection).sort(sort).lean(),
+        BannerConfig.findOne({ configKey: 'mainBanners' }).lean() // Fetch banners using the imported model
+    ]);
 
-    res.render('products/index', { // Render the standard product listing page
+    // Extract banner URLs (provide empty array if none found)
+    const banners = bannerConfig?.banners || [];
+    // Filter out any banners that might somehow be saved without an imageUrl
+    const validBanners = banners.filter(banner => banner.imageUrl);
+
+
+    res.render('products/index', {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
       products: products,
-      searchTerm: searchTerm
+      searchTerm: searchTerm,
+      homepageBanners: validBanners // Pass banners to the view
       // currentUser is available via res.locals
     });
   } catch (error) {
-    console.error("Error fetching products for home page:", error);
+    console.error("Error fetching products/banners for home page:", error);
     next(error);
   }
 };
@@ -3113,6 +3216,45 @@ module.exports = {
     isOrderRelevantToSeller // Export new middleware
 };
 
+models/BannerConfig.js:
+// models/BannerConfig.js
+const mongoose = require('mongoose');
+
+const BannerSchema = new mongoose.Schema({
+  imageUrl: { type: String, trim: true, required: true },
+  linkUrl: { type: String, trim: true }, // Optional: URL to navigate to when banner is clicked
+  title: { type: String, trim: true }, // Optional: Title/Alt text for the banner
+}, { _id: false }); // Don't need separate IDs for each banner item in the array
+
+const BannerConfigSchema = new mongoose.Schema({
+  // Using a known key to ensure we only have one document (singleton pattern)
+  configKey: {
+    type: String,
+    default: 'mainBanners',
+    unique: true, // Enforces only one banner config document
+    required: true,
+  },
+  banners: {
+    type: [BannerSchema],
+    validate: [arrayLimit, '{PATH} exceeds the limit of 4 banners'] // Custom validator
+  },
+  lastUpdatedBy: { // Track who last updated it
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }
+}, {
+  timestamps: true // Adds createdAt and updatedAt
+});
+
+// Custom validator function for array limit
+function arrayLimit(val) {
+  return val.length <= 4;
+}
+
+const BannerConfig = mongoose.model('BannerConfig', BannerConfigSchema);
+
+module.exports = BannerConfig;
+
 models/Order.js:
 // models/Order.js
 const mongoose = require('mongoose');
@@ -4755,7 +4897,138 @@ select.form-control-sm:not([size]):not([multiple]) {
   .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
 } /* End @media (min-width: 1024px) */
 
+/* Add near the end of the file */
+
+/* Banner Slider Styles */
+.banner-slider-container {
+  position: relative;
+  width: 100%;
+  /* Set aspect-ratio for responsive height. Adjust as needed */
+  aspect-ratio: 16 / 6; /* Common widescreen banner ratio */
+  overflow: hidden; /* Crucial for slider effect */
+  border-radius: var(--border-radius); /* Optional: round the corners */
+  background-color: #e0e0e0; /* Background while loading images */
+}
+
+.banner-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.banner-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.6s ease-in-out; /* Fade transition */
+  background-color: #eee; /* Slight background for slide itself */
+}
+
+.banner-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1; /* Ensure active slide is on top */
+}
+
+.banner-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.banner-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Cover the area, cropping if necessary */
+  /* object-position: center; /* Optional: center the image focus */
+}
+
+/* Navigation Arrows */
+.banner-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+  cursor: pointer;
+  z-index: 2; /* Above the slides */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  opacity: 0.8; /* Slightly transparent */
+}
+
+.banner-nav:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+}
+
+.banner-prev {
+  left: 10px;
+}
+
+.banner-next {
+  right: 10px;
+}
+
+/* Navigation Dots */
+.banner-dots {
+  position: absolute;
+  bottom: 15px; /* Position dots near the bottom */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2; /* Above the slides */
+}
+
+.banner-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0; /* Reset button padding */
+  transition: background-color 0.3s ease;
+}
+
+.banner-dot.active {
+  background-color: white;
+}
+
+/* Adjust aspect ratio for mobile */
+@media (max-width: 767px) {
+  .banner-slider-container {
+    aspect-ratio: 3 / 1; /* Taller on mobile */
+  }
+  .banner-nav {
+     width: 35px;
+     height: 35px;
+     font-size: 0.9rem;
+   }
+  .banner-dots {
+      bottom: 10px;
+  }
+  .banner-dot {
+       width: 8px;
+       height: 8px;
+   }
+}
+
 public/js/main.js:
+// public/js/main.js
 console.log("Main JS loaded.");
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -4900,6 +5173,39 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 profileAddBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
             }
+        }
+
+        // Name Edit Logic (Profile Page Only)
+        const editNameBtn = document.getElementById('edit-name-btn');
+        const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
+        const nameForm = document.getElementById('name-form');
+        const savedNameDisplaySpan = document.getElementById('saved-name-display'); // The span containing the welcome text
+        const nameInput = document.getElementById('name-input'); // The input field
+        const displayUserNameStrong = document.getElementById('display-user-name'); // The strong tag holding the name
+
+        const showNameForm = () => {
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
+            nameForm.classList.remove('hidden');        // Show the form
+            savedNameDisplaySpan.classList.add('hidden'); // Hide the "Welcome, Name" span
+            editNameBtn.classList.add('hidden');        // Hide the edit icon button
+            nameInput.focus();                          // Focus the input field
+        };
+
+        const hideNameForm = () => {
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
+            nameForm.classList.add('hidden');            // Hide the form
+            savedNameDisplaySpan.classList.remove('hidden'); // Show the "Welcome, Name" span
+            editNameBtn.classList.remove('hidden');      // Show the edit icon button again
+            // Reset input value to the currently displayed name when cancelling
+            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
+        };
+
+        if (editNameBtn) {
+            editNameBtn.addEventListener('click', showNameForm);
+        }
+
+        if (cancelNameBtn) {
+            cancelNameBtn.addEventListener('click', hideNameForm);
         }
     }
 
@@ -5103,8 +5409,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (searchContainer && window.innerWidth < 768) { // Also hide mobile search bar
                     searchContainer.classList.remove('active');
                  }
-                 // If you want to clear search on selection:
-                 // if (searchInput) searchInput.value = '';
              }
          });
      }
@@ -5189,7 +5493,6 @@ document.addEventListener('DOMContentLoaded', () => {
         proceedCheckoutBtn.addEventListener('click', function(event) {
             // Check if already loading
             if (proceedCheckoutBtn.classList.contains('loading')) {
-                // event.preventDefault(); // Not needed for nav links
                 return;
             }
 
@@ -5214,6 +5517,105 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // ========================================
     // End Loading State for Non-Form Actions
+    // ========================================
+
+    // ========================================
+    // Homepage Banner Slider Logic            <--- NEW SECTION
+    // ========================================
+    const sliderContainer = document.querySelector('[data-slider-container]');
+    if (sliderContainer) {
+        const slides = sliderContainer.querySelectorAll('[data-slide]');
+        const prevBtn = sliderContainer.querySelector('[data-slider-prev]');
+        const nextBtn = sliderContainer.querySelector('[data-slider-next]');
+        const dotsContainer = sliderContainer.querySelector('[data-slider-dots]');
+        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-slide-to]') : [];
+
+        let currentSlideIndex = 0;
+        let autoSlideInterval = null;
+        const slideIntervalTime = 5000; // Time in ms (e.g., 5 seconds)
+
+        function showSlide(index) {
+            if (!slides || slides.length === 0) return; // Exit if no slides
+
+            // Wrap index around if it goes out of bounds
+            const newIndex = (index + slides.length) % slides.length;
+
+            slides.forEach((slide, i) => {
+                slide.classList.remove('active');
+            });
+            dots.forEach(dot => {
+                dot.classList.remove('active');
+            });
+
+            slides[newIndex].classList.add('active');
+            if (dots[newIndex]) {
+                dots[newIndex].classList.add('active');
+            }
+            currentSlideIndex = newIndex;
+        }
+
+        function nextSlide() {
+            showSlide(currentSlideIndex + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlideIndex - 1);
+        }
+
+        function startAutoSlide() {
+            // Clear any existing interval before starting a new one
+            clearInterval(autoSlideInterval);
+            if (slides.length > 1) { // Only auto-slide if more than one banner
+                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
+            }
+        }
+
+        // Initial setup
+        if (slides.length > 0) {
+             showSlide(0); // Show the first slide initially
+             startAutoSlide(); // Start automatic sliding
+        }
+
+        // Event Listeners for Arrows
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                nextSlide();
+                startAutoSlide(); // Reset interval on manual click
+            });
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                prevSlide();
+                startAutoSlide(); // Reset interval on manual click
+            });
+        }
+
+        // Event Listener for Dots
+        if (dotsContainer) {
+            dotsContainer.addEventListener('click', (e) => {
+                const targetDot = e.target.closest('[data-slide-to]');
+                if (targetDot) {
+                    const index = parseInt(targetDot.dataset.slideTo, 10);
+                    if (!isNaN(index)) {
+                        showSlide(index);
+                        startAutoSlide(); // Reset interval on manual click
+                    }
+                }
+            });
+        }
+
+        // Pause on Hover
+        sliderContainer.addEventListener('mouseenter', () => {
+            clearInterval(autoSlideInterval);
+        });
+
+        sliderContainer.addEventListener('mouseleave', () => {
+            startAutoSlide();
+        });
+
+    } // End if (sliderContainer)
+    // ========================================
+    // End Homepage Banner Slider Logic
     // ========================================
 
 
@@ -5408,7 +5810,8 @@ function calculateNewCartCount() {
             if (quantityInput) {
                 const value = parseInt(quantityInput.value, 10);
                 if (!isNaN(value) && value > 0) {
-                    count += 1; // Count unique items with quantity > 0
+                    // Update count based on the QUANTITY of each item
+                    count += value; // THIS IS THE KEY CHANGE - SUM QUANTITIES, NOT ITEMS
                 }
             }
         }
@@ -5889,32 +6292,34 @@ views/admin/dashboard.ejs:
     <p class="text-muted mb-3">System-wide management access. Welcome, <%= currentUser.name %>!</p>
 
     <div class="admin-actions-grid">
-         <%# Admin Upload Product Card (Keep if Admins still upload) %>
          <a href="/admin/upload-product" class="admin-action-card">
             <i class="fas fa-upload text-primary"></i>
-            <h3>Upload Product (as Admin)</h3> <%# Clarify who is uploading %>
+            <h3>Upload Product (as Admin)</h3>
             <p>Add a product directly to the system.</p>
         </a>
-
-         <%# Updated Label: Manage ALL Products %>
          <a href="/admin/manage-products" class="admin-action-card">
             <i class="fas fa-edit text-success"></i>
-            <h3>Manage All Products</h3> <%# Updated label %>
-            <p>View, edit, remove products from any seller.</p> <%# Updated description %>
+            <h3>Manage All Products</h3>
+            <p>View, edit, remove products from any seller.</p>
          </a>
-
-         <%# Updated Label: Manage ALL Orders %>
         <a href="/admin/manage-orders" class="admin-action-card">
              <i class="fas fa-clipboard-list text-info"></i>
-             <h3>Manage All Orders</h3> <%# Updated label %>
-             <p>View, confirm delivery, or cancel any customer order.</p> <%# Updated description %>
+             <h3>Manage All Orders</h3>
+             <p>View, confirm delivery, or cancel any customer order.</p>
         </a>
-
         <a href="/admin/manage-users" class="admin-action-card">
              <i class="fas fa-users-cog text-warning"></i>
              <h3>Manage Users</h3>
              <p>Update roles (User, Seller, Admin), remove users.</p>
         </a>
+
+         <%# --- NEW: Manage Banners Card --- %>
+         <a href="/admin/manage-banners" class="admin-action-card">
+             <i class="fas fa-images text-secondary"></i> <%# Example icon %>
+             <h3>Manage Banners</h3>
+             <p>Update the promotional banners on the homepage.</p>
+         </a>
+         <%# --- End Manage Banners Card --- %>
 
          <a href="/user/profile" class="admin-action-card"> <%# Link to own profile %>
             <i class="fas fa-user-circle text-secondary"></i>
@@ -5925,6 +6330,48 @@ views/admin/dashboard.ejs:
 </div>
 
  <%- include('../partials/footer') %>
+
+views/admin/manage-banners.ejs:
+<%# views/admin/manage-banners.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container">
+    <h1><%= title %></h1>
+    <p class="text-muted small mb-3">Enter direct URLs for the images. Banners will appear on the homepage if URLs are provided.</p>
+
+    <form action="/admin/manage-banners" method="POST" class="form-submit-spinner">
+        <% bannerConfig.banners.forEach((banner, index) => { %>
+            <fieldset class="mb-4 border p-3 rounded"> <%# Group banner fields %>
+                <legend class="h5">Banner <%= index + 1 %></legend>
+                <div class="form-group">
+                    <label for="imageUrl<%= index + 1 %>">Image URL <%= index + 1 %>:</label>
+                    <input type="url" id="imageUrl<%= index + 1 %>" name="imageUrl<%= index + 1 %>" class="form-control" value="<%= banner.imageUrl %>" placeholder="https://example.com/banner<%= index + 1 %>.jpg">
+                    <% if (banner.imageUrl) { %>
+                        <img src="<%= banner.imageUrl %>" alt="Banner <%= index + 1 %> Preview" style="max-width: 200px; max-height: 75px; margin-top: 10px; border: 1px solid #ddd; padding: 2px; object-fit: contain;">
+                    <% } else { %>
+                         <small class="d-block mt-1 text-muted">No image set</small>
+                    <% } %>
+                </div>
+                <div class="form-group">
+                    <label for="linkUrl<%= index + 1 %>">Link URL <%= index + 1 %> (Optional):</label>
+                    <input type="url" id="linkUrl<%= index + 1 %>" name="linkUrl<%= index + 1 %>" class="form-control" value="<%= banner.linkUrl %>" placeholder="https://example.com/category/offers">
+                    <% if (banner.linkUrl) { %>
+                       <small class="d-block mt-1 text-muted">Clicks to: <%= banner.linkUrl %></small>
+                   <% } %>
+                </div>
+                <div class="form-group">
+                    <label for="title<%= index + 1 %>">Title/Alt Text <%= index + 1 %> (Optional):</label>
+                    <input type="text" id="title<%= index + 1 %>" name="title<%= index + 1 %>" class="form-control" value="<%= banner.title %>" placeholder="e.g., Special Summer Sale">
+                </div>
+             </fieldset>
+        <% }) %>
+
+        <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Banners</button>
+        <a href="/admin/dashboard" class="btn btn-secondary">Back to Dashboard</a>
+    </form>
+</div>
+
+<%- include('../partials/footer') %>
 
 views/admin/edit-product.ejs:
 <%- include('../partials/header', { title: title }) %>
@@ -6841,8 +7288,50 @@ views/products/index.ejs:
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
+<%# --- UPDATED: Homepage Banner Slider Section --- %>
+<% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
+    <div class="banner-slider-container mb-4" data-slider-container>
+        <div class="banner-slides" data-slides>
+            <% homepageBanners.forEach((banner, index) => { %>
+                <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
+                    <% if (banner.linkUrl) { %>
+                        <a href="<%= banner.linkUrl %>" target="_blank" rel="noopener noreferrer" class="banner-link">
+                            <img src="<%= banner.imageUrl %>"
+                                 alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                                 class="banner-image"
+                                 loading="lazy">
+                        </a>
+                    <% } else { %>
+                        <img src="<%= banner.imageUrl %>"
+                             alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                             class="banner-image"
+                             loading="lazy">
+                    <% } %>
+                </div>
+            <% }) %>
+        </div>
+
+        <%# Optional: Navigation Arrows (hide if only one banner) %>
+        <% if (homepageBanners.length > 1) { %>
+            <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
+            <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
+        <% } %>
+
+        <%# Optional: Navigation Dots (hide if only one banner) %>
+         <% if (homepageBanners.length > 1) { %>
+            <div class="banner-dots" data-slider-dots>
+                <% homepageBanners.forEach((_, index) => { %>
+                    <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+<% } %>
+<%# --- End: Homepage Banner Slider Section --- %>
+
 <div class="product-index-container">
-    <h1><%= title %></h1>
+    <br>
+        <h1>New Launches</h1>
 
     <% if (products.length > 0) { %>
         <div class="product-grid">
@@ -6852,10 +7341,7 @@ views/products/index.ejs:
                         <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-image">
                         <div class="product-info">
                             <h3 class="product-name"><%= product.name %></h3>
-                            <%# --- CURRENCY UPDATE --- %>
-                            <%# Safely handle potentially missing price before formatting %>
                             <p class="product-price">₹<%= (typeof product.price === 'number' ? product.price : 0).toFixed(2) %></p>
-                            <%# --- END CURRENCY UPDATE --- %>
                             <p class="product-stock">Stock: <%= product.stock %></p>
                             <% if (product.numReviews > 0) { %>
                                  <p class="product-rating">
@@ -6869,7 +7355,6 @@ views/products/index.ejs:
                             <% } %>
                         </div>
                     </a>
-                     <%# --- Spinner Class Added --- %>
                      <form action="/user/cart/add" method="POST" class="add-to-cart-form form-submit-spinner">
                          <input type="hidden" name="productId" value="<%= product._id %>">
                          <input type="hidden" name="quantity" value="1">
@@ -6881,7 +7366,13 @@ views/products/index.ejs:
             <% }) %>
         </div>
     <% } else { %>
-        <p>No products found matching your criteria.</p>
+         <p class="alert alert-info">
+             <% if (typeof searchTerm !== 'undefined' && searchTerm) { %>
+                 No products found matching your search "<%= searchTerm %>".
+             <% } else { %>
+                 No products are currently available. Check back soon!
+             <% } %>
+         </p>
     <% } %>
 
 </div>

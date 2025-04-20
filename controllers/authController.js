@@ -1,6 +1,7 @@
 // controllers/authController.js
 const User = require('../models/User');
-const Product = require('../models/Product'); // Keep for getHomePage
+const Product = require('../models/Product');
+const BannerConfig = require('../models/BannerConfig'); // *** <<< ADD THIS LINE ***
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
@@ -454,7 +455,6 @@ exports.loginUser = async (req, res, next) => {
 // --- UPDATED logoutUser ---
 exports.logoutUser = (req, res, next) => {
     // --- Step 1: Set the flash message BEFORE destroying the session ---
-    // This message will persist in the session until the *next* request reads it.
     req.flash('success_msg', 'You have been logged out successfully.');
 
     // --- Step 2: Destroy the session ---
@@ -462,25 +462,19 @@ exports.logoutUser = (req, res, next) => {
         if (err) {
             // Log the error, but don't try to flash another message.
             console.error('Session destruction error:', err);
-            // Redirecting to login is still appropriate. The original success_msg
-            // might technically survive if destruction failed partially, but that's
-            // less harmful than crashing.
-            // Consider adding a more specific error log/monitoring here.
              return res.redirect('/auth/login');
         }
 
         // --- Step 3: Clear the session cookie from the browser ---
-        // Use the same name configured in your session middleware ('connect.sid' is common default)
         res.clearCookie(req.app.get('session cookie name') || 'connect.sid'); // Safely get name or use default
 
         // --- Step 4: Redirect ---
-        // The flash message set in Step 1 will be available on this next request (/auth/login).
         res.redirect('/auth/login');
     });
 };
 
 
-// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version) ---
+// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version, except getHomePage) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -530,15 +524,12 @@ exports.forgotPassword = async (req, res, next) => {
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
             // If email failed, consider rolling back the OTP/token? Or just log and rely on expiry?
-            // Let's log and rely on expiry for simplicity now. User gets generic message anyway.
             console.error(`Failed to send password reset OTP email to ${user.email}`);
-             // User already got the generic message, just redirect back.
             res.redirect('/auth/forgot-password');
         }
 
     } catch (error) {
         console.error("Error in forgotPassword:", error);
-        // Don't reveal specific errors to the user
         req.flash('error_msg', 'An error occurred while processing your request. Please try again later.');
         res.redirect('/auth/forgot-password');
     }
@@ -561,21 +552,20 @@ exports.resetPassword = async (req, res, next) => {
     }
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         // Redirect back to the same reset form
          return res.redirect(`/auth/reset-password/${token}`);
     }
 
     // --- Password Reset Logic ---
     try {
-        // Find user by token and ensure it's still valid (not expired)
+        // Find user by token and ensure it's still valid
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() },
-         }).select('+password'); // Select password field to update it
+         }).select('+password');
 
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
-            return res.redirect('/auth/forgot-password'); // Redirect to start the process again
+            return res.redirect('/auth/forgot-password');
         }
 
         // Update password and clear reset/OTP fields
@@ -592,7 +582,6 @@ exports.resetPassword = async (req, res, next) => {
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
-                // Inform user password reset worked but login failed
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
@@ -612,53 +601,59 @@ exports.resetPassword = async (req, res, next) => {
                  }
                  // Success: Password reset and logged in
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                // Redirect to home page
                 res.redirect('/');
              });
          });
 
     } catch (error) {
-        // Handle validation errors during save (e.g., if password fails schema rules unexpectedly)
+        // Handle validation errors during save
         if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
-            return res.redirect(`/auth/reset-password/${token}`); // Redirect back to reset form
+            return res.redirect(`/auth/reset-password/${token}`);
        }
         next(error); // Pass other errors to handler
     }
 };
 
+
+// --- Modified getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
     let query = {
-        reviewStatus: 'approved', // *** Filter by approved status ***
-        stock: { $gt: 0 }         // *** Filter by stock > 0 ***
+        reviewStatus: 'approved',
+        stock: { $gt: 0 }
     };
 
     if (searchTerm) {
-         query.$text = { $search: searchTerm }; // Use text index
-         // Regex fallback:
-         // const escapedSearchTerm = searchTerm.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-         // const regex = new RegExp(escapedSearchTerm, 'i');
-         // query.$or = [ { name: regex }, { category: regex }, { specifications: regex } ];
+         query.$text = { $search: searchTerm };
     }
 
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
-    const products = await Product.find(query, projection)
-                                    .sort(sort)
-                                    .lean(); // Use lean for read-only
+    // Fetch Products and Banners concurrently
+    const [products, bannerConfig] = await Promise.all([
+        Product.find(query, projection).sort(sort).lean(),
+        BannerConfig.findOne({ configKey: 'mainBanners' }).lean() // Fetch banners using the imported model
+    ]);
 
-    res.render('products/index', { // Render the standard product listing page
+    // Extract banner URLs (provide empty array if none found)
+    const banners = bannerConfig?.banners || [];
+    // Filter out any banners that might somehow be saved without an imageUrl
+    const validBanners = banners.filter(banner => banner.imageUrl);
+
+
+    res.render('products/index', {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
       products: products,
-      searchTerm: searchTerm
+      searchTerm: searchTerm,
+      homepageBanners: validBanners // Pass banners to the view
       // currentUser is available via res.locals
     });
   } catch (error) {
-    console.error("Error fetching products for home page:", error);
+    console.error("Error fetching products/banners for home page:", error);
     next(error);
   }
 };

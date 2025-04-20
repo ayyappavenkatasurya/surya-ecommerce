@@ -13,25 +13,26 @@ router.use(isAuthenticated, isAdmin);
 router.get('/dashboard', adminController.getAdminDashboard);
 
 // --- Product Management (Admin) ---
-// *** ADDED BACK Admin Product Upload Routes ***
-router.get('/upload-product', adminController.getUploadProductPage); // Page for admin upload form
-router.post('/upload-product', adminController.uploadProduct);       // Handle admin product upload
-
-// Manage All Products (Existing Routes)
-router.get('/manage-products', adminController.getManageProductsPage);       // Admin sees all
-router.get('/manage-products/edit/:id', adminController.getEditProductPage); // Admin edits any
-router.post('/manage-products/update/:id', adminController.updateProduct);   // Admin updates any
-router.post('/manage-products/remove/:id', adminController.removeProduct);   // Admin removes any
+router.get('/upload-product', adminController.getUploadProductPage);
+router.post('/upload-product', adminController.uploadProduct);
+router.get('/manage-products', adminController.getManageProductsPage);
+router.get('/manage-products/edit/:id', adminController.getEditProductPage);
+router.post('/manage-products/update/:id', adminController.updateProduct);
+router.post('/manage-products/remove/:id', adminController.removeProduct);
 
 // Order Management (Admin View/Manage ALL - Existing Routes)
-router.get('/manage-orders', adminController.getManageOrdersPage); // Admin sees all
-router.post('/orders/:orderId/send-direct-delivery-otp', adminController.sendDirectDeliveryOtpByAdmin); // Admin OTP send
-router.post('/orders/:orderId/confirm-direct-delivery', adminController.confirmDirectDeliveryByAdmin); // Admin OTP confirm
-router.post('/orders/:orderId/cancel', adminController.cancelOrderByAdmin);                           // Admin cancel
+router.get('/manage-orders', adminController.getManageOrdersPage);
+router.post('/orders/:orderId/send-direct-delivery-otp', adminController.sendDirectDeliveryOtpByAdmin);
+router.post('/orders/:orderId/confirm-direct-delivery', adminController.confirmDirectDeliveryByAdmin);
+router.post('/orders/:orderId/cancel', adminController.cancelOrderByAdmin);
 
 // User Management (Existing Routes)
-router.get('/manage-users', adminController.getManageUsersPage);     // List users
-router.post('/users/:id/update-role', adminController.updateUserRole); // Update role (incl. seller)
-router.post('/users/:id/remove', adminController.removeUser);         // Remove user
+router.get('/manage-users', adminController.getManageUsersPage);
+router.post('/users/:id/update-role', adminController.updateUserRole);
+router.post('/users/:id/remove', adminController.removeUser);
+
+// --- NEW: Banner Management ---
+router.get('/manage-banners', adminController.getManageBannersPage); // Page to manage banners
+router.post('/manage-banners', adminController.updateBanners);       // Action to save banners
 
 module.exports = router;

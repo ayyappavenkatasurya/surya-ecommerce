@@ -2,6 +2,7 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
+const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
@@ -218,31 +219,23 @@ exports.removeProduct = async (req, res, next) => {
 };
 
 
-// --- *** UPDATED: Manage Orders (Admin sees ALL) *** ---
+// --- Manage Orders (Admin sees ALL - keep existing) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
                                    .sort({ orderDate: -1 })
-                                   // Select necessary fields including OTP for display logic
-                                   .select('-__v -products.__v -shippingAddress._id') // Exclude some verbose fields if needed
+                                   .select('-__v -products.__v -shippingAddress._id')
                                    .populate('products.productId', 'name imageUrl _id price sellerId')
                                    .populate('userId', 'name email')
                                    .lean();
 
-        const now = Date.now(); // Get current time once
+        const now = Date.now();
 
         orders.forEach(order => {
-            // Existing flags
             order.canBeCancelledByAdmin = order.status === 'Pending';
             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
+            order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
 
-            // *** ADDED: Logic to determine if OTP hint should be shown ***
-            order.showDeliveryOtp = order.status === 'Pending' &&
-                                    !!order.orderOTP &&          // OTP must exist
-                                    !!order.orderOTPExpires &&   // Expiry must exist
-                                    new Date(order.orderOTPExpires).getTime() > now; // Must not be expired
-
-            // Existing item summary logic
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
                     const productName = p.productId?.name || p.name || '[Product Missing]';
@@ -258,24 +251,22 @@ exports.getManageOrdersPage = async (req, res, next) => {
             title: 'Manage All Orders',
             orders: orders,
             cancellationReasons: cancellationReasons
-            // The formatDateIST helper is available via res.locals
         });
     } catch (error) {
         next(error);
     }
 };
 
-// --- Admin Order Actions (OTP Send/Confirm, Cancel - keep existing) ---
+// --- Admin Order Actions (keep existing) ---
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
-        // This function should save the OTP to the DB
         const result = await generateAndSendDirectDeliveryOTPByAdmin(orderId);
         req.flash('success_msg', result.message + ' Ask customer for OTP.');
     } catch (error) {
         req.flash('error_msg', `Admin OTP Send Failed: ${error.message}`);
     }
-    res.redirect('/admin/manage-orders'); // Redirect causes page reload, getManageOrdersPage runs again
+    res.redirect('/admin/manage-orders');
 };
 
 exports.confirmDirectDeliveryByAdmin = async (req, res, next) => {
@@ -326,7 +317,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
         }
 
-        // Restore Stock (keep existing logic)
+        // Restore Stock
         const productStockRestorePromises = order.products.map(item => {
             const quantityToRestore = Number(item.quantity);
             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -349,7 +340,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
         await sessionDB.commitTransaction();
 
-        // Send Email Notification (keep existing logic)
+        // Send Email Notification
         try {
             const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {
@@ -452,9 +443,6 @@ exports.removeUser = async (req, res, next) => {
             }
         }
 
-        // Consider implications for seller's products upon removal (orphan or disable)
-        // e.g., await Product.updateMany({ sellerId: userId }, { reviewStatus: 'rejected', rejectionReason: 'Seller Removed' });
-
         await User.deleteOne({ _id: userId });
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
@@ -467,5 +455,125 @@ exports.removeUser = async (req, res, next) => {
         console.error(`Error removing user ${userId}:`, error);
         req.flash('error_msg', 'Error removing user.');
         res.redirect('/admin/manage-users');
+    }
+};
+
+// --- *** NEW: Banner Management Controllers *** ---
+
+// GET request to render the banner management page
+exports.getManageBannersPage = async (req, res, next) => {
+    try {
+        // Find the single banner configuration document (using the known key)
+        let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
+
+        // If no config exists yet, create a default structure for the view
+        if (!bannerConfig) {
+            bannerConfig = {
+                configKey: 'mainBanners',
+                banners: [] // Start with an empty array
+            };
+        }
+
+        // Ensure the banners array always has 4 potential slots for the form
+        const displayBanners = Array.from({ length: 4 }).map((_, index) => {
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+         });
+
+        res.render('admin/manage-banners', {
+            title: 'Manage Homepage Banners',
+            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+        });
+    } catch (error) {
+        console.error("Error fetching banner configuration:", error);
+        next(error);
+    }
+};
+
+// POST request to update the banner URLs
+exports.updateBanners = async (req, res, next) => {
+    const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
+    const adminUserId = req.session.user._id;
+
+    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
+    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const bannerInputs = [
+        { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
+        { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
+        { imageUrl: imageUrl3, linkUrl: linkUrl3, title: title3 },
+        { imageUrl: imageUrl4, linkUrl: linkUrl4, title: title4 }
+    ];
+
+    const newBanners = [];
+    let validationError = false;
+    for (let i = 0; i < bannerInputs.length; i++) {
+        const input = bannerInputs[i];
+        const trimmedImageUrl = input.imageUrl?.trim();
+        const trimmedLinkUrl = input.linkUrl?.trim();
+        const trimmedTitle = input.title?.trim();
+
+        // Only add banner if image URL is provided
+        if (trimmedImageUrl) {
+            if (!urlPattern.test(trimmedImageUrl)) {
+                req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
+                validationError = true;
+                // You might choose to break or continue collecting errors
+            }
+            // Also validate link URL if provided
+            if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
+                 req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
+                 validationError = true;
+             }
+             if (!validationError) {
+                newBanners.push({
+                     imageUrl: trimmedImageUrl,
+                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
+                     title: trimmedTitle || undefined    // Store undefined if empty
+                 });
+             }
+        }
+    }
+
+    if (validationError) {
+         // Need to reconstruct the state for the view if validation fails
+         const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
+         return res.render('admin/manage-banners', {
+             title: 'Manage Homepage Banners',
+             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+             // Flash message is already set
+         });
+    }
+
+    try {
+        // Find and update (or create if doesn't exist) the banner config document
+        await BannerConfig.findOneAndUpdate(
+            { configKey: 'mainBanners' }, // Find by the key
+            {
+                banners: newBanners, // Set the new array of banners
+                lastUpdatedBy: adminUserId // Track the update
+            },
+            {
+                new: true, // Return the updated document
+                upsert: true, // Create if document doesn't exist
+                runValidators: true // Ensure arrayLimit validator runs
+            }
+        );
+
+        req.flash('success_msg', 'Homepage banners updated successfully.');
+        res.redirect('/admin/manage-banners');
+
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+             // Handle Mongoose validation errors (like array limit)
+            let errors = Object.values(error.errors).map(el => el.message);
+             req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
+             const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
+             return res.render('admin/manage-banners', {
+                  title: 'Manage Homepage Banners',
+                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+             });
+         }
+        console.error("Error updating banners:", error);
+        req.flash('error_msg', 'Failed to update banners due to a server error.');
+        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
     }
 };

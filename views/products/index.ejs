@@ -1,8 +1,50 @@
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
+<%# --- UPDATED: Homepage Banner Slider Section --- %>
+<% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
+    <div class="banner-slider-container mb-4" data-slider-container>
+        <div class="banner-slides" data-slides>
+            <% homepageBanners.forEach((banner, index) => { %>
+                <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
+                    <% if (banner.linkUrl) { %>
+                        <a href="<%= banner.linkUrl %>" target="_blank" rel="noopener noreferrer" class="banner-link">
+                            <img src="<%= banner.imageUrl %>"
+                                 alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                                 class="banner-image"
+                                 loading="lazy">
+                        </a>
+                    <% } else { %>
+                        <img src="<%= banner.imageUrl %>"
+                             alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                             class="banner-image"
+                             loading="lazy">
+                    <% } %>
+                </div>
+            <% }) %>
+        </div>
+
+        <%# Optional: Navigation Arrows (hide if only one banner) %>
+        <% if (homepageBanners.length > 1) { %>
+            <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
+            <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
+        <% } %>
+
+        <%# Optional: Navigation Dots (hide if only one banner) %>
+         <% if (homepageBanners.length > 1) { %>
+            <div class="banner-dots" data-slider-dots>
+                <% homepageBanners.forEach((_, index) => { %>
+                    <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                <% }) %>
+            </div>
+        <% } %>
+    </div>
+<% } %>
+<%# --- End: Homepage Banner Slider Section --- %>
+
 <div class="product-index-container">
-    <h1><%= title %></h1>
+    <br>
+        <h1>New Launches</h1>
 
     <% if (products.length > 0) { %>
         <div class="product-grid">
@@ -12,10 +54,7 @@
                         <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-image">
                         <div class="product-info">
                             <h3 class="product-name"><%= product.name %></h3>
-                            <%# --- CURRENCY UPDATE --- %>
-                            <%# Safely handle potentially missing price before formatting %>
                             <p class="product-price">₹<%= (typeof product.price === 'number' ? product.price : 0).toFixed(2) %></p>
-                            <%# --- END CURRENCY UPDATE --- %>
                             <p class="product-stock">Stock: <%= product.stock %></p>
                             <% if (product.numReviews > 0) { %>
                                  <p class="product-rating">
@@ -29,7 +68,6 @@
                             <% } %>
                         </div>
                     </a>
-                     <%# --- Spinner Class Added --- %>
                      <form action="/user/cart/add" method="POST" class="add-to-cart-form form-submit-spinner">
                          <input type="hidden" name="productId" value="<%= product._id %>">
                          <input type="hidden" name="quantity" value="1">
@@ -41,7 +79,13 @@
             <% }) %>
         </div>
     <% } else { %>
-        <p>No products found matching your criteria.</p>
+         <p class="alert alert-info">
+             <% if (typeof searchTerm !== 'undefined' && searchTerm) { %>
+                 No products found matching your search "<%= searchTerm %>".
+             <% } else { %>
+                 No products are currently available. Check back soon!
+             <% } %>
+         </p>
     <% } %>
 
 </div>

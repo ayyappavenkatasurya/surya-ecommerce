@@ -1,3 +1,4 @@
+// public/js/main.js
 console.log("Main JS loaded.");
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -142,6 +143,39 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 profileAddBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
             }
+        }
+
+        // Name Edit Logic (Profile Page Only)
+        const editNameBtn = document.getElementById('edit-name-btn');
+        const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
+        const nameForm = document.getElementById('name-form');
+        const savedNameDisplaySpan = document.getElementById('saved-name-display'); // The span containing the welcome text
+        const nameInput = document.getElementById('name-input'); // The input field
+        const displayUserNameStrong = document.getElementById('display-user-name'); // The strong tag holding the name
+
+        const showNameForm = () => {
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
+            nameForm.classList.remove('hidden');        // Show the form
+            savedNameDisplaySpan.classList.add('hidden'); // Hide the "Welcome, Name" span
+            editNameBtn.classList.add('hidden');        // Hide the edit icon button
+            nameInput.focus();                          // Focus the input field
+        };
+
+        const hideNameForm = () => {
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
+            nameForm.classList.add('hidden');            // Hide the form
+            savedNameDisplaySpan.classList.remove('hidden'); // Show the "Welcome, Name" span
+            editNameBtn.classList.remove('hidden');      // Show the edit icon button again
+            // Reset input value to the currently displayed name when cancelling
+            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
+        };
+
+        if (editNameBtn) {
+            editNameBtn.addEventListener('click', showNameForm);
+        }
+
+        if (cancelNameBtn) {
+            cancelNameBtn.addEventListener('click', hideNameForm);
         }
     }
 
@@ -345,8 +379,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  if (searchContainer && window.innerWidth < 768) { // Also hide mobile search bar
                     searchContainer.classList.remove('active');
                  }
-                 // If you want to clear search on selection:
-                 // if (searchInput) searchInput.value = '';
              }
          });
      }
@@ -431,7 +463,6 @@ document.addEventListener('DOMContentLoaded', () => {
         proceedCheckoutBtn.addEventListener('click', function(event) {
             // Check if already loading
             if (proceedCheckoutBtn.classList.contains('loading')) {
-                // event.preventDefault(); // Not needed for nav links
                 return;
             }
 
@@ -456,6 +487,105 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // ========================================
     // End Loading State for Non-Form Actions
+    // ========================================
+
+    // ========================================
+    // Homepage Banner Slider Logic            <--- NEW SECTION
+    // ========================================
+    const sliderContainer = document.querySelector('[data-slider-container]');
+    if (sliderContainer) {
+        const slides = sliderContainer.querySelectorAll('[data-slide]');
+        const prevBtn = sliderContainer.querySelector('[data-slider-prev]');
+        const nextBtn = sliderContainer.querySelector('[data-slider-next]');
+        const dotsContainer = sliderContainer.querySelector('[data-slider-dots]');
+        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-slide-to]') : [];
+
+        let currentSlideIndex = 0;
+        let autoSlideInterval = null;
+        const slideIntervalTime = 5000; // Time in ms (e.g., 5 seconds)
+
+        function showSlide(index) {
+            if (!slides || slides.length === 0) return; // Exit if no slides
+
+            // Wrap index around if it goes out of bounds
+            const newIndex = (index + slides.length) % slides.length;
+
+            slides.forEach((slide, i) => {
+                slide.classList.remove('active');
+            });
+            dots.forEach(dot => {
+                dot.classList.remove('active');
+            });
+
+            slides[newIndex].classList.add('active');
+            if (dots[newIndex]) {
+                dots[newIndex].classList.add('active');
+            }
+            currentSlideIndex = newIndex;
+        }
+
+        function nextSlide() {
+            showSlide(currentSlideIndex + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlideIndex - 1);
+        }
+
+        function startAutoSlide() {
+            // Clear any existing interval before starting a new one
+            clearInterval(autoSlideInterval);
+            if (slides.length > 1) { // Only auto-slide if more than one banner
+                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
+            }
+        }
+
+        // Initial setup
+        if (slides.length > 0) {
+             showSlide(0); // Show the first slide initially
+             startAutoSlide(); // Start automatic sliding
+        }
+
+        // Event Listeners for Arrows
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                nextSlide();
+                startAutoSlide(); // Reset interval on manual click
+            });
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                prevSlide();
+                startAutoSlide(); // Reset interval on manual click
+            });
+        }
+
+        // Event Listener for Dots
+        if (dotsContainer) {
+            dotsContainer.addEventListener('click', (e) => {
+                const targetDot = e.target.closest('[data-slide-to]');
+                if (targetDot) {
+                    const index = parseInt(targetDot.dataset.slideTo, 10);
+                    if (!isNaN(index)) {
+                        showSlide(index);
+                        startAutoSlide(); // Reset interval on manual click
+                    }
+                }
+            });
+        }
+
+        // Pause on Hover
+        sliderContainer.addEventListener('mouseenter', () => {
+            clearInterval(autoSlideInterval);
+        });
+
+        sliderContainer.addEventListener('mouseleave', () => {
+            startAutoSlide();
+        });
+
+    } // End if (sliderContainer)
+    // ========================================
+    // End Homepage Banner Slider Logic
     // ========================================
 
 
@@ -650,7 +780,8 @@ function calculateNewCartCount() {
             if (quantityInput) {
                 const value = parseInt(quantityInput.value, 10);
                 if (!isNaN(value) && value > 0) {
-                    count += 1; // Count unique items with quantity > 0
+                    // Update count based on the QUANTITY of each item
+                    count += value; // THIS IS THE KEY CHANGE - SUM QUANTITIES, NOT ITEMS
                 }
             }
         }
