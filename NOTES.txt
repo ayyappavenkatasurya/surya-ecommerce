@@ -4952,7 +4952,7 @@ select.form-control-sm {
 .banner-slider-container {
   position: relative;
   width: 100%;
-  aspect-ratio: 24 / 6; /* Default widescreen */
+  aspect-ratio: 25 / 6; /* Default widescreen */
   overflow: hidden;
   border-radius: var(--border-radius);
   background-color: #e0e0e0;
@@ -5056,7 +5056,7 @@ select.form-control-sm {
 /* Mobile Specific Styles (Less than 768px) */
 @media (max-width: 767px) {
   .app-footer { display: none; } /* Hide footer on small screens */
-  .banner-slider-container { aspect-ratio: 2.5 / 1; } /* Taller banner on mobile */
+  .banner-slider-container { aspect-ratio: 2.4 / 1; } /* Taller banner on mobile */
   .banner-nav { width: 35px; height: 35px; font-size: 0.9rem; }
   .banner-dots { bottom: 10px; }
   .banner-dot { width: 8px; height: 8px; }
