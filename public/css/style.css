@@ -1507,9 +1507,9 @@ select.form-control-sm {
       border-radius: var(--border-radius);
       height: 42px;
   }
-  #search-input-dynamic { color: var(--text-color); }
-  #search-input-dynamic::placeholder { color: var(--secondary-color); }
-  .search-submit-btn-dynamic { color: var(--secondary-color); }
+  #search-input-dynamic { color: rgb(36, 36, 36); background-color: white; }
+  #search-input-dynamic::placeholder { color: rgb(139, 139, 139); }
+  .search-submit-btn-dynamic { color: rgb(130, 130, 130); background-color: white; }
 
   .search-container-dynamic.active .search-form-dynamic {
       opacity: 1;
