@@ -2414,10 +2414,10 @@ const mongoose = require('mongoose');
 
 // --- NEW: Seller Cancellation Reasons ---
 const sellerCancellationReasons = [
-    "❗ Item Out of Stock (Seller)",
-    "🚚 Unable to Fulfill/Ship (Seller)",
-    "👤 Customer Requested Cancellation (via Seller)",
-    "❓ Other Reason (Seller)",
+    "❗ Item Out of Stock",
+    "🚚 Unable to Fulfill/Ship",
+    "👤 Customer Requested Cancellation",
+    "❓ Other Reason",
 ];
 
 // Seller Dashboard
