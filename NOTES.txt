@@ -80,7 +80,7 @@ controllers/adminController.js:
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
+const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
@@ -109,7 +109,8 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
@@ -127,6 +128,7 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            description: description ? description.trim() : '', // *** ADDED description ***
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
@@ -215,7 +217,8 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY - keep existing) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, reviewStatus, rejectionReason } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications, reviewStatus, rejectionReason } = req.body;
 
     // Validation (keep existing)
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
@@ -245,6 +248,7 @@ exports.updateProduct = async (req, res, next) => {
 
         product.name = name.trim();
         product.category = category.trim();
+        product.description = description ? description.trim() : ''; // *** ADDED description update ***
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
@@ -536,30 +540,19 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-// --- *** NEW: Banner Management Controllers *** ---
-
-// GET request to render the banner management page
+// --- *** Banner Management Controllers (Keep existing) *** ---
 exports.getManageBannersPage = async (req, res, next) => {
     try {
-        // Find the single banner configuration document (using the known key)
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
-
-        // If no config exists yet, create a default structure for the view
         if (!bannerConfig) {
-            bannerConfig = {
-                configKey: 'mainBanners',
-                banners: [] // Start with an empty array
-            };
+            bannerConfig = { configKey: 'mainBanners', banners: [] };
         }
-
-        // Ensure the banners array always has 4 potential slots for the form
         const displayBanners = Array.from({ length: 4 }).map((_, index) => {
-             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' };
          });
-
         res.render('admin/manage-banners', {
             title: 'Manage Homepage Banners',
-            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+            bannerConfig: { ...bannerConfig, banners: displayBanners }
         });
     } catch (error) {
         console.error("Error fetching banner configuration:", error);
@@ -567,13 +560,10 @@ exports.getManageBannersPage = async (req, res, next) => {
     }
 };
 
-// POST request to update the banner URLs
 exports.updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const adminUserId = req.session.user._id;
-
-    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
-    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const urlPattern = /^https?:\/\/.+/;
     const bannerInputs = [
         { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
         { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
@@ -589,14 +579,11 @@ exports.updateBanners = async (req, res, next) => {
         const trimmedLinkUrl = input.linkUrl?.trim();
         const trimmedTitle = input.title?.trim();
 
-        // Only add banner if image URL is provided
         if (trimmedImageUrl) {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
-                // You might choose to break or continue collecting errors
             }
-            // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
                  req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
                  validationError = true;
@@ -604,55 +591,42 @@ exports.updateBanners = async (req, res, next) => {
              if (!validationError) {
                 newBanners.push({
                      imageUrl: trimmedImageUrl,
-                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
-                     title: trimmedTitle || undefined    // Store undefined if empty
+                     linkUrl: trimmedLinkUrl || undefined,
+                     title: trimmedTitle || undefined
                  });
              }
         }
     }
 
     if (validationError) {
-         // Need to reconstruct the state for the view if validation fails
          const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
          return res.render('admin/manage-banners', {
              title: 'Manage Homepage Banners',
-             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
-             // Flash message is already set
+             bannerConfig: { banners: displayBannersForError }
          });
     }
 
     try {
-        // Find and update (or create if doesn't exist) the banner config document
         await BannerConfig.findOneAndUpdate(
-            { configKey: 'mainBanners' }, // Find by the key
-            {
-                banners: newBanners, // Set the new array of banners
-                lastUpdatedBy: adminUserId // Track the update
-            },
-            {
-                new: true, // Return the updated document
-                upsert: true, // Create if document doesn't exist
-                runValidators: true // Ensure arrayLimit validator runs
-            }
+            { configKey: 'mainBanners' },
+            { banners: newBanners, lastUpdatedBy: adminUserId },
+            { new: true, upsert: true, runValidators: true }
         );
-
         req.flash('success_msg', 'Homepage banners updated successfully.');
         res.redirect('/admin/manage-banners');
-
     } catch (error) {
         if (error.name === 'ValidationError') {
-             // Handle Mongoose validation errors (like array limit)
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
              const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
              return res.render('admin/manage-banners', {
                   title: 'Manage Homepage Banners',
-                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+                 bannerConfig: { banners: displayBannersForError }
              });
          }
         console.error("Error updating banners:", error);
         req.flash('error_msg', 'Failed to update banners due to a server error.');
-        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
+        res.redirect('/admin/manage-banners');
     }
 };
 
@@ -660,11 +634,16 @@ controllers/authController.js:
 // controllers/authController.js
 const User = require('../models/User');
 const Product = require('../models/Product');
-const BannerConfig = require('../models/BannerConfig'); // *** <<< ADD THIS LINE ***
+const BannerConfig = require('../models/BannerConfig'); // *** Keep this line ***
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 const { sendEmail } = require('../config/mailer');
+
+// --- Helper function for escaping Regex characters ---
+function escapeRegex(string) {
+  return string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+}
 
 // --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. (No changes needed) ---
 exports.getLoginPage = (req, res) => {
@@ -741,19 +720,17 @@ exports.registerUser = async (req, res, next) => {
     if (password && password.length < 6) {
         errors.push('Password must be at least 6 characters.');
     }
-    // Basic email format check (consider using a library for more robust validation)
     if (email && !/^\S+@\S+\.\S+$/.test(email)) {
         errors.push('Please enter a valid email address.');
     }
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        // Render the form again with entered values (except passwords)
         return res.render('auth/register', {
             title: 'Register',
             name: name,
-            email: email, // Pass back email and name
-            error_msg: req.flash('error_msg') // Ensure message is passed to view context
+            email: email,
+            error_msg: req.flash('error_msg')
         });
     }
 
@@ -762,43 +739,35 @@ exports.registerUser = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         let user = await User.findOne({ email: lowerCaseEmail });
 
-        // Handle existing users (verified or not)
         if (user && user.isVerified) {
             req.flash('error_msg', 'Email is already registered and verified. Please login.');
             return res.redirect('/auth/login');
         }
 
-        // Generate OTP and Expiration
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10); // 10 minutes expiry
+        const otpExpires = setOTPExpiration(10);
 
-        // Update unverified existing user or create new one
         if (user && !user.isVerified) {
-            // Update existing unverified user record
             user.name = name;
-            if (password) { user.password = password; } // Hash happens on save via pre-hook
+            if (password) { user.password = password; }
             user.otp = otp;
             user.otpExpires = otpExpires;
-            user.isVerified = false; // Ensure it's false
-            // Skip validation if just updating OTP fields on existing unverified doc
+            user.isVerified = false;
             await user.save({ validateBeforeSave: false });
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
-            // Create a new user instance
             user = new User({
                 name,
                 email: lowerCaseEmail,
-                password, // Hash happens on save via pre-hook
+                password,
                 otp,
                 otpExpires,
                 isVerified: false,
-                // Role defaults to 'user' as defined in schema
             });
-            await user.save(); // This will trigger pre-save hooks (password hashing)
+            await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
-        // --- Send Verification Email ---
         const subject = 'Verify Your Email Address';
         const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
         const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
@@ -807,13 +776,10 @@ exports.registerUser = async (req, res, next) => {
 
         if (emailSent) {
             req.flash('success_msg', `An OTP has been sent to ${user.email}. Please check your inbox and verify.`);
-            // Redirect to OTP verification page with email pre-filled
             res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
         } else {
-             // If email fails, consider cleanup for newly created, unverified users to prevent orphans
-             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { // Basic check for very new user
+             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) {
                 try {
-                    // Only delete if not verified AND potentially newly created
                     await User.deleteOne({ _id: user._id, isVerified: false });
                     console.log(`Cleaned up unverified user ${user.email} due to failed email send.`);
                 } catch (deleteError) {
@@ -821,24 +787,19 @@ exports.registerUser = async (req, res, next) => {
                 }
              }
             req.flash('error_msg', 'Could not send OTP email. Please try registering again or contact support.');
-            // Redirect back to registration page
             res.redirect('/auth/register');
         }
 
     } catch (error) {
-        // Handle potential database errors
-        if (error.code === 11000) { // Duplicate key error (email)
+        if (error.code === 11000) {
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-            // Render form again with entered values
             return res.render('auth/register', { title: 'Register', name: name, email: email });
         }
-        if (error.name === 'ValidationError') { // Mongoose validation errors
+        if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
-            // Render form again with entered values
             return res.render('auth/register', { title: 'Register', name: name, email: email });
        }
-        // For other errors, pass to the central error handler
         next(error);
     }
 };
@@ -846,120 +807,98 @@ exports.registerUser = async (req, res, next) => {
 exports.verifyOtp = async (req, res, next) => {
     const { email, otp } = req.body;
 
-     // Redirect logged-in users
      if (req.session.user) {
         return res.redirect('/');
     }
 
     if (!email || !otp) {
         req.flash('error_msg', 'Email and OTP are required.');
-         // Redirect back to verify page, keeping email in query param if possible
          return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email || '')}`);
     }
 
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user matching email, OTP, and non-expired OTP
         const user = await User.findOne({
             email: lowerCaseEmail,
-            otp: otp.trim(), // Trim OTP input
-            otpExpires: { $gt: Date.now() }, // Check expiry
-        }).select('+password'); // Include password for potential immediate login
+            otp: otp.trim(),
+            otpExpires: { $gt: Date.now() },
+        }).select('+password');
 
-        // --- Handle User Not Found or Invalid OTP ---
         if (!user) {
             const existingUser = await User.findOne({ email: lowerCaseEmail });
-            let errorMessage = 'Invalid or expired OTP. Please try again or resend.'; // Default message
+            let errorMessage = 'Invalid or expired OTP. Please try again or resend.';
 
             if (existingUser && existingUser.isVerified) {
                  errorMessage = 'This account is already verified. Please login.';
                  req.flash('error_msg', errorMessage);
                  return res.redirect('/auth/login');
             } else if (!existingUser) {
-                 // If user doesn't exist at all (perhaps deleted during retry?)
                  errorMessage = 'Verification failed. Account not found. Please register again.';
                  req.flash('error_msg', errorMessage);
                  return res.redirect('/auth/register');
             }
-            // If user exists but OTP is wrong/expired
              req.flash('error_msg', errorMessage);
-            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`); // Keep email in query
+            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
         }
 
-        // --- Handle Successful OTP Verification ---
-
-         // Check if this OTP verification is part of a password reset flow
          const isPasswordReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
 
-         // Update user status
          user.isVerified = true;
-         user.otp = undefined; // Clear OTP fields
+         user.otp = undefined;
          user.otpExpires = undefined;
 
-         // --- Password Reset Flow ---
          if (isPasswordReset) {
-             // Save user without validating (password not being changed here)
              await user.save({ validateBeforeSave: false });
-
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
-             // Redirect to the reset password form using the token
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
-         // --- Standard Registration Flow ---
          else {
-            // Save updated user (password validation not needed here either)
             await user.save({ validateBeforeSave: false });
 
-            // --- Log the user in automatically ---
-             req.session.regenerate(err => { // Regenerate session to prevent fixation
+             req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
                      req.flash('error_msg', 'Verification successful, but auto-login failed. Please login manually.');
-                     return res.redirect('/auth/login'); // Redirect to login on session error
+                     return res.redirect('/auth/login');
                  }
 
-                // Populate session with user data (excluding sensitive fields)
                 req.session.user = {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
                     role: user.role,
-                    address: user.address, // Include address if available
-                    cart: user.cart || []   // Include cart if available
+                    address: user.address,
+                    cart: user.cart || []
                  };
 
-                // Save the session before redirecting
                 req.session.save(err => {
                    if (err) {
                         console.error("Session save error after OTP verify login:", err);
                          req.flash('error_msg', 'Verification successful, but auto-login failed. Please login manually.');
                         return res.redirect('/auth/login');
                     }
-                    // Redirect to intended page or home
                     req.flash('success_msg', 'Email verified successfully! You are now logged in.');
-                    const returnTo = req.session.returnTo || '/'; // Use stored return path or default to home
-                    delete req.session.returnTo; // Clear stored path
+                    const returnTo = req.session.returnTo || '/';
+                    delete req.session.returnTo;
                     res.redirect(returnTo);
                  });
              });
          }
 
     } catch (error) {
-        next(error); // Pass errors to central handler
+        next(error);
     }
 };
 
 exports.resendOtp = async (req, res, next) => {
     const { email } = req.body;
 
-    // Redirect logged-in users
      if (req.session.user) {
         return res.redirect('/');
     }
 
     if (!email) {
         req.flash('error_msg', 'Email is required to resend OTP.');
-        // Try to redirect back to verify page with email if possible from query
          return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(req.query.email || '')}`);
     }
 
@@ -967,99 +906,81 @@ exports.resendOtp = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
 
-        // User not found case - send generic message to avoid user enumeration
         if (!user) {
-            // Log the attempt for monitoring if needed
             console.log(`Resend OTP attempt for non-existent email: ${lowerCaseEmail}`);
-            req.flash('info_msg', 'If your email is registered, a new OTP will be sent. Please check your inbox.'); // Use info message
-            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`); // Redirect back to OTP page
+            req.flash('info_msg', 'If your email is registered, a new OTP will be sent. Please check your inbox.');
+            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
         }
 
-        // Determine context: Password Reset or Initial Verification
         const isForReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
 
-        // Account already verified (and not for password reset)
         if(user.isVerified && !isForReset) {
              req.flash('error_msg', 'This account is already verified. Please login.');
             return res.redirect('/auth/login');
         }
 
-        // Generate new OTP and expiry
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10); // 10 minutes
+        const otpExpires = setOTPExpiration(10);
 
         user.otp = otp;
         user.otpExpires = otpExpires;
-        // If it's a reset request, maybe don't save immediately if email fails?
-        // But for verification, saving first is generally fine.
-        await user.save({ validateBeforeSave: false }); // Save new OTP
+        await user.save({ validateBeforeSave: false });
 
-        // Prepare email content based on context
         let subject, text, html;
         if (isForReset) {
             subject = 'Your New Password Reset OTP';
              text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
             html = `<p>Your new password reset OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
-        } else { // Initial verification
+        } else {
              subject = 'Your New Verification OTP';
              text = `Your new verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
             html = `<p>Your new verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
         }
 
-        // Send the email
         const emailSent = await sendEmail(user.email, subject, text, html);
 
-        // Redirect back to the verify OTP page, potentially adding reason query param
         const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
 
         if (emailSent) {
             req.flash('success_msg', `A new OTP has been sent to ${user.email}. Please check your inbox.`);
         } else {
-            // Consider if OTP should be rolled back if email fails, complex. Let's just inform user.
             console.error(`Failed to resend OTP email to ${user.email}`);
             req.flash('error_msg', 'Could not resend OTP email. Please try again later or contact support.');
         }
         res.redirect(redirectUrl);
 
     } catch (error) {
-        next(error); // Pass errors to central handler
+        next(error);
     }
 };
 
 exports.loginUser = async (req, res, next) => {
      if (req.session.user) {
-        return res.redirect('/'); // Redirect if already logged in
+        return res.redirect('/');
     }
     const { email, password } = req.body;
 
     if (!email || !password) {
         req.flash('error_msg', 'Please provide both email and password.');
-        // Render login page again, passing back email
         return res.render('auth/login', { title: 'Login', email: email });
     }
 
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user by email, include password, and populate cart for session
         const user = await User.findOne({ email: lowerCaseEmail })
-                             .select('+password') // Explicitly select password
-                             .populate('cart.productId', 'name price imageUrl'); // Populate basic cart details needed for session/badge
+                             .select('+password')
+                             .populate('cart.productId', 'name price imageUrl');
 
-        // User not found
         if (!user) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
-        // User found but not verified
          if (!user.isVerified) {
-            // Guide user to verify
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
-            // Redirect to verify page with email pre-filled
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
 
-        // Check password match
         const isMatch = await user.matchPassword(password);
 
         if (!isMatch) {
@@ -1067,30 +988,25 @@ exports.loginUser = async (req, res, next) => {
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
-        // --- Password is Correct - Login User ---
-         req.session.regenerate(err => { // Prevent session fixation
+         req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
 
-            // Populate session (exclude password!)
             req.session.user = {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 role: user.role,
-                address: user.address ? user.address.toObject() : undefined, // Store plain address object
-                // Store only essential cart info (productId, quantity) in session
+                address: user.address ? user.address.toObject() : undefined,
                 cart: user.cart ? user.cart.map(item => ({
-                    productId: item.productId?._id, // Store only ID
+                    productId: item.productId?._id,
                     quantity: item.quantity
                 })) : []
              };
 
-
-            // Save session before redirect
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -1098,42 +1014,31 @@ exports.loginUser = async (req, res, next) => {
                       return res.render('auth/login', { title: 'Login', email: email });
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
-                 // Redirect to originally requested URL or home
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo; // Clean up returnTo
+                 delete req.session.returnTo;
                  res.redirect(returnTo);
             });
         });
 
     } catch (error) {
-        next(error); // Pass to error handler
+        next(error);
     }
 };
 
 
-// --- UPDATED logoutUser ---
 exports.logoutUser = (req, res, next) => {
-    // --- Step 1: Set the flash message BEFORE destroying the session ---
     req.flash('success_msg', 'You have been logged out successfully.');
-
-    // --- Step 2: Destroy the session ---
     req.session.destroy(err => {
         if (err) {
-            // Log the error, but don't try to flash another message.
             console.error('Session destruction error:', err);
              return res.redirect('/auth/login');
         }
-
-        // --- Step 3: Clear the session cookie from the browser ---
-        res.clearCookie(req.app.get('session cookie name') || 'connect.sid'); // Safely get name or use default
-
-        // --- Step 4: Redirect ---
+        res.clearCookie(req.app.get('session cookie name') || 'connect.sid');
         res.redirect('/auth/login');
     });
 };
 
 
-// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version, except getHomePage) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -1143,46 +1048,37 @@ exports.forgotPassword = async (req, res, next) => {
 
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user by email
         const user = await User.findOne({ email: lowerCaseEmail });
 
-        // Generic message to prevent user enumeration attacks
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage); // Use info or success flash
+        req.flash('info_msg', genericMessage);
 
-        // Only proceed if user exists AND is verified
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
-            return res.redirect('/auth/forgot-password'); // Redirect back
+            return res.redirect('/auth/forgot-password');
         }
 
-        // Generate OTP and Reset Token with Expirations
          const otp = generateOTP();
-         const resetToken = crypto.randomBytes(20).toString('hex'); // For the actual reset link/form later
-        const otpExpires = setOTPExpiration(10); // OTP expires in 10 minutes
-        const resetExpires = setOTPExpiration(60); // Reset capability expires in 60 minutes
+         const resetToken = crypto.randomBytes(20).toString('hex');
+        const otpExpires = setOTPExpiration(10);
+        const resetExpires = setOTPExpiration(60);
 
-        // Set fields on user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false }); // Save OTP and token info
+        await user.save({ validateBeforeSave: false });
 
-        // Send OTP email
         const subject = 'Password Reset Request - Verify OTP';
         const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
         const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
 
          const emailSent = await sendEmail(user.email, subject, text, html);
 
-        // Handle Email Sending Result
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
-             // Redirect to OTP verification page, marking it as reset context
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
-            // If email failed, consider rolling back the OTP/token? Or just log and rely on expiry?
             console.error(`Failed to send password reset OTP email to ${user.email}`);
             res.redirect('/auth/forgot-password');
         }
@@ -1198,7 +1094,6 @@ exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
 
-    // --- Input Validation ---
     let errors = [];
     if (!password || !confirmPassword) {
         errors.push('Please enter and confirm your new password.');
@@ -1214,9 +1109,7 @@ exports.resetPassword = async (req, res, next) => {
          return res.redirect(`/auth/reset-password/${token}`);
     }
 
-    // --- Password Reset Logic ---
     try {
-        // Find user by token and ensure it's still valid
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() },
@@ -1227,56 +1120,50 @@ exports.resetPassword = async (req, res, next) => {
             return res.redirect('/auth/forgot-password');
         }
 
-        // Update password and clear reset/OTP fields
-        user.password = password; // Pre-save hook will hash it
+        user.password = password;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
-        user.otp = undefined; // Also clear OTP fields used for verification step
+        user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true; // Ensure user is marked verified
+        user.isVerified = true;
 
-        await user.save(); // This triggers password hashing
+        await user.save();
 
-        // --- Log the user in automatically after successful reset ---
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
-             // Populate session
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
                   cart: user.cart ? user.cart.map(item => ({ productId: item.productId, quantity: item.quantity })) : []
               };
 
-            // Save session
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
                      req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                     return res.redirect('/auth/login');
                  }
-                 // Success: Password reset and logged in
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
                 res.redirect('/');
              });
          });
 
     } catch (error) {
-        // Handle validation errors during save
         if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        next(error); // Pass other errors to handler
+        next(error);
     }
 };
 
 
-// --- Modified getHomePage ---
+// --- UPDATED getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
@@ -1284,23 +1171,36 @@ exports.getHomePage = async (req, res, next) => {
         reviewStatus: 'approved',
         stock: { $gt: 0 }
     };
+    let sort = { createdAt: -1 }; // Default sort: newest first
 
+    // --- Use Regex for sequential matching if searchTerm exists ---
     if (searchTerm) {
-         query.$text = { $search: searchTerm };
-    }
+      const escapedSearchTerm = escapeRegex(searchTerm); // Escape special characters
+      const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
 
-     const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
-     const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
+      // *** INCLUDE description in the $or query ***
+      query.$or = [
+        { name: regex },
+        { category: regex },
+        { description: regex } // Search description field
+        // Consider adding { specifications: regex } if needed
+      ];
+      // Optional: Change sort for search results if needed, e.g., alphabetical
+      // sort = { name: 1 };
+      console.log(`Homepage Regex Search Query: ${JSON.stringify(query)}`);
+    }
+    // --- End Regex modification ---
 
     // Fetch Products and Banners concurrently
     const [products, bannerConfig] = await Promise.all([
-        Product.find(query, projection).sort(sort).lean(),
-        BannerConfig.findOne({ configKey: 'mainBanners' }).lean() // Fetch banners using the imported model
+        Product.find(query) // Removed projection as text score is not used
+               .sort(sort)  // Apply sort
+               .lean(),
+        BannerConfig.findOne({ configKey: 'mainBanners' }).lean()
     ]);
 
     // Extract banner URLs (provide empty array if none found)
     const banners = bannerConfig?.banners || [];
-    // Filter out any banners that might somehow be saved without an imageUrl
     const validBanners = banners.filter(banner => banner.imageUrl);
 
 
@@ -1308,8 +1208,7 @@ exports.getHomePage = async (req, res, next) => {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
       products: products,
       searchTerm: searchTerm,
-      homepageBanners: validBanners // Pass banners to the view
-      // currentUser is available via res.locals
+      homepageBanners: validBanners
     });
   } catch (error) {
     console.error("Error fetching products/banners for home page:", error);
@@ -1805,44 +1704,44 @@ function escapeRegex(string) {
 // --- Get Products (Handles both listing and search results with sequential matching) ---
 exports.getProducts = async (req, res, next) => {
   try {
-    const searchTerm = req.query.search || ''; // Get search term from query param 'search'
+    const searchTerm = req.query.search || '';
     let query = {
-        reviewStatus: 'approved', // Always filter by approved
-        stock: { $gt: 0 }         // Always filter by in-stock
+        reviewStatus: 'approved',
+        stock: { $gt: 0 }
     };
-    let sort = { createdAt: -1 }; // Default sort
-    const projection = {}; // No text score projection needed for regex
+    let sort = { createdAt: -1 };
+    const projection = {};
 
     // --- NEW: Use Regex for sequential matching if searchTerm exists ---
     if (searchTerm) {
-      const escapedSearchTerm = escapeRegex(searchTerm); // Escape special characters
-      const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+      const escapedSearchTerm = escapeRegex(searchTerm);
+      const regex = new RegExp(escapedSearchTerm, 'i');
 
-      query.$or = [ // Match name OR category sequentially
+      // *** INCLUDE description in the $or query ***
+      query.$or = [
         { name: regex },
-        { category: regex }
+        { category: regex },
+        { description: regex } // Search description field
         // Add { specifications: regex } here if you want to search specs sequentially too
       ];
-      // Optional: Change sort for search results, e.g., alphabetical
-      // sort = { name: 1 };
-      console.log(`Regex Search Query: ${JSON.stringify(query)}`); // Log the query
+      // sort = { name: 1 }; // Optional: change sort for search
+      console.log(`Regex Search Query (getProducts): ${JSON.stringify(query)}`);
     }
     // --- End Regex modification ---
 
-    const products = await Product.find(query, projection) // Projection is now empty
+    const products = await Product.find(query, projection)
                                     .sort(sort)
-                                    .lean(); // Use lean for read-only performance
+                                    .lean();
 
     // Render the same index page, passing search term for display
     res.render('products/index', {
       title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home', // Dynamic title
       products: products,
-      searchTerm: searchTerm // Pass term back to view
-      // currentUser is available via res.locals
+      searchTerm: searchTerm
     });
   } catch (error) {
     console.error("Error fetching products:", error);
-    next(error); // Pass error to central handler
+    next(error);
   }
 };
 
@@ -1851,16 +1750,15 @@ exports.getProducts = async (req, res, next) => {
 exports.getProductDetails = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
-                                    .populate('sellerId', 'name email') // Populate seller
-                                    .lean(); // Use lean()
+                                    .populate('sellerId', 'name email')
+                                    .lean();
 
     if (!product) {
        const error = new Error('Product not found');
        error.status = 404;
-       return next(error); // Use central error handler
+       return next(error);
     }
 
-    // Check if product is viewable
     const isApproved = product.reviewStatus === 'approved';
     const user = req.session.user;
     const isAdmin = user?.role === 'admin';
@@ -1868,20 +1766,17 @@ exports.getProductDetails = async (req, res, next) => {
 
 
     if (!isApproved && !isAdmin && !isOwner) {
-        // If product isn't approved, only admin or owner can see it
          const error = new Error('Product not available');
-         error.status = 404; // Or 403 Forbidden, but 404 is less revealing
+         error.status = 404;
          return next(error);
     }
 
-    // User rating logic
     let userRating = null;
     if (user) {
        const ratingData = product.ratings?.find(r => r.userId?.toString() === user._id.toString());
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // Rating stats calculation
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
@@ -1905,7 +1800,6 @@ exports.getProductDetails = async (req, res, next) => {
       userCanRate: user ? true : false,
       ratingCounts: ratingCounts,
       totalRatings: displayTotalRatings
-      // Add other necessary variables like fullUrl etc. if needed by header partial
     });
   } catch (error) {
        if (error.name === 'CastError') {
@@ -1913,7 +1807,7 @@ exports.getProductDetails = async (req, res, next) => {
            notFoundError.status = 404;
            return next(notFoundError);
        }
-    next(error); // Pass other errors to central handler
+    next(error);
   }
 };
 
@@ -1926,11 +1820,11 @@ exports.getProductDetails = async (req, res, next) => {
 
      if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) {
          req.flash('error_msg', 'Please provide a valid rating between 1 and 5.');
-        return res.redirect('back'); // Redirect to previous page
+        return res.redirect('back');
      }
 
     try {
-        const product = await Product.findById(productId); // Not lean()
+        const product = await Product.findById(productId);
 
          if (!product) {
              req.flash('error_msg', 'Product not found.');
@@ -1945,10 +1839,10 @@ exports.getProductDetails = async (req, res, next) => {
             product.ratings.push({ userId, rating: Number(rating) });
          }
 
-        await product.save(); // Triggers pre-save hook for averageRating/numReviews
+        await product.save();
 
          req.flash('success_msg', 'Thank you for your rating!');
-         res.redirect(`/products/${productId}`); // Redirect back to product page
+         res.redirect(`/products/${productId}`);
 
      } catch (error) {
         if (error.name === 'CastError') {
@@ -1956,609 +1850,56 @@ exports.getProductDetails = async (req, res, next) => {
             return res.status(400).redirect('/');
         }
         console.error("Error rating product:", error);
-        next(error); // Central error handler
+        next(error);
      }
  };
 
  // --- Get Product Suggestions (Updated for sequential matching) ---
  exports.getProductSuggestions = async (req, res, next) => {
-    const searchTerm = req.query.q; // Get query from 'q' parameter
-    const limit = 8; // Max number of suggestions
+    const searchTerm = req.query.q;
+    const limit = 8;
 
     if (!searchTerm || searchTerm.trim().length < 2) {
-        return res.json([]); // Return empty if no/short query
+        return res.json([]);
     }
 
     try {
         // --- NEW: Use Regex for sequential matching ---
-        const escapedSearchTerm = escapeRegex(searchTerm); // Escape special chars
-        const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+        const escapedSearchTerm = escapeRegex(searchTerm);
+        const regex = new RegExp(escapedSearchTerm, 'i');
 
+        // *** INCLUDE description in the $or query ***
         const query = {
-            $or: [ // Match name OR category sequentially
+            $or: [
                 { name: regex },
-                { category: regex }
+                { category: regex },
+                { description: regex } // Search description field
             ],
-            reviewStatus: 'approved', // Only suggest approved products
-            stock: { $gt: 0 }         // Only suggest products in stock
+            reviewStatus: 'approved',
+            stock: { $gt: 0 }
         };
         // --- End Regex modification ---
 
         const suggestions = await Product.find(query)
             .select('_id name imageUrl') // Select only needed fields
             .limit(limit)
-            .sort({ name: 1 }) // Sort suggestions alphabetically
-            .lean(); // Use lean for performance
+            .sort({ name: 1 })
+            .lean();
 
-        res.json(suggestions); // Send results as JSON
+        res.json(suggestions);
 
     } catch (error) {
         console.error("Error fetching product suggestions:", error);
-        // Avoid sending full error details to client
         res.status(500).json({ error: 'Failed to fetch suggestions' });
     }
  };
-
-controllers/userController.js:
-// controllers/userController.js
-const User = require('../models/User');
-const Product = require('../models/Product');
-const mongoose = require('mongoose'); // Import mongoose for ID validation
-
-exports.getUserProfilePage = async (req, res, next) => {
-    try {
-        const userId = req.session.user._id;
-        // Select only necessary fields for profile display
-        const user = await User.findById(userId)
-                            .select('name email role address createdAt') // Added createdAt for info if needed
-                            .lean(); // Use lean for read-only
-
-        if (!user) {
-            // This case should ideally be handled by isAuthenticated middleware
-            console.warn(`User not found in DB despite active session: ${userId}`);
-            req.flash('error_msg', 'User session invalid. Please log in again.');
-            return req.session.destroy(err => {
-                if (err) return next(err);
-                res.redirect('/auth/login');
-            });
-        }
-
-        res.render('user/profile', {
-            title: 'My Profile',
-            user: user // Pass user data to the view
-            // currentUser is available via res.locals
-        });
-
-    } catch (error) {
-        next(error); // Pass error to handler
-    }
-};
-
-// --- NEW: Function to update user's name ---
-exports.updateUserName = async (req, res, next) => {
-    const { name } = req.body;
-    const userId = req.session.user._id;
-
-    // --- Input Validation ---
-    if (!name || typeof name !== 'string' || name.trim().length < 2) {
-        req.flash('error_msg', 'Please enter a valid name (at least 2 characters).');
-        return res.redirect('/user/profile');
-    }
-
-    const trimmedName = name.trim();
-
-    try {
-        // Find user (not lean, need to save)
-        const user = await User.findById(userId);
-        if (!user) {
-            req.flash('error_msg', 'User not found. Please log in again.');
-            return res.redirect('/auth/login');
-        }
-
-        // Update the name
-        user.name = trimmedName;
-        await user.save();
-
-        // --- Update Session ---
-        req.session.user.name = user.name; // Update name in session
-
-        // Note: User initials are recalculated in the middleware on the *next* request
-        // based on the updated session name. No need to recalculate here unless
-        // you need the *new* initials immediately before the redirect (unlikely).
-
-        await req.session.save(); // Wait for session save to complete
-
-        req.flash('success_msg', 'Name updated successfully.');
-        res.redirect('/user/profile'); // Redirect back to profile
-
-    } catch (error) {
-        // Handle Mongoose validation errors specifically
-        if (error.name === 'ValidationError') {
-            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
-            return res.redirect('/user/profile');
-        }
-        // Pass other errors to the central handler
-        console.error("Error updating user name:", error);
-        next(error);
-    }
-};
-
-
-exports.saveAddress = async (req, res, next) => {
-    const { name, phone, pincode, cityVillage, landmarkNearby, source } = req.body;
-    const userId = req.session.user._id;
-
-    // Determine redirect path based on where the form was submitted from
-    const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
-
-    // --- Input Validation ---
-    let errors = [];
-    if (!name || !phone || !pincode || !cityVillage) {
-        errors.push('Please provide Name, Phone, Pincode, and City/Village.');
-    }
-    // Validate phone format (10-15 digits)
-    if (phone && !/^\d{10,15}$/.test(phone.trim())) {
-        errors.push('Please enter a valid phone number (10-15 digits, numbers only).');
-    }
-    // Validate pincode format (6 digits)
-     if (pincode && !/^\d{6}$/.test(pincode.trim())) {
-        errors.push('Please enter a valid 6-digit pincode.');
-    }
-    if (errors.length > 0) {
-         req.flash('error_msg', errors.join(' '));
-        return res.redirect(redirectPath); // Redirect back to the form page
-    }
-
-    // --- Save Address Logic ---
-    try {
-        // Find user by ID (not lean, need to save)
-        const user = await User.findById(userId);
-        if (!user) {
-            // Should be caught by auth middleware, but good to check
-            req.flash('error_msg', 'User not found.');
-            return res.redirect('/auth/login');
-        }
-        // Update or create address sub-document
-        user.address = {
-            name: name.trim(),
-            phone: phone.trim(),
-            pincode: pincode.trim(),
-            cityVillage: cityVillage.trim(),
-            landmarkNearby: landmarkNearby ? landmarkNearby.trim() : undefined // Store as undefined if empty
-        };
-        // Save the user document (this will trigger Mongoose validation if any on AddressSchema)
-        await user.save();
-
-        // --- Update Session ---
-        // Ensure session reflects the saved address
-        req.session.user.address = user.address.toObject(); // Convert Mongoose sub-doc to plain object for session
-        await req.session.save(); // Wait for session save to complete
-
-        req.flash('success_msg', 'Address saved successfully.');
-        res.redirect(redirectPath); // Redirect to the appropriate page
-
-    } catch (error) {
-        // Handle Mongoose validation errors specifically
-        if (error.name === 'ValidationError') {
-            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
-            return res.redirect(redirectPath);
-        }
-        // Pass other errors to the central handler
-        next(error);
-    }
-};
-
-exports.getCart = async (req, res, next) => {
-    try {
-        const userId = req.session.user._id;
-        const user = await User.findById(userId)
-                                    // Populate products in cart - select fields needed for display & calculation
-                                    .populate('cart.productId', 'name price imageUrl stock _id reviewStatus')
-                                    .lean(); // Use lean for reading
-
-        if (!user) {
-           // Should be caught by auth middleware
-           console.warn(`User not found in getCart despite session: ${userId}`);
-           req.flash('error_msg', 'User not found.');
-           return req.session.destroy(err => {
-                if(err) return next(err);
-                res.redirect('/auth/login');
-           });
-         }
-
-        let cartTotal = 0;
-        let populatedCart = [];
-        let cartUpdated = false; // Flag to check if session cart needs updating
-
-        if (user.cart && user.cart.length > 0) {
-             populatedCart = user.cart.map(item => {
-                 // Check if product was populated and is approved
-                 if (!item.productId || !item.productId._id) {
-                     console.warn(`Cart item ${item._id} refers to a non-existent product ID for user: ${user.email}. Will filter.`);
-                     cartUpdated = true; // Mark that session cart needs update
-                     return null; // Filter this item out
-                 }
-                 // *** Check if product is approved - remove if not ***
-                 if (item.productId.reviewStatus !== 'approved') {
-                      console.warn(`Product ${item.productId.name} (${item.productId._id}) in cart is not approved. Will filter.`);
-                      cartUpdated = true;
-                      return null; // Filter this out
-                 }
-
-                // Calculate subtotal if valid
-                const itemSubtotal = item.productId.price * item.quantity;
-                cartTotal += itemSubtotal;
-
-                return {
-                    // Cart Item ID itself, useful for forms? Not really needed for display.
-                    // _id: item._id,
-                    productId: item.productId._id, // Use product's ID
-                    name: item.productId.name,
-                    price: item.productId.price,
-                    imageUrl: item.productId.imageUrl,
-                    stock: item.productId.stock,
-                    quantity: item.quantity,
-                    subtotal: itemSubtotal
-                };
-             }).filter(item => item !== null); // Remove null entries
-
-            // If items were filtered out, update the session cart
-             if (cartUpdated) {
-                 const validCartItems = populatedCart.map(item => ({ productId: item.productId, quantity: item.quantity }));
-                 req.session.user.cart = validCartItems;
-                 // No need to save user DB here, just update session representation
-                 // Let user manually remove or proceed to checkout where it gets filtered again.
-                  // TODO: Consider triggering an async background task to clean DB cart? Or wait for next cart action?
-                  console.log(`Session cart updated for user ${user.email} due to invalid/unapproved items found.`);
-             }
-         } // End if user.cart
-
-
-        res.render('user/cart', {
-          title: 'Your Shopping Cart',
-          cart: populatedCart,
-          cartTotal: cartTotal
-          // currentUser is available via res.locals
-        });
-      } catch (error) {
-        next(error); // Pass errors to central handler
-      }
-};
-
-// --- UPDATE addToCart (Check Approval) ---
-exports.addToCart = async (req, res, next) => {
-    const { productId, quantity = 1 } = req.body;
-    const userId = req.session.user._id;
-    const numQuantity = parseInt(quantity, 10);
-
-     // Validate Product ID and Quantity
-     if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 1) {
-         req.flash('error_msg', 'Invalid product or quantity.');
-         return res.redirect(req.headers.referer || '/'); // Redirect back
-     }
-
-    try {
-        // Find user and product concurrently
-        const [user, product] = await Promise.all([
-            User.findById(userId),
-            // Fetch product including reviewStatus and stock
-            Product.findById(productId).select('name stock reviewStatus') // Minimal fields needed
-        ]);
-
-        // Handle User/Product Not Found
-        if (!user) {
-            req.flash('error_msg', 'User session error. Please log in again.');
-            return res.redirect('/auth/login');
-        }
-        if (!product) {
-            req.flash('error_msg', 'Product not found.');
-            return res.redirect(req.headers.referer || '/');
-        }
-
-        // *** NEW CHECK: Only allow adding approved products ***
-        if (product.reviewStatus !== 'approved') {
-             req.flash('error_msg', `Sorry, "${product.name}" is currently unavailable.`);
-             return res.redirect(req.headers.referer || '/'); // Redirect back
-        }
-
-       // Check stock (before potentially adding more)
-       if (product.stock <= 0) { // Explicitly check for 0 stock too
-            req.flash('error_msg', `${product.name} is currently out of stock.`);
-            return res.redirect(req.headers.referer || '/');
-        }
-
-       // Find existing cart item index
-       const existingCartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
-
-       if (existingCartItemIndex > -1) {
-           // Update existing item quantity
-           const existingQuantity = user.cart[existingCartItemIndex].quantity;
-           const newQuantity = existingQuantity + numQuantity;
-           // Check combined stock
-            if (product.stock < newQuantity) {
-               req.flash('error_msg', `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total (you have ${existingQuantity} in cart).`);
-                return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
-           }
-            user.cart[existingCartItemIndex].quantity = newQuantity;
-       } else {
-           // Add new item - check stock for the requested quantity first
-           if (product.stock < numQuantity) {
-               req.flash('error_msg', `Insufficient stock for ${product.name}. Only ${product.stock} available.`);
-                return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
-           }
-           user.cart.push({ productId, quantity: numQuantity });
-       }
-
-        await user.save(); // Save the updated user cart to DB
-
-       // Update session cart reliably after saving DB
-       req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity })); // Use simplified format
-       await req.session.save(); // Wait for session to save
-
-        req.flash('success_msg', `${product.name} added to cart!`);
-
-       // Redirect based on query parameter or default to cart
-        if(req.query.redirectTo === 'checkout') {
-           return res.redirect('/user/checkout');
-       }
-        res.redirect('/user/cart');
-
-    } catch (error) {
-         if (error.name === 'CastError') { // Handle potential ID format error during findById
-            req.flash('error_msg', 'Invalid product ID format.');
-             return res.redirect('/');
-         }
-         console.error("Add to Cart Error:", error);
-        next(error);
-    }
-};
-
-exports.updateCartQuantity = async (req, res, next) => {
-         const { productId, quantity } = req.body;
-         const userId = req.session.user._id;
-         const numQuantity = parseInt(quantity, 10);
-
-         // Validation
-         if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) {
-              return res.status(400).json({ success: false, message: 'Invalid product ID or quantity.' });
-         }
-
-        try {
-            // Fetch user and product simultaneously
-            const [user, product] = await Promise.all([
-                 User.findById(userId), // Find user to modify cart
-                 // Fetch product to check stock and price (minimal fields)
-                 Product.findById(productId).select('stock price reviewStatus name')
-            ]);
-
-            if (!user) { // Should not happen if authenticated
-               return res.status(404).json({ success: false, message: 'User not found.' });
-            }
-            if (!product) {
-               return res.status(404).json({ success: false, message: 'Product not found.' });
-            }
-
-            // *** Check if product is approved ***
-            if (product.reviewStatus !== 'approved') {
-                // If product isn't approved anymore, remove it from cart via this update
-                const itemIndexToRemove = user.cart.findIndex(item => item.productId.toString() === productId.toString());
-                if (itemIndexToRemove > -1) {
-                    user.cart.splice(itemIndexToRemove, 1); // Remove from user cart array
-                    await user.save(); // Save the user
-                    req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity })); // Update session
-                    await req.session.save();
-                }
-                return res.status(400).json({ success: false, message: `Product "${product.name}" is unavailable and has been removed.`, removal: true }); // Indicate removal
-            }
-
-            // Find the cart item
-            const cartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
-
-           // Handle removing the item (quantity = 0)
-            if (numQuantity === 0) {
-                if (cartItemIndex > -1) {
-                    user.cart.splice(cartItemIndex, 1); // Remove item from array
-                }
-                // If item wasn't found, do nothing for quantity 0
-            }
-            // Handle updating or adding the item
-            else {
-                // Check stock for the NEW quantity
-               if (product.stock < numQuantity) {
-                   // Respond with error, don't change cart
-                  return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}. Only ${product.stock} available.` });
-                 }
-                // Update existing item or add if it wasn't in cart (shouldn't happen for update > 0?)
-                if (cartItemIndex > -1) {
-                    user.cart[cartItemIndex].quantity = numQuantity;
-                } else {
-                    // Add item if trying to update a non-existent item to > 0? Or return error? Let's add.
-                    user.cart.push({ productId, quantity: numQuantity });
-                 }
-            }
-
-            // Save user cart changes to DB
-            await user.save();
-
-            // Update session cart
-            req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
-
-            // --- Recalculate cart total AFTER updating DB cart ---
-            // Refetch user with populated cart for accurate total OR calculate manually from current cart
-            let cartTotal = 0;
-            let itemSubtotal = 0;
-            // Use the updated user.cart array for calculation
-             for (const item of user.cart) {
-                 // Need product price. Could fetch all prices again, or use stored price if reliable?
-                 // Fetching price again is safer.
-                 const relatedProduct = await Product.findById(item.productId).select('price').lean(); // Fetch price minimally
-                 if (relatedProduct) {
-                    const currentItemSubtotal = relatedProduct.price * item.quantity;
-                    cartTotal += currentItemSubtotal;
-                    // Set subtotal for the item being updated
-                    if (item.productId.toString() === productId.toString()) {
-                         itemSubtotal = currentItemSubtotal;
-                     }
-                 }
-            }
-
-
-             await req.session.save(); // Save session with updated cart array
-
-            // Send JSON response
-            res.json({
-                 success: true,
-                 message: 'Cart updated successfully.',
-                 // Provide updated quantity (might be 0 if removed)
-                 newQuantity: user.cart.find(item => item.productId.toString() === productId.toString())?.quantity ?? 0,
-                 itemSubtotal: itemSubtotal,
-                 cartTotal: cartTotal,
-                 itemId: productId // Send back item ID for frontend reference
-             });
-
-        } catch (error) {
-            console.error("Cart Update Error:", error);
-            res.status(500).json({ success: false, message: 'Error updating cart quantity.' });
-        }
-};
-
-exports.removeFromCart = async (req, res, next) => {
-    const { productId } = req.params;
-    const userId = req.session.user._id;
-
-    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) { // Validate ID format
-       req.flash('error_msg', 'Invalid Product ID.');
-       return res.redirect('/user/cart');
-     }
-
-    try {
-        // Use findOneAndUpdate to pull the item directly from DB cart
-        const user = await User.findOneAndUpdate(
-            { _id: userId }, // Find the user
-            { $pull: { cart: { productId: productId } } }, // Pull item matching productId
-            { new: true } // Return the updated user document
-        );
-
-         if (!user) { // Should not happen if authenticated
-             req.flash('error_msg', 'User not found.');
-            return res.redirect('/auth/login');
-         }
-
-         // Check if item was actually removed (might have already been gone)
-         // This requires comparing cart before/after, findOneAndUpdate doesn't easily tell if $pull removed something.
-         // Alternative: Find user, filter cart manually, save user. Less atomic but gives more info.
-
-         // Let's stick with atomic $pull and assume it worked if no error.
-
-         // Update session cart
-         req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
-         await req.session.save(); // Save updated session
-
-         req.flash('success_msg', 'Item removed from cart.');
-         res.redirect('/user/cart'); // Redirect back to cart
-
-    } catch (error) {
-       console.error("Remove From Cart Error:", error);
-       next(error); // Pass to central error handler
-    }
-};
-
-// --- UPDATE getCheckoutPage (Check Approval and Stock) ---
-exports.getCheckoutPage = async (req, res, next) => {
-    try {
-       const userId = req.session.user._id;
-       const user = await User.findById(userId)
-                              // Populate product fields needed for checkout validation & display
-                              .populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId _id')
-                              .lean(); // Use lean for read-only
-
-       // Basic checks
-       if (!user) {
-           req.flash('error_msg', 'User session expired. Please login.');
-           return res.redirect('/auth/login');
-       }
-       if (!user.cart || user.cart.length === 0) {
-           req.flash('error_msg', 'Your cart is empty.');
-           return res.redirect('/user/cart');
-       }
-
-       let subTotal = 0;
-        let checkoutItems = [];
-        let issuesFound = false;
-        let issueMessages = []; // Collect all issues
-
-       // --- Validate items for checkout ---
-       for (const item of user.cart) {
-           if (!item.productId || !item.productId._id) {
-               issueMessages.push('An invalid item reference was detected.');
-               issuesFound = true;
-               continue; // Skip processing this item
-           }
-
-           // *** CHECK: Product Approval Status ***
-            if(item.productId.reviewStatus !== 'approved'){
-                issueMessages.push(`"${item.productId.name}" is unavailable.`);
-                issuesFound = true;
-                continue; // Skip this item
-            }
-
-            // *** CHECK: Stock Availability ***
-            if(item.productId.stock < item.quantity){
-                issueMessages.push(`Insufficient stock for "${item.productId.name}" (Only ${item.productId.stock} left).`);
-                issuesFound = true;
-                // Don't break here, collect all messages first
-                 continue; // Skip adding to checkout list if stock issue
-            }
-
-            // If all checks pass, add to checkout summary
-            const itemTotal = item.productId.price * item.quantity;
-            subTotal += itemTotal;
-
-           checkoutItems.push({
-               productId: item.productId._id,
-               name: item.productId.name,
-               price: item.productId.price,
-               imageUrl: item.productId.imageUrl,
-               quantity: item.quantity,
-               stock: item.productId.stock, // Pass stock for display if needed
-               itemTotal: itemTotal
-               // sellerId: item.productId.sellerId // Pass if needed
-            });
-       } // End loop
-
-        // If any validation issues were found, redirect to cart with messages
-        if (issuesFound) {
-            // Optionally: Trigger removal of problematic items from user's DB cart here
-            // await User.updateOne(...)
-             req.flash('error_msg', "Please resolve the following issues in your cart: " + issueMessages.join(' '));
-             return res.redirect('/user/cart');
-        }
-
-        // Proceed to render checkout page if cart is valid
-        const totalAmount = subTotal; // Apply shipping costs if any
-
-       res.render('user/checkout', {
-           title: 'Checkout',
-           userAddress: user.address,    // Pass user's address
-           items: checkoutItems,        // Pass validated items
-           subTotal: subTotal,
-           totalAmount: totalAmount,
-           paymentMethod: 'COD'         // Default payment method
-       });
-
-   } catch (error) {
-       next(error); // Pass errors to handler
-   }
-};
 
 controllers/sellerController.js:
 // controllers/sellerController.js
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const { sendEmail } = require('../config/mailer'); // Import sendEmail
+const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPBySeller,
@@ -2566,7 +1907,6 @@ const {
 } = require('./orderController');
 const mongoose = require('mongoose');
 
-// --- NEW: Seller Cancellation Reasons ---
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
     "🚚 Unable to Fulfill/Ship",
@@ -2581,7 +1921,6 @@ exports.getSellerDashboard = (req, res) => {
 
 // Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    // Pass an empty product object or defaults if needed for rendering sticky form
     res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
 };
 
@@ -2604,16 +1943,14 @@ exports.getManageProductsPage = async (req, res, next) => {
 exports.getEditProductPage = async (req, res, next) => {
      try {
         // isProductOwner middleware ensures ownership
-        const product = await Product.findById(req.params.id).lean(); // Use lean here
+        const product = await Product.findById(req.params.id).lean();
         if (!product) {
            req.flash('error_msg', 'Product not found.');
            return res.redirect('/seller/products');
        }
-       // Ownership check already done by middleware
-
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
-           product: product // Pass lean object
+           product: product
        });
    } catch (error) {
         if (error.name === 'CastError') {
@@ -2626,7 +1963,8 @@ exports.getEditProductPage = async (req, res, next) => {
 
 // Product Management Actions
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
@@ -2643,6 +1981,7 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            description: description ? description.trim() : '', // *** ADDED description ***
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
@@ -2658,11 +1997,10 @@ exports.uploadProduct = async (req, res, next) => {
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(newProduct).then(async reviewResult => {
              try {
-                 // Fetch the latest version of the product to update
                  const productToUpdate = await Product.findById(newProduct._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
-                    productToUpdate.rejectionReason = reviewResult.reason; // Might be null/undefined
+                    productToUpdate.rejectionReason = reviewResult.reason;
                     await productToUpdate.save();
                     console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
                  } else {
@@ -2673,8 +2011,6 @@ exports.uploadProduct = async (req, res, next) => {
              }
         }).catch(reviewError => {
              console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
-             // Consider setting status back to 'pending' or a specific 'error' state
-             // Example: Mark as pending with a reason if review fails completely
               Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
         });
 
@@ -2694,12 +2030,12 @@ exports.uploadProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id; // For validation, though middleware handles access
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    const sellerId = req.session.user._id;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        // Need to fetch product again to render edit page correctly
         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
@@ -2708,7 +2044,6 @@ exports.updateProduct = async (req, res, next) => {
      }
 
     try {
-        // Find product ensuring it belongs to the seller (redundant with middleware, but safe)
         const product = await Product.findOne({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2718,6 +2053,7 @@ exports.updateProduct = async (req, res, next) => {
 
          product.name = name.trim();
          product.category = category.trim();
+         product.description = description ? description.trim() : ''; // *** ADDED description update ***
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
@@ -2731,7 +2067,7 @@ exports.updateProduct = async (req, res, next) => {
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(product).then(async reviewResult => {
              try {
-                 const productToUpdate = await Product.findById(product._id); // Fetch again to update
+                 const productToUpdate = await Product.findById(product._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
                     productToUpdate.rejectionReason = reviewResult.reason;
@@ -2765,7 +2101,6 @@ exports.removeProduct = async (req, res, next) => {
     const sellerId = req.session.user._id;
 
     try {
-         // Middleware verifies ownership, find and delete in one step
          const product = await Product.findOneAndDelete({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2816,23 +2151,18 @@ exports.getManageOrdersPage = async (req, res, next) => {
         orders.forEach(order => {
              order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             // *** NEW: Seller Cancellation Logic ***
-             order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
+             order.canBeCancelledBySeller = order.status === 'Pending';
 
              order.showDeliveryOtp = order.status === 'Pending' &&
                                      !!order.orderOTP &&
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
-            // Format Items Summary (Highlight seller's items)
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
-                    // Ensure productId and sellerId exist before comparing
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
                     const productName = p.productId?.name || p.name || '[Product Name Missing]';
-
-                    // Highlight seller's item clearly
                     return `${isSellerItem ? '<strong class="text-success">' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Your Item)</strong>' : ''}`;
                 }).join('<br>');
             } else {
@@ -2840,12 +2170,11 @@ exports.getManageOrdersPage = async (req, res, next) => {
             }
         });
 
-        // *** Render the template, PASSING message as null and reasons ***
         res.render('seller/manage-orders', {
             title: 'Manage Your Orders',
             orders: orders,
-            message: null, // Pass null when orders exist
-            sellerCancellationReasons: sellerCancellationReasons // Pass reasons to the view
+            message: null,
+            sellerCancellationReasons: sellerCancellationReasons
         });
     } catch (error) {
         next(error);
@@ -2892,14 +2221,13 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     res.redirect('/seller/orders');
 };
 
-// --- NEW: Seller Cancel Order ---
+// --- Seller Cancel Order ---
 exports.cancelOrderBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
     const sellerId = req.session.user._id;
-    const sellerEmail = req.session.user.email; // For logging
+    const sellerEmail = req.session.user.email;
 
-    // Validate reason
     if (!reason || !sellerCancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid seller reason for cancellation.');
         return res.redirect('/seller/orders');
@@ -2908,10 +2236,9 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     const sessionDB = await mongoose.startSession();
     sessionDB.startTransaction();
     try {
-        // Find the order and populate product sellerId
         const order = await Order.findById(orderId)
-                                .populate('products.productId', 'sellerId name _id') // Need sellerId and _id
-                                .populate('userId', 'email') // For notification
+                                .populate('products.productId', 'sellerId name _id')
+                                .populate('userId', 'email')
                                 .session(sessionDB);
 
         if (!order) {
@@ -2920,14 +2247,12 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             return res.status(404).redirect('/seller/orders');
         }
 
-        // Check if order status is Pending
         if (order.status !== 'Pending') {
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', `Order status is '${order.status}'. Only 'Pending' orders can be cancelled by seller.`);
             return res.redirect('/seller/orders');
         }
 
-        // Double check relevance (middleware should handle this, but good practice)
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
              await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -2936,11 +2261,9 @@ exports.cancelOrderBySeller = async (req, res, next) => {
              return res.status(403).redirect('/seller/orders');
         }
 
-
-        // --- Restore Stock ONLY for the seller's items ---
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
         const productStockRestorePromises = order.products
-            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
+            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString())
             .map(item => {
                 const quantityToRestore = Number(item.quantity);
                  if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -2950,7 +2273,7 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                 console.log(`Seller Cancel: Restoring ${quantityToRestore} stock for P.ID ${item.productId._id}`);
                  return Product.updateOne(
                      { _id: item.productId._id },
-                     { $inc: { stock: quantityToRestore, orderCount: -1 } }, // Restore stock, decrement order count
+                     { $inc: { stock: quantityToRestore, orderCount: -1 } },
                      { session: sessionDB }
                  ).catch(err => {
                     console.error(`Seller Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
@@ -2960,19 +2283,16 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
         console.log(`Seller Cancel: Stock restoration attempts completed for seller ${sellerId} in order ${orderId}.`);
 
-        // Update Order Status and Reason
         order.status = 'Cancelled';
-        order.cancellationReason = `Cancelled by Seller: ${reason}`; // Add prefix
-        // Clear OTP fields etc. (pre-save hook might also do this)
+        order.cancellationReason = `Cancelled by Seller: ${reason}`;
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
-        order.cancellationAllowedUntil = undefined; // Remove cancellation window
+        order.cancellationAllowedUntil = undefined;
 
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // --- Send Email Notification (Outside Transaction) ---
         try {
             const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {
@@ -3378,6 +2698,13 @@ const ProductSchema = new mongoose.Schema({
         trim: true,
         index: true // Added index for searching
     },
+    // *** NEW: Added description field ***
+    description: {
+        type: String,
+        trim: true,
+        default: '' // Default to empty string, not required
+    },
+    // *** End New Field ***
     category: {
         type: String,
         required: [true, 'Please provide a product category'],
@@ -3404,14 +2731,12 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    // *** UPDATED: Added sellerId reference ***
     sellerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true
     },
-    // Keep sellerEmail for potential display/legacy reasons, but sellerId is primary
     sellerEmail: {
         type: String,
         required: true,
@@ -3427,28 +2752,27 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    orderCount: { // Tracks how many times item appeared in orders
+    orderCount: {
         type: Number,
         default: 0,
     },
-    // *** NEW: Fields for Review Status ***
     reviewStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
-        index: true // Index for filtering visible products
+        index: true
     },
     rejectionReason: {
         type: String,
         trim: true
     }
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt
+    timestamps: true
 });
 
 // Calculate average rating and numReviews before saving
 ProductSchema.pre('save', function(next) {
-    if (this.isModified('ratings')) { // Only recalculate if ratings changed
+    if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
             this.numReviews = this.ratings.length;
             this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
@@ -3458,7 +2782,6 @@ ProductSchema.pre('save', function(next) {
         }
     }
 
-    // Ensure rejectionReason is cleared if status is not 'rejected'
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
@@ -3466,8 +2789,8 @@ ProductSchema.pre('save', function(next) {
     next();
 });
 
-// Define text index for searching multiple fields
-ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' });
+// Define text index for searching multiple fields (including description)
+ProductSchema.index({ name: 'text', category: 'text', description: 'text', specifications: 'text' });
 
 
 const Product = mongoose.model('Product', ProductSchema);
@@ -6316,22 +5639,17 @@ module.exports = { generateOTP, setOTPExpiration };
 services/geminiService.js:
 // services/geminiService.js
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
-const axios = require('axios'); // Import axios for fetching image data
+const axios = require('axios');
 
-// --- Configuration ---
 const API_KEY = process.env.GEMINI_API_KEY;
 
-// Check if API key is set
 if (!API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
 
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
+const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null; // Updated model
 
-// *** Use the Vision model ***
-const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null;
-
-// Optional: Configure safety settings
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -6346,13 +5664,12 @@ if (genAI && visionModel) {
      console.log("Gemini AI SDK Vision model could not be initialized (API Key missing or configuration error?).");
 }
 
-// --- Helper function to fetch image and get Base64 data + MIME type ---
 async function urlToGenerativePart(url) {
     console.log(`Fetching image from: ${url}`);
     try {
         const response = await axios.get(url, {
-            responseType: 'arraybuffer', // Fetch as binary data
-            timeout: 10000 // Add a timeout (10 seconds)
+            responseType: 'arraybuffer',
+            timeout: 10000
         });
 
         if (response.status !== 200) {
@@ -6360,7 +5677,6 @@ async function urlToGenerativePart(url) {
         }
 
         const contentType = response.headers['content-type'];
-        // Basic validation for common image types Gemini supports
         if (!contentType || !['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
             console.warn(`Invalid or unsupported image Content-Type: ${contentType} from URL: ${url}`);
             throw new Error(`Unsupported image type: ${contentType}`);
@@ -6376,66 +5692,49 @@ async function urlToGenerativePart(url) {
         };
     } catch (error) {
          console.error(`Error fetching image from ${url}: ${error.message}`);
-         // Determine if the error is network related, timeout, or status code
          if (axios.isAxiosError(error)) {
              if (error.response) {
-                 // Server responded with a status code outside 2xx range
                  throw new Error(`Failed to fetch image: Server responded with status ${error.response.status}`);
              } else if (error.request) {
-                 // Request was made but no response received (e.g., timeout, network issue)
                   throw new Error(`Failed to fetch image: No response received (Timeout or network issue)`);
              } else {
-                  // Something else happened in setting up the request
                  throw new Error(`Failed to fetch image: Request setup error (${error.message})`);
              }
          } else {
-            // Not an Axios error (e.g., validation error thrown above)
-             throw error; // Re-throw the original error
+             throw error;
          }
     }
 }
 
-
-/**
- * Reviews product text and image content using Gemini Vision API.
- * Fetches the image from the provided URL.
- *
- * @param {object} product - The product object (name, category, price, imageUrl, specifications).
- * @returns {Promise<{status: ('approved'|'rejected'|'pending'), reason: string | null}>} Review result.
- */
 const reviewProductWithGemini = async (product) => {
-    // Check if Vision model is available
     if (!visionModel) {
         console.log("Gemini Vision model not available. Skipping review, defaulting to 'pending'.");
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
 
-    const { name, category, price, specifications, imageUrl } = product;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, description, specifications, imageUrl } = product;
 
-    // --- 1. Fetch and Prepare Image Part ---
     let imagePart;
     try {
         imagePart = await urlToGenerativePart(imageUrl);
-        if (!imagePart) { // Should have thrown an error, but double-check
+        if (!imagePart) {
             throw new Error("Image processing failed unexpectedly.");
         }
          console.log(`Successfully prepared image part for ${name} from ${imageUrl}`);
     } catch (imageError) {
         console.error(`Cannot review product "${name}" due to image processing error: ${imageError.message}`);
-        // Reject if image fetch/processing fails critically
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
 
-
-    // --- 2. Construct Text Prompt Part ---
-    // Update prompt to include image analysis instructions
+    // *** UPDATE text prompt to include description ***
     const textPrompt = `
         Analyze the following product details AND the provided image for an e-commerce store. Act as a strict content moderator.
 
         **Instructions:**
         1. Examine the IMAGE CONTENT closely.
-        2. Examine the TEXT DETAILS (Name, Category, Price, Specifications).
-        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category). Is it clearly the item described?
+        2. Examine the TEXT DETAILS (Name, Category, Description, Price, Specifications).
+        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category, key features in description). Is it clearly the item described?
         4. Check BOTH image and text for:
             - Explicit content (nudity, graphic violence).
             - Depictions of weapons (unless clearly a toy and stated category is 'Toys').
@@ -6443,37 +5742,40 @@ const reviewProductWithGemini = async (product) => {
             - Hateful symbols or hate speech.
             - Any generally unsafe or harmful content.
         5. Check if the text details seem legitimate:
-            - Is the name/description sensible? Avoid gibberish or clearly misleading text.
-            - Is the price reasonable for the category (reject absurd prices like ₹1 for a car, but allow discounts)?
-            - Does the category make sense for the name/image?
+            - Is the name/description sensible and relevant? Avoid gibberish or clearly misleading text.
+            - Is the price reasonable for the category/description (reject absurd prices, but allow discounts)?
+            - Does the category make sense for the name/image/description?
         6. **SAFETY IS PARAMOUNT**: If unsure, lean towards rejection, especially for safety concerns (weapons, explicit, illegal).
         7. Use ONLY the required response format.
 
         **Product Details (Text):**
         - Name: ${name}
         - Category: ${category}
+        - Description: ${description || 'Not provided'}  <%# ADDED description %>
         - Price: ₹${price?.toFixed(2) || 'N/A'}
         - Specifications: ${specifications || 'Not provided'}
         - Provided Image URL: ${imageUrl}
 
         **Analysis Task:** Based on BOTH the text analysis AND image content analysis:
         - Respond with "APPROVE" if the product (image and text) seems legitimate, safe, accurately described, and the image clearly matches the text description.
-        - Respond with "REJECT: [BRIEF REASON]" if ANY issues are found (safety violation in image/text, image mismatch, misleading text, nonsensical entry, absurd price, etc.). Example Reasons: "Image contains prohibited items", "Text contains inappropriate language", "Image does not match product description", "Price is nonsensical".
+        - Respond with "REJECT: [BRIEF REASON]" if ANY issues are found (safety violation in image/text, image mismatch, misleading text/description, nonsensical entry, absurd price, etc.). Example Reasons: "Image contains prohibited items", "Text/Description contains inappropriate language", "Image does not match product description", "Price is nonsensical".
 
         Your response:`;
 
     const textPart = { text: textPrompt };
 
-    // --- 3. Call Gemini API ---
     try {
         console.log(`Sending product "${name}" (with image) for Gemini Vision review...`);
+        const generationConfig = {
+            // Optional: Adjust temperature if needed, but default is often fine for classification
+            // temperature: 0.4,
+        };
         const result = await visionModel.generateContent(
-            [textPart, imagePart], // Send both text and image parts
-            { safetySettings } // Apply safety settings
+            [textPart, imagePart],
+            { safetySettings, generationConfig } // Pass settings and config
         );
         const response = result?.response;
 
-        // Handle potential blocked response due to safety settings BEFORE checking text content
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            const safetyRatings = response?.promptFeedback?.safetyRatings || [];
@@ -6481,7 +5783,6 @@ const reviewProductWithGemini = async (product) => {
            return { status: 'rejected', reason: `Content blocked by AI safety filters (${blockReason}).` };
        }
 
-        // Process the successful response text
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Review Raw Response for "${name}": ${reviewText}`);
 
@@ -6489,27 +5790,22 @@ const reviewProductWithGemini = async (product) => {
             console.log(`Gemini Vision approved product: ${name}`);
             return { status: 'approved', reason: null };
         } else if (reviewText.startsWith('REJECT')) {
-            // Extract reason, provide default if missing after colon
             const reason = reviewText.split(':')[1]?.trim() || 'Rejected by AI model (no specific reason provided).';
             console.log(`Gemini Vision rejected product: ${name}. Reason: ${reason}`);
             return { status: 'rejected', reason: reason };
         } else {
-            // Handle unexpected valid response formats
             console.warn(`Unexpected Gemini Vision response format for "${name}": ${reviewText}. Defaulting to pending.`);
             return { status: 'pending', reason: 'AI review result unclear.' };
         }
 
     } catch (error) {
-        // Catch errors during the Gemini API call itself
         console.error(`Error during Gemini Vision API call for product "${name}":`, error);
         let reason = 'AI review failed due to an API error.';
-        // Check for specific safety errors sometimes caught here
         if (error.message && error.message.includes('SAFETY')) {
             reason = 'Content blocked by AI safety filters during API call.';
         } else if (error.message) {
-            reason = `AI API Error: ${error.message.substring(0, 100)}...`; // Keep reason brief
+            reason = `AI API Error: ${error.message.substring(0, 100)}...`;
         }
-        // Default to rejection on significant API errors? Or pending? Rejection is safer.
         return { status: 'rejected', reason: reason };
     }
 };
@@ -6601,6 +5897,7 @@ views/admin/manage-banners.ejs:
 <%- include('../partials/footer') %>
 
 views/admin/edit-product.ejs:
+<%# views/admin/edit-product.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
@@ -6610,27 +5907,34 @@ views/admin/edit-product.ejs:
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
         </div>
 
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= product.category %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
         </div>
+
+         <%# *** ADDED Description Textarea *** %>
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" class="form-control" rows="4"><%= product.description || '' %></textarea>
+        </div>
+        <%# *** End Added Block *** %>
 
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
 
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
 
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
@@ -6638,7 +5942,7 @@ views/admin/edit-product.ejs:
 
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications || '' %></textarea>
         </div>
 
         <hr>
@@ -6965,6 +6269,7 @@ views/admin/manage-users.ejs:
 <%- include('../partials/footer') %>
 
 views/admin/upload-product.ejs:
+<%# views/admin/upload-product.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container"> <%# Reuse admin style %>
@@ -6980,6 +6285,12 @@ views/admin/upload-product.ejs:
             <label for="category">Category:</label>
             <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
         </div>
+        <%# *** ADDED Description Textarea *** %>
+        <div class="form-group">
+            <label for="description">Description (Optional):</label>
+            <textarea id="description" name="description" class="form-control" rows="4"><%= typeof product !== 'undefined' ? (product.description || '') : '' %></textarea>
+        </div>
+        <%# *** End Added Block *** %>
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -6994,7 +6305,7 @@ views/admin/upload-product.ejs:
         </div>
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? (product.specifications || '') : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>
@@ -7300,13 +6611,13 @@ views/partials/messages.ejs:
 views/products/detail.ejs:
 <%# views/products/detail.ejs %>
 
-<%# --- Meta Description Preparation (Same as before) --- %>
-<% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
+<%# --- Meta Description Preparation --- %>
+<% let metaDesc = product.description ? product.description.substring(0, 155) + '...' : `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
 <% if (metaDesc.length > 160) { metaDesc = metaDesc.substring(0, 157) + '...'; } %>
 
 <%- include('../partials/header', {
     title: product.name,
-    metaTitle: product.name + ' - ' + defaultSiteName, // Use defaultSiteName
+    metaTitle: product.name + ' - ' + defaultSiteName,
     metaDescription: metaDesc,
     metaImageUrl: product.imageUrl,
     metaUrl: fullUrl,
@@ -7315,7 +6626,7 @@ views/products/detail.ejs:
 
 <div class="product-detail-container">
 
-   <%# --- Status Banner for Admin/Owner if Not Approved --- %>
+   <%# --- Status Banner (Keep existing) --- %>
    <% if (!isApproved && (isAdminView || isOwnerView)) { %>
      <div class="alert alert-<%= product.reviewStatus === 'rejected' ? 'danger' : 'warning' %> mb-3" role="alert">
        <strong>Status:</strong> <span class="text-capitalize fw-bold"><%= product.reviewStatus %></span>
@@ -7324,22 +6635,18 @@ views/products/detail.ejs:
        <% } else if (product.reviewStatus === 'pending') { %>
           - This product is awaiting review and is not visible to customers.
        <% } %>
-       <% if (isOwnerView && product.reviewStatus !== 'approved') { %> <%# Show edit link only to owner if not approved %>
+       <% if (isOwnerView && product.reviewStatus !== 'approved') { %>
           <br><a href="/seller/products/edit/<%= product._id %>" class="alert-link">Edit and Resubmit for Review</a>
         <% } else if (isAdminView && product.reviewStatus !== 'approved') { %>
            <br><a href="/admin/manage-products/edit/<%= product._id %>" class="alert-link">Admin: Edit Status/Details</a>
        <% } %>
      </div>
    <% } else if (!isApproved && !isAdminView && !isOwnerView) { %>
-      <%# This block should technically not be reachable due to controller redirect, but acts as safety %>
       <div class="alert alert-danger">This product is currently unavailable.</div>
-      <%# Early exit or hide the rest of the content %>
-      </div> <%- /* End product-detail-container */ %>
+      </div>
       <%- include('../partials/footer') %>
-      <% return; %> <%# Stop rendering further %>
+      <% return; %>
    <% } %>
-   <%# --- End Status Banner --- %>
-
 
    <div class="product-detail-main">
         <div class="product-detail-image">
@@ -7347,6 +6654,17 @@ views/products/detail.ejs:
         </div>
        <div class="product-detail-info">
             <h1><%= product.name %></h1>
+
+            <%# *** MOVED Description Display HERE *** %>
+            <% if (product.description) { %>
+            <div class="product-description mb-2"> <%# Removed mt-3, added mb-2 %>
+                <%# REMOVED h3 title, description flows directly from product name %>
+                <%# Use CSS white-space: pre-wrap to preserve line breaks entered in textarea %>
+                <p class="description-text text-muted small"><%= product.description %></p> <%# Added text-muted and small class for style %>
+            </div>
+            <% } %>
+            <%# *** End Moved Block *** %>
+
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
             <p class="detail-stock">
                 <% if (product.stock > 0) { %>
@@ -7354,10 +6672,10 @@ views/products/detail.ejs:
                 <% } else { %>
                     <span class="text-danger fw-bold">Out of Stock</span>
                 <% } %>
-            </p> <%# End of stock paragraph %>
+            </p>
 
-            <%# === MOVED SHARE BUTTON HERE === %>
-            <div class="share-section mt-2"> <%# Adjusted margin %>
+            <%# Share Button (Keep existing position) %>
+            <div class="share-section mt-2">
                 <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
                         data-title="<%= product.name %>"
                         data-text="Check out this product: <%= product.name %>"
@@ -7365,34 +6683,27 @@ views/products/detail.ejs:
                     <i class="fas fa-share-alt"></i> Share
                 </button>
                 <div id="fallback-share-links" class="fallback-share-links hidden">
-                    <small>Share via:</small>
-                    <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
-                    <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
-                    <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
-                    <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
-                </div>
+                     <small>Share via:</small>
+                     <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
+                     <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
+                     <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
+                     <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
+                 </div>
             </div>
-            <%# === END MOVED SHARE BUTTON === %>
 
-           <%# --- RATING DISPLAY BLOCK REMOVED FROM HERE --- %>
-
-           <%# --- Conditional Purchase Actions --- %>
+           <%# Purchase Actions (Keep existing) %>
            <% if (isApproved) { %>
                <div class="product-actions">
-                   <%# === MODIFIED Add to Cart Form === %>
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
-                       <div class="quantity-selector mb-2 d-inline-flex align-items-center"> <%# Added d-inline-flex and align-items-center %>
-                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label> <%# Kept text-muted style %>
+                       <div class="quantity-selector mb-2 d-inline-flex align-items-center">
+                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label>
                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;">
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                        </button>
                   </form>
-                  <%# === END MODIFIED Add to Cart Form === %>
-
-                   <%# Buy Now Form %>
                     <% if (product.stock > 0) { %>
                     <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
                           <input type="hidden" name="productId" value="<%= product._id %>">
@@ -7410,25 +6721,25 @@ views/products/detail.ejs:
                      <p class="text-muted small mt-2">This product is currently under review or unavailable.</p>
                  </div>
             <% } %>
-            <%# --- End Conditional Purchase Actions --- %>
 
-            <%# Specifications %>
+            <%# Description Block REMOVED from here %>
+
+            <%# Specifications (Keep existing) %>
             <div class="product-specifications mt-3">
                  <h3>Specifications</h3>
                  <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
-            </div> <%# End of product-specifications div %>
+            </div>
 
-            <%# === MOVED SELLER INFO HERE === %>
+            <%# Seller Info (Keep existing) %>
             <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
-            <%# === END MOVED SELLER INFO === %>
 
        </div> <%# End product-detail-info %>
     </div> <%# End product-detail-main %>
 
-   <%# --- Conditional Rating Section --- %>
+   <%# --- Remaining Sections (Rating, Stats) Keep existing --- %>
    <div class="product-rating-section mt-4 border-top pt-3">
         <h3>Rate This Product</h3>
-        <% if (isApproved) { %> <%# Only allow rating if approved %>
+        <% if (isApproved) { %>
             <% if (userCanRate) { %>
                 <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
                     <div class="rating-stars">
@@ -7443,10 +6754,8 @@ views/products/detail.ejs:
              <p class="text-muted">Rating is unavailable until the product is approved.</p>
          <% } %>
    </div>
-   <%# --- End Conditional Rating Section --- %>
 
-    <%# --- RATING DISPLAY BLOCK PASTED HERE --- %>
-    <div class="mb-3"> <%# Removed mt-3, added mb-3 for spacing below %>
+    <div class="mb-3">
         <% if (product.numReviews > 0) { %>
             <p class="detail-rating">
                 Rating:
@@ -7457,10 +6766,7 @@ views/products/detail.ejs:
             <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
         <% } %>
     </div>
-    <%# --- END PASTED RATING DISPLAY BLOCK --- %>
 
-
-    <%# --- Rating Stats Display --- %>
     <div class="rating-stats-container mt-4 border-top pt-3">
         <h3>Ratings & Reviews Summary</h3>
          <% if (totalRatings > 0) { %>
@@ -7479,8 +6785,8 @@ views/products/detail.ejs:
                  %>
                      <div class="rating-bar-row">
                          <span class="rating-bar-label small"><%= i %> <i class="fas fa-star text-warning"></i></span>
-                         <div class="rating-bar-progress progress" style="height: 8px;"> <%# Use Bootstrap progress bar style %>
-                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div> <%# Start width at 0 %>
+                         <div class="rating-bar-progress progress" style="height: 8px;">
+                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div>
                          </div>
                          <span class="rating-bar-count small text-muted"><%= count %></span>
                      </div>
@@ -7490,17 +6796,15 @@ views/products/detail.ejs:
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
-     <%# --- End Rating Stats Display --- %>
 
 </div> <%# End product-detail-container %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Animate progress bars
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            setTimeout(() => { // Small delay for visual effect
+            setTimeout(() => {
                  el.style.width = width + '%';
             }, 100);
         }
@@ -7639,6 +6943,7 @@ seller/dashboard.ejs:
 <%- include('../partials/footer') %>
 
 seller/edit-product.ejs:
+<%# views/seller/edit-product.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container"> <%# Reuse admin style %>
@@ -7656,30 +6961,36 @@ seller/edit-product.ejs:
 
         <div class="form-group">
              <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
          </div>
         <div class="form-group">
             <label for="category">Category:</label>
-             <input type="text" id="category" name="category" value="<%= product.category %>" required>
+             <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
          </div>
+         <%# *** ADDED Description Textarea *** %>
+        <div class="form-group">
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" class="form-control" rows="4"><%= product.description || '' %></textarea>
+        </div>
+        <%# *** End Added Block *** %>
          <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
          </div>
         <div class="form-group">
              <label for="stock">Stock Quantity:</label>
-             <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
          <div class="form-group">
              <label for="imageUrl">Image URL:</label>
-             <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
              <% if(product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border: 1px solid #ddd; padding: 2px;">
              <% } %>
          </div>
          <div class="form-group">
              <label for="specifications">Specifications (Optional):</label>
-             <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications || '' %></textarea>
         </div>
          <button type="submit" class="btn btn-primary">Update & Resubmit for Review</button>
          <a href="/seller/products" class="btn btn-secondary">Cancel</a>
@@ -7885,6 +7196,7 @@ seller/manage-products.ejs:
 <%- include('../partials/footer') %>
 
 seller/upload-product.ejs:
+<%# views/seller/upload-product.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container"> <%# Reuse admin style %>
@@ -7894,27 +7206,33 @@ seller/upload-product.ejs:
     <form action="/seller/products/upload" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
         </div>
+         <%# *** ADDED Description Textarea *** %>
+        <div class="form-group">
+            <label for="description">Description (Optional):</label>
+            <textarea id="description" name="description" class="form-control" rows="4"><%= typeof product !== 'undefined' ? (product.description || '') : '' %></textarea>
+        </div>
+        <%# *** End Added Block *** %>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? (product.specifications || '') : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/seller/dashboard" class="btn btn-secondary">Cancel</a>

@@ -2,7 +2,7 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const { sendEmail } = require('../config/mailer'); // Import sendEmail
+const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPBySeller,
@@ -10,7 +10,6 @@ const {
 } = require('./orderController');
 const mongoose = require('mongoose');
 
-// --- NEW: Seller Cancellation Reasons ---
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
     "🚚 Unable to Fulfill/Ship",
@@ -25,7 +24,6 @@ exports.getSellerDashboard = (req, res) => {
 
 // Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    // Pass an empty product object or defaults if needed for rendering sticky form
     res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
 };
 
@@ -48,16 +46,14 @@ exports.getManageProductsPage = async (req, res, next) => {
 exports.getEditProductPage = async (req, res, next) => {
      try {
         // isProductOwner middleware ensures ownership
-        const product = await Product.findById(req.params.id).lean(); // Use lean here
+        const product = await Product.findById(req.params.id).lean();
         if (!product) {
            req.flash('error_msg', 'Product not found.');
            return res.redirect('/seller/products');
        }
-       // Ownership check already done by middleware
-
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
-           product: product // Pass lean object
+           product: product
        });
    } catch (error) {
         if (error.name === 'CastError') {
@@ -70,7 +66,8 @@ exports.getEditProductPage = async (req, res, next) => {
 
 // Product Management Actions
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
@@ -87,6 +84,7 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            description: description ? description.trim() : '', // *** ADDED description ***
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
@@ -102,11 +100,10 @@ exports.uploadProduct = async (req, res, next) => {
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(newProduct).then(async reviewResult => {
              try {
-                 // Fetch the latest version of the product to update
                  const productToUpdate = await Product.findById(newProduct._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
-                    productToUpdate.rejectionReason = reviewResult.reason; // Might be null/undefined
+                    productToUpdate.rejectionReason = reviewResult.reason;
                     await productToUpdate.save();
                     console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
                  } else {
@@ -117,8 +114,6 @@ exports.uploadProduct = async (req, res, next) => {
              }
         }).catch(reviewError => {
              console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
-             // Consider setting status back to 'pending' or a specific 'error' state
-             // Example: Mark as pending with a reason if review fails completely
               Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
         });
 
@@ -138,12 +133,12 @@ exports.uploadProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id; // For validation, though middleware handles access
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    const sellerId = req.session.user._id;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        // Need to fetch product again to render edit page correctly
         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
@@ -152,7 +147,6 @@ exports.updateProduct = async (req, res, next) => {
      }
 
     try {
-        // Find product ensuring it belongs to the seller (redundant with middleware, but safe)
         const product = await Product.findOne({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -162,6 +156,7 @@ exports.updateProduct = async (req, res, next) => {
 
          product.name = name.trim();
          product.category = category.trim();
+         product.description = description ? description.trim() : ''; // *** ADDED description update ***
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
@@ -175,7 +170,7 @@ exports.updateProduct = async (req, res, next) => {
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(product).then(async reviewResult => {
              try {
-                 const productToUpdate = await Product.findById(product._id); // Fetch again to update
+                 const productToUpdate = await Product.findById(product._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
                     productToUpdate.rejectionReason = reviewResult.reason;
@@ -209,7 +204,6 @@ exports.removeProduct = async (req, res, next) => {
     const sellerId = req.session.user._id;
 
     try {
-         // Middleware verifies ownership, find and delete in one step
          const product = await Product.findOneAndDelete({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -260,23 +254,18 @@ exports.getManageOrdersPage = async (req, res, next) => {
         orders.forEach(order => {
              order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             // *** NEW: Seller Cancellation Logic ***
-             order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
+             order.canBeCancelledBySeller = order.status === 'Pending';
 
              order.showDeliveryOtp = order.status === 'Pending' &&
                                      !!order.orderOTP &&
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
-            // Format Items Summary (Highlight seller's items)
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
-                    // Ensure productId and sellerId exist before comparing
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
                     const productName = p.productId?.name || p.name || '[Product Name Missing]';
-
-                    // Highlight seller's item clearly
                     return `${isSellerItem ? '<strong class="text-success">' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Your Item)</strong>' : ''}`;
                 }).join('<br>');
             } else {
@@ -284,12 +273,11 @@ exports.getManageOrdersPage = async (req, res, next) => {
             }
         });
 
-        // *** Render the template, PASSING message as null and reasons ***
         res.render('seller/manage-orders', {
             title: 'Manage Your Orders',
             orders: orders,
-            message: null, // Pass null when orders exist
-            sellerCancellationReasons: sellerCancellationReasons // Pass reasons to the view
+            message: null,
+            sellerCancellationReasons: sellerCancellationReasons
         });
     } catch (error) {
         next(error);
@@ -336,14 +324,13 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     res.redirect('/seller/orders');
 };
 
-// --- NEW: Seller Cancel Order ---
+// --- Seller Cancel Order ---
 exports.cancelOrderBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
     const sellerId = req.session.user._id;
-    const sellerEmail = req.session.user.email; // For logging
+    const sellerEmail = req.session.user.email;
 
-    // Validate reason
     if (!reason || !sellerCancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid seller reason for cancellation.');
         return res.redirect('/seller/orders');
@@ -352,10 +339,9 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     const sessionDB = await mongoose.startSession();
     sessionDB.startTransaction();
     try {
-        // Find the order and populate product sellerId
         const order = await Order.findById(orderId)
-                                .populate('products.productId', 'sellerId name _id') // Need sellerId and _id
-                                .populate('userId', 'email') // For notification
+                                .populate('products.productId', 'sellerId name _id')
+                                .populate('userId', 'email')
                                 .session(sessionDB);
 
         if (!order) {
@@ -364,14 +350,12 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             return res.status(404).redirect('/seller/orders');
         }
 
-        // Check if order status is Pending
         if (order.status !== 'Pending') {
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', `Order status is '${order.status}'. Only 'Pending' orders can be cancelled by seller.`);
             return res.redirect('/seller/orders');
         }
 
-        // Double check relevance (middleware should handle this, but good practice)
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
              await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -380,11 +364,9 @@ exports.cancelOrderBySeller = async (req, res, next) => {
              return res.status(403).redirect('/seller/orders');
         }
 
-
-        // --- Restore Stock ONLY for the seller's items ---
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
         const productStockRestorePromises = order.products
-            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
+            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString())
             .map(item => {
                 const quantityToRestore = Number(item.quantity);
                  if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -394,7 +376,7 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                 console.log(`Seller Cancel: Restoring ${quantityToRestore} stock for P.ID ${item.productId._id}`);
                  return Product.updateOne(
                      { _id: item.productId._id },
-                     { $inc: { stock: quantityToRestore, orderCount: -1 } }, // Restore stock, decrement order count
+                     { $inc: { stock: quantityToRestore, orderCount: -1 } },
                      { session: sessionDB }
                  ).catch(err => {
                     console.error(`Seller Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
@@ -404,19 +386,16 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
         console.log(`Seller Cancel: Stock restoration attempts completed for seller ${sellerId} in order ${orderId}.`);
 
-        // Update Order Status and Reason
         order.status = 'Cancelled';
-        order.cancellationReason = `Cancelled by Seller: ${reason}`; // Add prefix
-        // Clear OTP fields etc. (pre-save hook might also do this)
+        order.cancellationReason = `Cancelled by Seller: ${reason}`;
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
-        order.cancellationAllowedUntil = undefined; // Remove cancellation window
+        order.cancellationAllowedUntil = undefined;
 
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // --- Send Email Notification (Outside Transaction) ---
         try {
             const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {

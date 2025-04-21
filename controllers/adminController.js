@@ -2,7 +2,7 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
+const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
@@ -31,7 +31,8 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
@@ -49,6 +50,7 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            description: description ? description.trim() : '', // *** ADDED description ***
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
@@ -137,7 +139,8 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY - keep existing) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, reviewStatus, rejectionReason } = req.body;
+    // *** ADD 'description' to destructuring ***
+    const { name, category, price, stock, imageUrl, description, specifications, reviewStatus, rejectionReason } = req.body;
 
     // Validation (keep existing)
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
@@ -167,6 +170,7 @@ exports.updateProduct = async (req, res, next) => {
 
         product.name = name.trim();
         product.category = category.trim();
+        product.description = description ? description.trim() : ''; // *** ADDED description update ***
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
@@ -458,30 +462,19 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-// --- *** NEW: Banner Management Controllers *** ---
-
-// GET request to render the banner management page
+// --- *** Banner Management Controllers (Keep existing) *** ---
 exports.getManageBannersPage = async (req, res, next) => {
     try {
-        // Find the single banner configuration document (using the known key)
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
-
-        // If no config exists yet, create a default structure for the view
         if (!bannerConfig) {
-            bannerConfig = {
-                configKey: 'mainBanners',
-                banners: [] // Start with an empty array
-            };
+            bannerConfig = { configKey: 'mainBanners', banners: [] };
         }
-
-        // Ensure the banners array always has 4 potential slots for the form
         const displayBanners = Array.from({ length: 4 }).map((_, index) => {
-             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' };
          });
-
         res.render('admin/manage-banners', {
             title: 'Manage Homepage Banners',
-            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+            bannerConfig: { ...bannerConfig, banners: displayBanners }
         });
     } catch (error) {
         console.error("Error fetching banner configuration:", error);
@@ -489,13 +482,10 @@ exports.getManageBannersPage = async (req, res, next) => {
     }
 };
 
-// POST request to update the banner URLs
 exports.updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const adminUserId = req.session.user._id;
-
-    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
-    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const urlPattern = /^https?:\/\/.+/;
     const bannerInputs = [
         { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
         { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
@@ -511,14 +501,11 @@ exports.updateBanners = async (req, res, next) => {
         const trimmedLinkUrl = input.linkUrl?.trim();
         const trimmedTitle = input.title?.trim();
 
-        // Only add banner if image URL is provided
         if (trimmedImageUrl) {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
-                // You might choose to break or continue collecting errors
             }
-            // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
                  req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
                  validationError = true;
@@ -526,54 +513,41 @@ exports.updateBanners = async (req, res, next) => {
              if (!validationError) {
                 newBanners.push({
                      imageUrl: trimmedImageUrl,
-                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
-                     title: trimmedTitle || undefined    // Store undefined if empty
+                     linkUrl: trimmedLinkUrl || undefined,
+                     title: trimmedTitle || undefined
                  });
              }
         }
     }
 
     if (validationError) {
-         // Need to reconstruct the state for the view if validation fails
          const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
          return res.render('admin/manage-banners', {
              title: 'Manage Homepage Banners',
-             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
-             // Flash message is already set
+             bannerConfig: { banners: displayBannersForError }
          });
     }
 
     try {
-        // Find and update (or create if doesn't exist) the banner config document
         await BannerConfig.findOneAndUpdate(
-            { configKey: 'mainBanners' }, // Find by the key
-            {
-                banners: newBanners, // Set the new array of banners
-                lastUpdatedBy: adminUserId // Track the update
-            },
-            {
-                new: true, // Return the updated document
-                upsert: true, // Create if document doesn't exist
-                runValidators: true // Ensure arrayLimit validator runs
-            }
+            { configKey: 'mainBanners' },
+            { banners: newBanners, lastUpdatedBy: adminUserId },
+            { new: true, upsert: true, runValidators: true }
         );
-
         req.flash('success_msg', 'Homepage banners updated successfully.');
         res.redirect('/admin/manage-banners');
-
     } catch (error) {
         if (error.name === 'ValidationError') {
-             // Handle Mongoose validation errors (like array limit)
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
              const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
              return res.render('admin/manage-banners', {
                   title: 'Manage Homepage Banners',
-                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+                 bannerConfig: { banners: displayBannersForError }
              });
          }
         console.error("Error updating banners:", error);
         req.flash('error_msg', 'Failed to update banners due to a server error.');
-        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
+        res.redirect('/admin/manage-banners');
     }
 };
