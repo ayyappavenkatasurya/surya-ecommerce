@@ -1,4 +1,3 @@
-<%# views/admin/edit-product.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
@@ -8,58 +7,40 @@
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" value="<%= product.name %>" required>
         </div>
 
-        <%# --- MODIFIED: Category Dropdown --- %>
         <div class="form-group">
-            <label for="categoryRef">Category:</label>
-            <select id="categoryRef" name="categoryRef" class="form-control" required>
-                <option value="" disabled>-- Select a Category --</option>
-                 <% if (locals.categories && categories.length > 0) { %>
-                    <% categories.forEach(cat => { %>
-                        <%# IMPORTANT: Compare categoryRef._id if populated, otherwise compare strings %>
-                        <% const currentCategoryId = product.categoryRef?._id?.toString() || product.categoryRef?.toString(); %>
-                        <option value="<%= cat._id %>" <%= (currentCategoryId === cat._id.toString()) ? 'selected' : '' %>>
-                             <%= cat.name %>
-                         </option>
-                    <% }) %>
-                 <% } else { %>
-                      <option value="" disabled>No categories available</option>
-                  <% } %>
-            </select>
-             <% if (!locals.categories || categories.length === 0) { %>
-                 <small class="text-danger d-block mt-1">Cannot update products without categories. Please <a href="/admin/manage-categories">add categories</a> first.</small>
-             <% } %>
+            <label for="category">Category:</label>
+            <input type="text" id="category" name="category" value="<%= product.category %>" required>
         </div>
-        <%# --- End Modification --- %>
 
-        <div class="form-group">
-            <label for="description">Description:</label>
-            <textarea id="description" name="description" class="form-control" rows="4"><%= product.description || '' %></textarea>
-        </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
+
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
         </div>
+
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
         </div>
+
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications || '' %></textarea>
+            <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
         </div>
 
         <hr>
         <h4>Admin Review Control</h4>
+
         <div class="form-group">
             <label for="reviewStatus">Review Status:</label>
             <select id="reviewStatus" name="reviewStatus" class="form-control" onchange="toggleRejectionReason(this.value)">
@@ -68,21 +49,30 @@
                 <option value="rejected" <%= product.reviewStatus === 'rejected' ? 'selected' : '' %>>Rejected</option>
             </select>
         </div>
+
         <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
             <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
             <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>
         </div>
 
-        <button type="submit" class="btn btn-primary" <%= (!locals.categories || categories.length === 0) ? 'disabled' : '' %>>
-            Update Product (Admin)
-        </button>
+        <button type="submit" class="btn btn-primary">Update Product (Admin)</button>
         <a href="/admin/manage-products" class="btn btn-secondary">Cancel</a>
     </form>
 </div>
 
 <script>
-    function toggleRejectionReason(status) { /* Keep existing script */ }
-    document.addEventListener('DOMContentLoaded', () => { /* Keep existing script */ });
+    function toggleRejectionReason(status) {
+        const reasonGroup = document.getElementById('rejectionReasonGroup');
+        if (status === 'rejected') {
+            reasonGroup.style.display = 'block';
+        } else {
+            reasonGroup.style.display = 'none';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        toggleRejectionReason(document.getElementById('reviewStatus').value);
+    });
 </script>
 
 <%- include('../partials/footer') %>

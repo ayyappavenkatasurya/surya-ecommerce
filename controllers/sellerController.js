@@ -2,8 +2,7 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const Category = require('../models/Category'); // *** IMPORT Category Model ***
-const { sendEmail } = require('../config/mailer');
+const { sendEmail } = require('../config/mailer'); // Import sendEmail
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPBySeller,
@@ -11,6 +10,7 @@ const {
 } = require('./orderController');
 const mongoose = require('mongoose');
 
+// --- NEW: Seller Cancellation Reasons ---
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
     "🚚 Unable to Fulfill/Ship",
@@ -23,103 +23,70 @@ exports.getSellerDashboard = (req, res) => {
     res.render('seller/dashboard', { title: 'Seller Dashboard' });
 };
 
-// --- Product Management Pages ---
-// --- UPDATED: Fetch Categories for Upload Page ---
-exports.getUploadProductPage = async (req, res, next) => {
-     try {
-         const categories = await Category.find().sort('name').lean(); // Fetch categories
-         res.render('seller/upload-product', {
-            title: 'Upload New Product',
-            product: {}, // Empty product object for form binding
-            categories: categories // Pass categories to the view
-        });
-     } catch (error) {
-        console.error("Error fetching categories for seller upload page:", error);
-        req.flash('error_msg', 'Could not load category data.');
-         res.render('seller/upload-product', { // Render even if category fetch fails
-             title: 'Upload New Product',
-             product: {},
-             categories: []
-         });
-     }
+// Product Management Pages
+exports.getUploadProductPage = (req, res) => {
+    // Pass an empty product object or defaults if needed for rendering sticky form
+    res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
 };
 
-// --- UPDATED: Fetch Categories for Edit Page ---
-exports.getEditProductPage = async (req, res, next) => {
-     try {
-        // isProductOwner middleware ensures ownership
-        const [product, categories] = await Promise.all([
-             Product.findOne({ _id: req.params.id, sellerId: req.session.user._id })
-                    .populate('categoryRef') // Populate category object
-                    .lean(), // Fetch the specific product owned by the seller
-             Category.find().sort('name').lean() // Fetch all categories
-        ]);
+exports.getManageProductsPage = async (req, res, next) => {
+    try {
+        const sellerId = req.session.user._id;
+        const products = await Product.find({ sellerId: sellerId })
+                                    .sort({ createdAt: -1 })
+                                    .lean();
 
-        if (!product) {
-           req.flash('error_msg', 'Product not found or you do not have permission to edit it.');
-           return res.redirect('/seller/products');
-        }
-
-        res.render('seller/edit-product', {
-           title: `Edit Product: ${product.name}`,
-           product: product,
-           categories: categories // Pass categories to the view
+        res.render('seller/manage-products', {
+            title: 'Manage Your Products',
+            products: products
         });
-
-   } catch (error) {
-        if (error.name === 'CastError') {
-            req.flash('error_msg', 'Invalid product ID format.');
-            return res.redirect('/seller/products');
-        }
-        console.error("Error fetching product/categories for edit:", error);
+    } catch (error) {
         next(error);
     }
 };
 
+exports.getEditProductPage = async (req, res, next) => {
+     try {
+        // isProductOwner middleware ensures ownership
+        const product = await Product.findById(req.params.id).lean(); // Use lean here
+        if (!product) {
+           req.flash('error_msg', 'Product not found.');
+           return res.redirect('/seller/products');
+       }
+       // Ownership check already done by middleware
 
-// --- Product Management Actions ---
-// --- UPDATED: Handle categoryRef on Upload ---
+       res.render('seller/edit-product', {
+           title: `Edit Product: ${product.name}`,
+           product: product // Pass lean object
+       });
+   } catch (error) {
+        if (error.name === 'CastError') {
+          req.flash('error_msg', 'Invalid product ID format.');
+           return res.redirect('/seller/products');
+      }
+       next(error);
+    }
+};
+
+// Product Management Actions
 exports.uploadProduct = async (req, res, next) => {
-    // *** Get categoryRef instead of category ***
-    const { name, categoryRef, price, stock, imageUrl, description, specifications } = req.body;
+    const { name, category, price, stock, imageUrl, specifications } = req.body;
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
-    let categories = []; // For re-rendering form on error
 
-     try {
-         // Fetch categories for validation and error re-rendering
-         categories = await Category.find().sort('name').lean();
+     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+    }
+     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
+        req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+     }
 
-         // --- Updated Validation ---
-        if (!name || !categoryRef || price === undefined || stock === undefined || !imageUrl) { // Check ref
-            req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-            return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
-        }
-         if (!mongoose.Types.ObjectId.isValid(categoryRef)) {
-            req.flash('error_msg', 'Invalid category selected.');
-            return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
-         }
-         if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-            req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-            return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
-         }
-          // Ensure categories are loaded for the check below
-          if (!categories || categories.length === 0) {
-               throw new Error("Categories could not be loaded for validation.");
-          }
-          // Verify Category Exists
-          const selectedCategory = categories.find(cat => cat._id.toString() === categoryRef);
-          if (!selectedCategory) {
-              req.flash('error_msg', 'Selected category not found or invalid.');
-              return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
-          }
-
-        // --- Save using categoryRef (categoryName will be added by pre-save hook) ---
+    try {
         const newProduct = new Product({
             name: name.trim(),
-            categoryRef: categoryRef, // Use categoryRef
-            // categoryName will be set by pre-save hook using selectedCategory.name
-            description: description ? description.trim() : '',
+            category: category.trim(),
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
@@ -129,17 +96,18 @@ exports.uploadProduct = async (req, res, next) => {
             reviewStatus: 'pending' // Start as pending
         });
 
-        await newProduct.save(); // Pre-save hook runs here to set categoryName
-        console.log(`Product ${newProduct._id} (Cat: ${newProduct.categoryName}) saved initially by seller ${sellerEmail}.`);
+        await newProduct.save();
+        console.log(`Product ${newProduct._id} saved initially by seller ${sellerEmail}.`);
 
-        // Trigger Gemini review asynchronously (pass the saved product which now has _id)
+        // Trigger Gemini review asynchronously
         reviewProductWithGemini(newProduct).then(async reviewResult => {
              try {
+                 // Fetch the latest version of the product to update
                  const productToUpdate = await Product.findById(newProduct._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
-                    productToUpdate.rejectionReason = reviewResult.reason;
-                    await productToUpdate.save(); // Save the updated review status
+                    productToUpdate.rejectionReason = reviewResult.reason; // Might be null/undefined
+                    await productToUpdate.save();
                     console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
                  } else {
                      console.warn(`Product ${newProduct._id} not found for status update after Gemini review.`);
@@ -149,177 +117,107 @@ exports.uploadProduct = async (req, res, next) => {
              }
         }).catch(reviewError => {
              console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
-             // Attempt to mark as pending with error reason if review chain fails
+             // Consider setting status back to 'pending' or a specific 'error' state
+             // Example: Mark as pending with a reason if review fails completely
               Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
         });
 
         req.flash('success_msg', `Product "${newProduct.name}" submitted for review.`);
-        res.redirect('/seller/products'); // Redirect to seller's product list
+        res.redirect('/seller/products');
 
     } catch (error) {
-         // Ensure categories are available if an error occurs before or during fetch
-         if (!categories || categories.length === 0) {
-              try { categories = await Category.find().sort('name').lean(); } catch (catError) { console.error("Failed to fetch categories for error display:", catError); }
-         }
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories || [] });
+           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
        }
         console.error("Error uploading product:", error);
-        req.flash('error_msg', `Error uploading product: ${error.message}`);
-        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories || [] });
-        // Or use next(error);
+        next(error);
     }
 };
 
-// --- UPDATED: Handle categoryRef on Update ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id;
-    // *** Get categoryRef instead of category ***
-    const { name, categoryRef, price, stock, imageUrl, description, specifications } = req.body;
-     let categories = []; // For potential re-rendering on error
+    const sellerId = req.session.user._id; // For validation, though middleware handles access
+    const { name, category, price, stock, imageUrl, specifications } = req.body;
+
+     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
+        req.flash('error_msg', 'Please fill in all required fields.');
+        // Need to fetch product again to render edit page correctly
+        try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+    }
+     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
+         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
+         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+     }
 
     try {
-        // Fetch categories early for validation/error case
-        categories = await Category.find().sort('name').lean();
-
-         // --- Updated Validation ---
-         if (!name || !categoryRef || price === undefined || stock === undefined || !imageUrl) { // Check ref
-            req.flash('error_msg', 'Please fill in all required fields.');
-             // Redirect back to edit page, data will be re-fetched by getEditProductPage
-             return res.redirect(`/seller/products/edit/${productId}`);
-         }
-        if (!mongoose.Types.ObjectId.isValid(categoryRef)) {
-             req.flash('error_msg', 'Invalid category selected.');
-             return res.redirect(`/seller/products/edit/${productId}`);
-          }
-         if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-             req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-             return res.redirect(`/seller/products/edit/${productId}`);
-         }
-          // Ensure categories loaded for check
-          if (!categories || categories.length === 0) {
-               throw new Error("Categories could not be loaded for validation.");
-          }
-        // Verify Category Exists using pre-fetched categories
-        const selectedCategory = categories.find(cat => cat._id.toString() === categoryRef);
-        if (!selectedCategory) {
-           req.flash('error_msg', 'Selected category not found or invalid.');
-           return res.redirect(`/seller/products/edit/${productId}`);
-        }
-
-        // Use findOne to ensure ownership and get non-lean doc for saving
+        // Find product ensuring it belongs to the seller (redundant with middleware, but safe)
         const product = await Product.findOne({ _id: productId, sellerId: sellerId });
+
         if (!product) {
             req.flash('error_msg', 'Product not found or access denied.');
             return res.status(404).redirect('/seller/products');
          }
 
-         // Check if core details impacting review have changed
-         const detailsChanged = product.name !== name.trim() ||
-                               product.categoryRef.toString() !== categoryRef ||
-                               product.description !== (description ? description.trim() : '') ||
-                               product.imageUrl !== imageUrl.trim();
-
-
-         // Update product fields
          product.name = name.trim();
-         product.categoryRef = categoryRef; // Update Ref
-         // categoryName will be updated by pre-save hook using selectedCategory.name
-         product.description = description ? description.trim() : '';
+         product.category = category.trim();
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
          product.specifications = specifications ? specifications.trim() : '';
+         product.reviewStatus = 'pending'; // Reset status on update
+         product.rejectionReason = undefined;
 
-         // Only reset review status if relevant details changed
-         if (detailsChanged) {
-            product.reviewStatus = 'pending'; // Reset status on update of key details
-            product.rejectionReason = undefined; // Clear rejection reason
-            console.log(`Product ${productId} core details updated by seller, set to pending review.`);
-         } else {
-            console.log(`Product ${productId} updated by seller (only price/stock/specs?), review status remains ${product.reviewStatus}.`);
-         }
+         await product.save();
+         console.log(`Product ${productId} updated by seller, set to pending review.`);
 
-
-         await product.save(); // Pre-save runs to update categoryName if needed
-
-        // Trigger Gemini review only if status was reset to pending
-        if (product.reviewStatus === 'pending') {
-            reviewProductWithGemini(product).then(async reviewResult => {
-                 try {
-                     const productToUpdate = await Product.findById(product._id); // Refetch fresh instance
-                     if (productToUpdate) {
-                        productToUpdate.reviewStatus = reviewResult.status;
-                        productToUpdate.rejectionReason = reviewResult.reason;
-                        await productToUpdate.save(); // Save review status
-                        console.log(`Product ${product._id} review status updated to ${reviewResult.status} after edit.`);
-                     }
-                 } catch (updateError) {
-                    console.error(`Error updating product ${product._id} after Gemini review (post-edit):`, updateError);
+        // Trigger Gemini review asynchronously
+        reviewProductWithGemini(product).then(async reviewResult => {
+             try {
+                 const productToUpdate = await Product.findById(product._id); // Fetch again to update
+                 if (productToUpdate) {
+                    productToUpdate.reviewStatus = reviewResult.status;
+                    productToUpdate.rejectionReason = reviewResult.reason;
+                    await productToUpdate.save();
+                    console.log(`Product ${product._id} review status updated to ${reviewResult.status} after edit.`);
                  }
-            }).catch(reviewError => {
-                 console.error(`Error in Gemini review promise chain for edited product ${product._id}:`, reviewError);
-                  Product.findByIdAndUpdate(product._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed after edit.' }).catch(err => console.error("Failed to mark edited product as pending after review error:", err));
-             });
-        }
+             } catch (updateError) {
+                console.error(`Error updating product ${product._id} after Gemini review (post-edit):`, updateError);
+             }
+        }).catch(reviewError => {
+             console.error(`Error in Gemini review promise chain for edited product ${product._id}:`, reviewError);
+              Product.findByIdAndUpdate(product._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed after edit.' }).catch(err => console.error("Failed to mark edited product as pending after review error:", err));
+         });
 
-         req.flash('success_msg', `Product "${product.name}" updated${product.reviewStatus === 'pending' ? ' and resubmitted for review' : ''}.`);
+         req.flash('success_msg', `Product "${product.name}" updated and resubmitted for review.`);
          res.redirect('/seller/products');
 
     } catch (error) {
-         // Ensure categories available for potential error render (though redirect is preferred)
-          if (!categories || categories.length === 0) {
-               try { categories = await Category.find().sort('name').lean(); } catch (catErr) {}
-           }
-        if (error.name === 'ValidationError') {
+         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-        } else {
-             console.error("Error updating product:", error);
-            req.flash('error_msg', 'An error occurred while updating the product.');
-        }
-        // Redirect back to edit page on any error to allow user to fix
-        return res.redirect(`/seller/products/edit/${productId}`);
-    }
-};
-
-// --- UPDATED: Populate category name ---
-exports.getManageProductsPage = async (req, res, next) => {
-    try {
-        const sellerId = req.session.user._id;
-        const products = await Product.find({ sellerId: sellerId })
-                                    .populate('categoryRef', 'name') // Populate category name via ref
-                                    .sort({ createdAt: -1 })
-                                    .lean();
-
-        res.render('seller/manage-products', {
-            title: 'Manage Your Products',
-            products: products
-        });
-    } catch (error) {
-        console.error("Error fetching seller products:", error);
-        next(error);
-    }
-};
+             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
+             try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+         }
+         console.error("Error updating product:", error);
+         next(error);
+     }
+ };
 
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id; // Ensure seller ID from session
+    const sellerId = req.session.user._id;
 
     try {
-         // Find and delete specifically matching the product ID AND seller ID
+         // Middleware verifies ownership, find and delete in one step
          const product = await Product.findOneAndDelete({ _id: productId, sellerId: sellerId });
 
         if (!product) {
-             // Product either doesn't exist or doesn't belong to this seller
-             req.flash('error_msg', 'Product not found or you do not have permission to remove it.');
+             req.flash('error_msg', 'Product not found or already removed.');
              return res.status(404).redirect('/seller/products');
          }
          req.flash('success_msg', `Product "${product.name}" removed successfully.`);
-         res.redirect('/seller/products'); // Redirect back to the seller's product list
+         res.redirect('/seller/products');
     } catch (error) {
         if (error.name === 'CastError') {
              req.flash('error_msg', 'Invalid product ID format.');
@@ -331,7 +229,7 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-// --- Seller Order Management Page ---
+// --- CORRECTED Seller Order Management Page ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -353,29 +251,32 @@ exports.getManageOrdersPage = async (req, res, next) => {
         // 2. Find orders containing any of these products
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price sellerId') // Include sellerId here
+                                   .populate('products.productId', 'name imageUrl _id price sellerId')
                                    .populate('userId', 'name email') // Populate user for display if needed
                                    .lean();
 
         // 3. Add flags specific to seller actions and format items summary
         const now = Date.now();
         orders.forEach(order => {
-             order.isRelevantToSeller = true; // Set flag based on the find query
+             order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             order.canBeCancelledBySeller = order.status === 'Pending';
+             // *** NEW: Seller Cancellation Logic ***
+             order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
 
              order.showDeliveryOtp = order.status === 'Pending' &&
                                      !!order.orderOTP &&
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
-            // Format item summary, highlighting seller's items
+            // Format Items Summary (Highlight seller's items)
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
+                    // Ensure productId and sellerId exist before comparing
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
                     const productName = p.productId?.name || p.name || '[Product Name Missing]';
-                    // Highlight seller's items using text-success (or other class)
+
+                    // Highlight seller's item clearly
                     return `${isSellerItem ? '<strong class="text-success">' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Your Item)</strong>' : ''}`;
                 }).join('<br>');
             } else {
@@ -383,23 +284,20 @@ exports.getManageOrdersPage = async (req, res, next) => {
             }
         });
 
+        // *** Render the template, PASSING message as null and reasons ***
         res.render('seller/manage-orders', {
             title: 'Manage Your Orders',
             orders: orders,
-            message: null, // No general message if orders were found
-            sellerCancellationReasons: sellerCancellationReasons
+            message: null, // Pass null when orders exist
+            sellerCancellationReasons: sellerCancellationReasons // Pass reasons to the view
         });
     } catch (error) {
-        console.error("Error fetching seller orders:", error);
         next(error);
     }
 };
 
 
-// --- Seller Order Actions (send OTP, confirm delivery, cancel order) ---
-// These actions don't directly involve category details, so no changes needed here
-// assuming relevance is checked via middleware (isOrderRelevantToSeller).
-
+// --- Seller Order Actions ---
 exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const sellerId = req.session.user._id;
@@ -415,7 +313,7 @@ exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     } catch (error) {
         req.flash('error_msg', `Failed to send delivery OTP: ${error.message}`);
     }
-    res.redirect('/seller/orders'); // Redirect back to the orders page
+    res.redirect('/seller/orders');
 };
 
 exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
@@ -435,15 +333,17 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     } catch (error) {
         req.flash('error_msg', `Delivery confirmation failed: ${error.message}`);
     }
-    res.redirect('/seller/orders'); // Redirect back
+    res.redirect('/seller/orders');
 };
 
+// --- NEW: Seller Cancel Order ---
 exports.cancelOrderBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email; // For logging
 
+    // Validate reason
     if (!reason || !sellerCancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid seller reason for cancellation.');
         return res.redirect('/seller/orders');
@@ -452,10 +352,10 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     const sessionDB = await mongoose.startSession();
     sessionDB.startTransaction();
     try {
-        // Middleware ensures relevance, but fetch needed details again for the transaction
+        // Find the order and populate product sellerId
         const order = await Order.findById(orderId)
-                                .populate('products.productId', 'sellerId name _id') // Include necessary fields
-                                .populate('userId', 'email')
+                                .populate('products.productId', 'sellerId name _id') // Need sellerId and _id
+                                .populate('userId', 'email') // For notification
                                 .session(sessionDB);
 
         if (!order) {
@@ -464,13 +364,14 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             return res.status(404).redirect('/seller/orders');
         }
 
+        // Check if order status is Pending
         if (order.status !== 'Pending') {
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', `Order status is '${order.status}'. Only 'Pending' orders can be cancelled by seller.`);
             return res.redirect('/seller/orders');
         }
 
-        // Double-check relevance inside transaction
+        // Double check relevance (middleware should handle this, but good practice)
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
              await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -479,46 +380,45 @@ exports.cancelOrderBySeller = async (req, res, next) => {
              return res.status(403).redirect('/seller/orders');
         }
 
+
+        // --- Restore Stock ONLY for the seller's items ---
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
-        // Filter to only restore stock for THIS seller's items
         const productStockRestorePromises = order.products
-            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString())
+            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
             .map(item => {
                 const quantityToRestore = Number(item.quantity);
                  if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
                     console.warn(`Seller Cancel: Invalid P.ID ${item.productId?._id} or Qty ${item.quantity} for seller's item in O.ID ${orderId}. Skipping restore.`);
-                    return Promise.resolve(); // Skip invalid items gracefully
+                    return Promise.resolve();
                 }
                 console.log(`Seller Cancel: Restoring ${quantityToRestore} stock for P.ID ${item.productId._id}`);
-                 // Update Product stock and decrement order count within transaction
                  return Product.updateOne(
                      { _id: item.productId._id },
-                     { $inc: { stock: quantityToRestore, orderCount: -1 } },
-                     { session: sessionDB } // Use transaction session
+                     { $inc: { stock: quantityToRestore, orderCount: -1 } }, // Restore stock, decrement order count
+                     { session: sessionDB }
                  ).catch(err => {
-                    // Log the error but allow the main cancellation logic to continue
                     console.error(`Seller Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
                  });
             });
 
-        await Promise.allSettled(productStockRestorePromises); // Wait for all attempts
+        await Promise.allSettled(productStockRestorePromises);
         console.log(`Seller Cancel: Stock restoration attempts completed for seller ${sellerId} in order ${orderId}.`);
 
-        // Cancel the entire order (current implementation)
+        // Update Order Status and Reason
         order.status = 'Cancelled';
-        order.cancellationReason = `Cancelled by Seller: ${reason}`;
-        // Clear sensitive fields upon cancellation
+        order.cancellationReason = `Cancelled by Seller: ${reason}`; // Add prefix
+        // Clear OTP fields etc. (pre-save hook might also do this)
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
-        order.cancellationAllowedUntil = undefined;
+        order.cancellationAllowedUntil = undefined; // Remove cancellation window
 
-        await order.save({ session: sessionDB }); // Save order changes
+        await order.save({ session: sessionDB });
 
-        await sessionDB.commitTransaction(); // Commit the transaction
+        await sessionDB.commitTransaction();
 
-        // Send email notification (outside transaction)
+        // --- Send Email Notification (Outside Transaction) ---
         try {
-            const customerEmail = order.userEmail || order.userId?.email; // Find customer email
+            const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {
                 const subjectCust = `Update on Your Order (${order._id})`;
                 const htmlCust = `<p>Unfortunately, your order (${order._id}) has been cancelled by the seller.</p>
@@ -526,7 +426,7 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                                 <p>Any payment made (if applicable) will be refunded according to policy.</p>
                                 <p>We apologize for any inconvenience. Please contact support if you have questions.</p>`;
                 const textCust = `Your order ${order._id} was cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
-                await sendEmail(customerEmail, subjectCust, textCust, htmlCust); // Send email
+                await sendEmail(customerEmail, subjectCust, textCust, htmlCust);
             } else {
                 console.warn(`Seller Cancel: Could not find customer email for order ${orderId} notification.`);
             }
@@ -535,16 +435,14 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         }
 
         req.flash('success_msg', `Order ${orderId} cancelled successfully. Reason: ${reason}. Customer notified.`);
-        res.redirect('/seller/orders'); // Redirect back
+        res.redirect('/seller/orders');
 
     } catch (error) {
-        if (sessionDB.inTransaction()) { // Abort if transaction is still active
-            await sessionDB.abortTransaction();
-        }
+        await sessionDB.abortTransaction();
         console.error(`Error cancelling order ${orderId} by seller ${sellerEmail} (${sellerId}):`, error);
         req.flash('error_msg', 'Failed to cancel order due to an internal error.');
-        res.redirect('/seller/orders'); // Redirect back
+        res.redirect('/seller/orders');
     } finally {
-         if (sessionDB.id) { await sessionDB.endSession(); } // Always end the session
+        sessionDB.endSession();
     }
 };

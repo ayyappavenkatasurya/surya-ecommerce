@@ -13,27 +13,14 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a product name'],
         trim: true,
-        index: true
+        index: true // Added index for searching
     },
-    description: {
+    category: {
         type: String,
+        required: [true, 'Please provide a product category'],
         trim: true,
-        default: ''
+        index: true // Added index for searching
     },
-    // --- MODIFIED: Changed category field ---
-    categoryRef: { // Changed from 'category'
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Category', // References the new Category model
-        required: [true, 'Please select a product category'],
-        index: true
-    },
-    categoryName: { // Denormalized for easier display/search
-        type: String,
-        required: [true, 'Category name is missing'],
-        trim: true,
-        index: true // Index for searching/filtering by name
-    },
-    // --- End Modification ---
     price: {
         type: Number,
         required: [true, 'Please provide a product price'],
@@ -54,12 +41,14 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
+    // *** UPDATED: Added sellerId reference ***
     sellerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true
     },
+    // Keep sellerEmail for potential display/legacy reasons, but sellerId is primary
     sellerEmail: {
         type: String,
         required: true,
@@ -75,47 +64,28 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    orderCount: {
+    orderCount: { // Tracks how many times item appeared in orders
         type: Number,
         default: 0,
     },
+    // *** NEW: Fields for Review Status ***
     reviewStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
-        index: true
+        index: true // Index for filtering visible products
     },
     rejectionReason: {
         type: String,
         trim: true
     }
 }, {
-    timestamps: true
+    timestamps: true // Automatically adds createdAt and updatedAt
 });
 
-// Pre-save hook to handle ratings AND fetch categoryName
-ProductSchema.pre('save', async function(next) {
-    // --- Update Category Name if categoryRef is modified ---
-    if (this.isModified('categoryRef') || this.isNew) {
-        try {
-            const Category = mongoose.model('Category');
-            const categoryDoc = await Category.findById(this.categoryRef).select('name');
-            if (categoryDoc) {
-                this.categoryName = categoryDoc.name;
-            } else {
-                 console.warn(`Product Save: Could not find Category with ID ${this.categoryRef}. Setting categoryName to 'Unknown'.`);
-                 this.categoryName = 'Unknown Category'; // Or throw an error?
-                 // return next(new Error(`Invalid Category selected for product ${this.name}`)); // Option: Fail validation
-             }
-        } catch (error) {
-            console.error(`Product Save: Error fetching category name for ID ${this.categoryRef}:`, error);
-             // Consider how to handle this - fail validation or allow save with fallback?
-             return next(error);
-        }
-    }
-
-    // Existing Rating logic
-    if (this.isModified('ratings')) {
+// Calculate average rating and numReviews before saving
+ProductSchema.pre('save', function(next) {
+    if (this.isModified('ratings')) { // Only recalculate if ratings changed
         if (this.ratings && this.ratings.length > 0) {
             this.numReviews = this.ratings.length;
             this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
@@ -125,6 +95,7 @@ ProductSchema.pre('save', async function(next) {
         }
     }
 
+    // Ensure rejectionReason is cleared if status is not 'rejected'
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
@@ -132,9 +103,9 @@ ProductSchema.pre('save', async function(next) {
     next();
 });
 
+// Define text index for searching multiple fields
+ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' });
 
-// Define text index - REMOVED 'category', added 'categoryName'
-ProductSchema.index({ name: 'text', description: 'text', categoryName: 'text', specifications: 'text' });
 
 const Product = mongoose.model('Product', ProductSchema);
 

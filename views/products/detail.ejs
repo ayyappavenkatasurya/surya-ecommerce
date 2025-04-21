@@ -1,12 +1,12 @@
 <%# views/products/detail.ejs %>
 
-<%# --- Meta Description Preparation --- %>
-<% let metaDesc = product.description ? product.description.substring(0, 155) + '...' : `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
+<%# --- Meta Description Preparation (Same as before) --- %>
+<% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
 <% if (metaDesc.length > 160) { metaDesc = metaDesc.substring(0, 157) + '...'; } %>
 
 <%- include('../partials/header', {
     title: product.name,
-    metaTitle: product.name + ' - ' + defaultSiteName,
+    metaTitle: product.name + ' - ' + defaultSiteName, // Use defaultSiteName
     metaDescription: metaDesc,
     metaImageUrl: product.imageUrl,
     metaUrl: fullUrl,
@@ -15,7 +15,7 @@
 
 <div class="product-detail-container">
 
-   <%# --- Status Banner (Keep existing) --- %>
+   <%# --- Status Banner for Admin/Owner if Not Approved --- %>
    <% if (!isApproved && (isAdminView || isOwnerView)) { %>
      <div class="alert alert-<%= product.reviewStatus === 'rejected' ? 'danger' : 'warning' %> mb-3" role="alert">
        <strong>Status:</strong> <span class="text-capitalize fw-bold"><%= product.reviewStatus %></span>
@@ -24,18 +24,22 @@
        <% } else if (product.reviewStatus === 'pending') { %>
           - This product is awaiting review and is not visible to customers.
        <% } %>
-       <% if (isOwnerView && product.reviewStatus !== 'approved') { %>
+       <% if (isOwnerView && product.reviewStatus !== 'approved') { %> <%# Show edit link only to owner if not approved %>
           <br><a href="/seller/products/edit/<%= product._id %>" class="alert-link">Edit and Resubmit for Review</a>
         <% } else if (isAdminView && product.reviewStatus !== 'approved') { %>
            <br><a href="/admin/manage-products/edit/<%= product._id %>" class="alert-link">Admin: Edit Status/Details</a>
        <% } %>
      </div>
    <% } else if (!isApproved && !isAdminView && !isOwnerView) { %>
+      <%# This block should technically not be reachable due to controller redirect, but acts as safety %>
       <div class="alert alert-danger">This product is currently unavailable.</div>
-      </div>
+      <%# Early exit or hide the rest of the content %>
+      </div> <%- /* End product-detail-container */ %>
       <%- include('../partials/footer') %>
-      <% return; %>
+      <% return; %> <%# Stop rendering further %>
    <% } %>
+   <%# --- End Status Banner --- %>
+
 
    <div class="product-detail-main">
         <div class="product-detail-image">
@@ -43,17 +47,6 @@
         </div>
        <div class="product-detail-info">
             <h1><%= product.name %></h1>
-
-            <%# *** MOVED Description Display HERE *** %>
-            <% if (product.description) { %>
-            <div class="product-description mb-2"> <%# Removed mt-3, added mb-2 %>
-                <%# REMOVED h3 title, description flows directly from product name %>
-                <%# Use CSS white-space: pre-wrap to preserve line breaks entered in textarea %>
-                <p class="description-text text-muted small"><%= product.description %></p> <%# Added text-muted and small class for style %>
-            </div>
-            <% } %>
-            <%# *** End Moved Block *** %>
-
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
             <p class="detail-stock">
                 <% if (product.stock > 0) { %>
@@ -61,10 +54,10 @@
                 <% } else { %>
                     <span class="text-danger fw-bold">Out of Stock</span>
                 <% } %>
-            </p>
+            </p> <%# End of stock paragraph %>
 
-            <%# Share Button (Keep existing position) %>
-            <div class="share-section mt-2">
+            <%# === MOVED SHARE BUTTON HERE === %>
+            <div class="share-section mt-2"> <%# Adjusted margin %>
                 <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
                         data-title="<%= product.name %>"
                         data-text="Check out this product: <%= product.name %>"
@@ -72,27 +65,34 @@
                     <i class="fas fa-share-alt"></i> Share
                 </button>
                 <div id="fallback-share-links" class="fallback-share-links hidden">
-                     <small>Share via:</small>
-                     <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
-                     <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
-                     <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
-                     <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
-                 </div>
+                    <small>Share via:</small>
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
+                    <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
+                    <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
+                    <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
+                </div>
             </div>
+            <%# === END MOVED SHARE BUTTON === %>
 
-           <%# Purchase Actions (Keep existing) %>
+           <%# --- RATING DISPLAY BLOCK REMOVED FROM HERE --- %>
+
+           <%# --- Conditional Purchase Actions --- %>
            <% if (isApproved) { %>
                <div class="product-actions">
+                   <%# === MODIFIED Add to Cart Form === %>
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
-                       <div class="quantity-selector mb-2 d-inline-flex align-items-center">
-                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label>
+                       <div class="quantity-selector mb-2 d-inline-flex align-items-center"> <%# Added d-inline-flex and align-items-center %>
+                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label> <%# Kept text-muted style %>
                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;">
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                        </button>
                   </form>
+                  <%# === END MODIFIED Add to Cart Form === %>
+
+                   <%# Buy Now Form %>
                     <% if (product.stock > 0) { %>
                     <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
                           <input type="hidden" name="productId" value="<%= product._id %>">
@@ -110,25 +110,25 @@
                      <p class="text-muted small mt-2">This product is currently under review or unavailable.</p>
                  </div>
             <% } %>
+            <%# --- End Conditional Purchase Actions --- %>
 
-            <%# Description Block REMOVED from here %>
-
-            <%# Specifications (Keep existing) %>
+            <%# Specifications %>
             <div class="product-specifications mt-3">
                  <h3>Specifications</h3>
                  <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
-            </div>
+            </div> <%# End of product-specifications div %>
 
-            <%# Seller Info (Keep existing) %>
+            <%# === MOVED SELLER INFO HERE === %>
             <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
+            <%# === END MOVED SELLER INFO === %>
 
        </div> <%# End product-detail-info %>
     </div> <%# End product-detail-main %>
 
-   <%# --- Remaining Sections (Rating, Stats) Keep existing --- %>
+   <%# --- Conditional Rating Section --- %>
    <div class="product-rating-section mt-4 border-top pt-3">
         <h3>Rate This Product</h3>
-        <% if (isApproved) { %>
+        <% if (isApproved) { %> <%# Only allow rating if approved %>
             <% if (userCanRate) { %>
                 <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
                     <div class="rating-stars">
@@ -143,8 +143,10 @@
              <p class="text-muted">Rating is unavailable until the product is approved.</p>
          <% } %>
    </div>
+   <%# --- End Conditional Rating Section --- %>
 
-    <div class="mb-3">
+    <%# --- RATING DISPLAY BLOCK PASTED HERE --- %>
+    <div class="mb-3"> <%# Removed mt-3, added mb-3 for spacing below %>
         <% if (product.numReviews > 0) { %>
             <p class="detail-rating">
                 Rating:
@@ -155,7 +157,10 @@
             <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
         <% } %>
     </div>
+    <%# --- END PASTED RATING DISPLAY BLOCK --- %>
 
+
+    <%# --- Rating Stats Display --- %>
     <div class="rating-stats-container mt-4 border-top pt-3">
         <h3>Ratings & Reviews Summary</h3>
          <% if (totalRatings > 0) { %>
@@ -174,8 +179,8 @@
                  %>
                      <div class="rating-bar-row">
                          <span class="rating-bar-label small"><%= i %> <i class="fas fa-star text-warning"></i></span>
-                         <div class="rating-bar-progress progress" style="height: 8px;">
-                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div>
+                         <div class="rating-bar-progress progress" style="height: 8px;"> <%# Use Bootstrap progress bar style %>
+                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div> <%# Start width at 0 %>
                          </div>
                          <span class="rating-bar-count small text-muted"><%= count %></span>
                      </div>
@@ -185,15 +190,17 @@
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
+     <%# --- End Rating Stats Display --- %>
 
 </div> <%# End product-detail-container %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Animate progress bars
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            setTimeout(() => {
+            setTimeout(() => { // Small delay for visual effect
                  el.style.width = width + '%';
             }, 100);
         }
