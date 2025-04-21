@@ -13,21 +13,27 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a product name'],
         trim: true,
-        index: true // Added index for searching
+        index: true
     },
-    // *** NEW: Added description field ***
     description: {
         type: String,
         trim: true,
-        default: '' // Default to empty string, not required
+        default: ''
     },
-    // *** End New Field ***
-    category: {
+    // --- MODIFIED: Changed category field ---
+    categoryRef: { // Changed from 'category'
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Category', // References the new Category model
+        required: [true, 'Please select a product category'],
+        index: true
+    },
+    categoryName: { // Denormalized for easier display/search
         type: String,
-        required: [true, 'Please provide a product category'],
+        required: [true, 'Category name is missing'],
         trim: true,
-        index: true // Added index for searching
+        index: true // Index for searching/filtering by name
     },
+    // --- End Modification ---
     price: {
         type: Number,
         required: [true, 'Please provide a product price'],
@@ -87,8 +93,28 @@ const ProductSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Calculate average rating and numReviews before saving
-ProductSchema.pre('save', function(next) {
+// Pre-save hook to handle ratings AND fetch categoryName
+ProductSchema.pre('save', async function(next) {
+    // --- Update Category Name if categoryRef is modified ---
+    if (this.isModified('categoryRef') || this.isNew) {
+        try {
+            const Category = mongoose.model('Category');
+            const categoryDoc = await Category.findById(this.categoryRef).select('name');
+            if (categoryDoc) {
+                this.categoryName = categoryDoc.name;
+            } else {
+                 console.warn(`Product Save: Could not find Category with ID ${this.categoryRef}. Setting categoryName to 'Unknown'.`);
+                 this.categoryName = 'Unknown Category'; // Or throw an error?
+                 // return next(new Error(`Invalid Category selected for product ${this.name}`)); // Option: Fail validation
+             }
+        } catch (error) {
+            console.error(`Product Save: Error fetching category name for ID ${this.categoryRef}:`, error);
+             // Consider how to handle this - fail validation or allow save with fallback?
+             return next(error);
+        }
+    }
+
+    // Existing Rating logic
     if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
             this.numReviews = this.ratings.length;
@@ -106,9 +132,9 @@ ProductSchema.pre('save', function(next) {
     next();
 });
 
-// Define text index for searching multiple fields (including description)
-ProductSchema.index({ name: 'text', category: 'text', description: 'text', specifications: 'text' });
 
+// Define text index - REMOVED 'category', added 'categoryName'
+ProductSchema.index({ name: 'text', description: 'text', categoryName: 'text', specifications: 'text' });
 
 const Product = mongoose.model('Product', ProductSchema);
 

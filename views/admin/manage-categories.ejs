@@ -1,0 +1,73 @@
+<%# views/admin/manage-categories.ejs %>
+<%- include('../partials/header', { title: title }) %>
+
+<div class="admin-manage-container">
+    <h1><%= title %></h1>
+    <a href="/admin/categories/new" class="btn btn-primary mb-3"><i class="fas fa-plus"></i> Add New Category</a>
+
+    <% if (categories.length > 0) { %>
+        <div class="table-container card">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Name</th>
+                        <th>Created By</th>
+                        <th>Last Updated</th>
+                        <th class="actions-cell" style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% categories.forEach(category => { %>
+                        <tr>
+                            <td data-label="Image">
+                                <img src="<%= category.imageUrl %>" alt="<%= category.name %>" class="table-img" style="width: 50px; height: 50px; object-fit: cover;">
+                            </td>
+                            <td data-label="Name">
+                                <%= category.name %> <br>
+                                <small class="text-muted">Slug: <%= category.slug %></small>
+                            </td>
+                            <td data-label="Created By">
+                                <% if (category.createdBy) { %>
+                                    <%= category.createdBy.name %> <br>
+                                    <small class="text-muted"><%= category.createdBy.email %></small>
+                                <% } else { %>
+                                    N/A
+                                <% } %>
+                            </td>
+                            <td data-label="Last Updated">
+                                <small>
+                                    <%= formatDateIST(category.updatedAt) %><br>
+                                    By: <%= category.lastUpdatedBy && category.lastUpdatedBy.name ? category.lastUpdatedBy.name : 'N/A' %>
+                                </small>
+                            </td>
+                            <td data-label="Actions" class="actions-cell">
+                                <a href="/admin/categories/edit/<%= category._id %>" class="btn btn-text btn-sm" title="Edit Category">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <form action="/admin/categories/delete/<%= category._id %>" method="POST" class="inline-form form-submit-spinner"
+                                    data-category-name="<%= category.name.replace(/"/g, '&quot;').replace(/'/g, '&#39;') %>"
+                                    onsubmit="return confirmDeleteCategory(this);">
+                                    <button type="submit" class="btn btn-text btn-danger btn-sm" title="Remove Category">
+                                        <i class="fas fa-trash"></i> Remove
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    <% }) %>
+                </tbody>
+            </table>
+        </div>
+    <% } else { %>
+        <p class="alert alert-info mt-3">No categories found. <a href="/admin/categories/new">Add the first one!</a></p>
+    <% } %>
+</div>
+
+<script>
+    function confirmDeleteCategory(form) {
+        const name = form.getAttribute('data-category-name');
+        return confirm(`ADMIN ACTION: Are you sure you want to remove category "${name}"? This might fail if products are associated with it.`);
+    }
+</script>
+
+<%- include('../partials/footer') %>

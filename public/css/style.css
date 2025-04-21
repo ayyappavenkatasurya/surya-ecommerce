@@ -849,6 +849,13 @@ select.form-control-sm {
   font-size: 1rem;
 }
 
+.product-category {
+  /* Specific style for category name on product card */
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+  margin-bottom: calc(var(--spacing-unit) * 0.2);
+}
+
 .product-stock,
 .product-rating {
   font-size: 0.8rem;
@@ -917,6 +924,9 @@ select.form-control-sm {
 }
 .detail-rating i { color: #f8d347; }
 .detail-rating .fa-star-regular { color: #e4e5e9; }
+.product-description .description-text {
+  white-space: pre-wrap; /* Preserve line breaks from textarea */
+}
 
 .product-actions {
     margin: calc(var(--spacing-unit) * 1.2) 0;
@@ -1472,6 +1482,88 @@ select.form-control-sm {
 
 
 /* ============================ */
+/* Category Display Styles      */
+/* ============================ */
+
+.category-display-section {
+    padding: 1rem 0; /* Vertical padding */
+    margin-bottom: 1.5rem; /* Space below the section */
+    border-top: 1px solid var(--border-color); /* Optional separator line */
+    padding-top: 1.5rem; /* Space above the heading */
+}
+
+.category-display-section h2 {
+    font-size: 1.3rem; /* Slightly larger heading */
+    margin-bottom: 1rem; /* Space below heading */
+    text-align: left; /* Align heading left */
+    font-weight: 500;
+}
+
+.category-grid {
+    display: grid;
+    /* Adjust minmax for desired minimum/maximum card width */
+    /* Using 110px min ensures slightly larger cards on smaller screens */
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 1rem; /* Space between category cards */
+}
+
+.category-card {
+    display: flex; /* Use flexbox for alignment */
+    flex-direction: column; /* Stack image and text vertically */
+    align-items: center; /* Center items horizontally */
+    text-align: center; /* Center the text */
+    padding: 0.75rem 0.5rem; /* Padding inside the card */
+    text-decoration: none;
+    color: var(--text-color);
+    border-radius: var(--border-radius);
+    transition: background-color 0.2s ease-in-out, transform 0.2s ease-in-out;
+    background-color: rgba(255, 255, 255, 0.4); /* Optional: subtle background */
+    border: 1px solid transparent; /* Placeholder for hover border */
+}
+
+.category-card:hover {
+    background-color: rgba(255, 255, 255, 0.7);
+    transform: translateY(-2px); /* Slight lift effect */
+    text-decoration: none;
+    color: var(--primary-color);
+    /* border-color: var(--border-color); */ /* Optional hover border */
+}
+
+.category-image-wrapper {
+    width: 80px; /* Keep size or adjust if needed */
+    height: 80px;
+    overflow: hidden;
+    border-radius: 15%; /* Rounded square */
+    margin-bottom: 0.5rem; /* Space between image and name */
+    background-color: #f0f0f0; /* Placeholder background */
+    border: 1px solid var(--border-color);
+    flex-shrink: 0; /* Prevent shrinking if container is small */
+    display: flex; /* Center image if it's smaller */
+    align-items: center;
+    justify-content: center;
+}
+
+.category-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cover the area, might crop */
+    display: block;
+}
+
+.category-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    line-height: 1.3;
+    /* Allow text wrapping */
+    word-break: break-word;
+    overflow-wrap: break-word;
+    /* Limit to max 2 lines (optional) */
+    max-height: 2.6em; /* Approx 2 lines based on line-height */
+    overflow: hidden;
+    /* Can add text-overflow ellipsis if needed, but might look odd when centered */
+}
+
+/* ============================ */
 /* Media Queries                */
 /* ============================ */
 
@@ -1663,6 +1755,23 @@ select.form-control-sm {
   .btn-login-register { font-size: 0.9rem; }
   .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; width: 100%; }
 
+  /* Responsive adjustments for category grid */
+  .category-grid {
+      /* Increase gap slightly on larger screens */
+      gap: 1.25rem;
+  }
+   .category-card {
+       padding: 1rem 0.75rem;
+   }
+   .category-image-wrapper {
+       width: 90px;
+       height: 90px;
+       margin-bottom: 0.75rem;
+   }
+  .category-name {
+      font-size: 0.9rem;
+  }
+
 } /* End @media (min-width: 768px) */
 
 
@@ -1673,10 +1782,45 @@ select.form-control-sm {
   .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); }
   .admin-actions-grid { grid-template-columns: repeat(3, 1fr); } /* 3 columns for larger screens */
   .navbar { max-width: 1140px; } /* Wider navbar content */
+
+   /* Category Grid on Larger Desktops */
+  .category-grid {
+       /* Maybe allow more columns implicitly via auto-fit/minmax */
+       /* Or explicitly set more columns if preferred */
+       /* grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); */
+   }
+   .category-image-wrapper {
+       width: 100px;
+       height: 100px;
+   }
 } /* End @media (min-width: 1024px) */
 
 
 /* Extra Large Desktops (1200px+) */
 @media (min-width: 1200px) {
     .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns for very large screens */
+}
+
+/* public/css/style.css - Add this at the end or within category styles */
+
+/* Category Highlighting Style */
+.category-card.active-category {
+  border-color: var(--primary-color); /* Add a primary color border */
+  background-color: rgba(0, 123, 255, 0.1); /* Subtle primary background tint */
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2); /* Optional focus-like ring */
+  transform: translateY(0); /* Override hover lift effect if desired */
+}
+
+/* Make the text bold and primary color for the active category */
+.category-card.active-category .category-name {
+  color: var(--primary-hover);
+  font-weight: 600;
+}
+
+/* Optional: Adjust hover for active category to keep it distinct */
+.category-card.active-category:hover {
+  /* Keep the active styles, maybe slightly enhance */
+  background-color: rgba(0, 123, 255, 0.15);
+  border-color: var(--primary-hover);
+  color: var(--primary-hover); /* Ensure text color stays */
 }

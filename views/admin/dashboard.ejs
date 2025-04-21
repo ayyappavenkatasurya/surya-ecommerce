@@ -5,9 +5,16 @@
     <p class="text-muted mb-3">System-wide management access. Welcome, <%= currentUser.name %>!</p>
 
     <div class="admin-actions-grid">
+        <%# --- NEW: Manage Categories Card --- %>
+        <a href="/admin/manage-categories" class="admin-action-card">
+             <i class="fas fa-tags text-purple"></i> <%# Example color class, define in CSS %>
+             <h3>Manage Categories</h3>
+             <p>Add, edit, or remove product categories.</p>
+        </a>
+
          <a href="/admin/upload-product" class="admin-action-card">
             <i class="fas fa-upload text-primary"></i>
-            <h3>Upload Product (as Admin)</h3>
+            <h3>Upload Product</h3>
             <p>Add a product directly to the system.</p>
         </a>
          <a href="/admin/manage-products" class="admin-action-card">
@@ -25,16 +32,15 @@
              <h3>Manage Users</h3>
              <p>Update roles (User, Seller, Admin), remove users.</p>
         </a>
-
          <a href="/admin/manage-banners" class="admin-action-card">
              <i class="fas fa-images text-secondary"></i>
              <h3>Manage Banners</h3>
              <p>Update the promotional banners on the homepage.</p>
          </a>
-
-         <%# The "My Admin Profile" card linking to /user/profile has been removed %>
-
     </div>
 </div>
+
+<%# --- Optional CSS for new icon color --- %>
+<style> .text-purple { color: #6f42c1; } </style>
 
  <%- include('../partials/footer') %>
