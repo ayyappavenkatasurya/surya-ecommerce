@@ -2,13 +2,13 @@
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
+const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-} = require('./orderController'); // Assuming these functions handle OTP logic correctly
+} = require('./orderController');
 const mongoose = require('mongoose');
 
 const cancellationReasons = [
@@ -31,7 +31,8 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
@@ -49,11 +50,13 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            // *** ADD shortDescription ***
+            shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerId: adminUserId,
+            sellerId: adminUserId, // Uploaded *by* admin
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
@@ -92,7 +95,6 @@ exports.uploadProduct = async (req, res, next) => {
         next(error);
     }
 };
-
 
 // --- Manage Products (Admin sees ALL - keep existing) ---
 exports.getManageProductsPage = async (req, res, next) => {
@@ -137,7 +139,8 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY - keep existing) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, reviewStatus, rejectionReason } = req.body;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
 
     // Validation (keep existing)
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
@@ -167,6 +170,8 @@ exports.updateProduct = async (req, res, next) => {
 
         product.name = name.trim();
         product.category = category.trim();
+        // *** ADD shortDescription ***
+        product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
@@ -220,6 +225,7 @@ exports.removeProduct = async (req, res, next) => {
 
 
 // --- Manage Orders (Admin sees ALL - keep existing) ---
+// ... (rest of manage orders code remains the same)
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -257,7 +263,9 @@ exports.getManageOrdersPage = async (req, res, next) => {
     }
 };
 
+
 // --- Admin Order Actions (keep existing) ---
+// ... (sendDirectDeliveryOtpByAdmin, confirmDirectDeliveryByAdmin, cancelOrderByAdmin remain the same)
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -367,6 +375,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
 
 // --- Manage Users (Admin - keep existing) ---
+// ... (getManageUsersPage, updateUserRole, removeUser remain the same)
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -458,9 +467,9 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-// --- *** NEW: Banner Management Controllers *** ---
 
-// GET request to render the banner management page
+// --- Banner Management Controllers ---
+// ... (getManageBannersPage, updateBanners remain the same)
 exports.getManageBannersPage = async (req, res, next) => {
     try {
         // Find the single banner configuration document (using the known key)
@@ -516,7 +525,6 @@ exports.updateBanners = async (req, res, next) => {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
-                // You might choose to break or continue collecting errors
             }
             // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
@@ -534,28 +542,21 @@ exports.updateBanners = async (req, res, next) => {
     }
 
     if (validationError) {
-         // Need to reconstruct the state for the view if validation fails
          const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
          return res.render('admin/manage-banners', {
              title: 'Manage Homepage Banners',
-             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
-             // Flash message is already set
+             bannerConfig: { banners: displayBannersForError }
          });
     }
 
     try {
-        // Find and update (or create if doesn't exist) the banner config document
         await BannerConfig.findOneAndUpdate(
             { configKey: 'mainBanners' }, // Find by the key
             {
-                banners: newBanners, // Set the new array of banners
-                lastUpdatedBy: adminUserId // Track the update
+                banners: newBanners,
+                lastUpdatedBy: adminUserId
             },
-            {
-                new: true, // Return the updated document
-                upsert: true, // Create if document doesn't exist
-                runValidators: true // Ensure arrayLimit validator runs
-            }
+            { new: true, upsert: true, runValidators: true }
         );
 
         req.flash('success_msg', 'Homepage banners updated successfully.');
@@ -563,17 +564,16 @@ exports.updateBanners = async (req, res, next) => {
 
     } catch (error) {
         if (error.name === 'ValidationError') {
-             // Handle Mongoose validation errors (like array limit)
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
              const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
              return res.render('admin/manage-banners', {
                   title: 'Manage Homepage Banners',
-                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+                 bannerConfig: { banners: displayBannersForError }
              });
          }
         console.error("Error updating banners:", error);
         req.flash('error_msg', 'Failed to update banners due to a server error.');
-        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
+        res.redirect('/admin/manage-banners');
     }
 };

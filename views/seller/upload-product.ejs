@@ -7,27 +7,33 @@
     <form action="/seller/products/upload" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+        </div>
+        <!-- *** END *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/seller/dashboard" class="btn btn-secondary">Cancel</a>

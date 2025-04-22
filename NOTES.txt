@@ -81,13 +81,13 @@ controllers/adminController.js:
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const BannerConfig = require('../models/BannerConfig'); // *** ADDED THIS LINE ***
+const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
-} = require('./orderController'); // Assuming these functions handle OTP logic correctly
+} = require('./orderController');
 const mongoose = require('mongoose');
 
 const cancellationReasons = [
@@ -110,7 +110,8 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
@@ -128,11 +129,13 @@ exports.uploadProduct = async (req, res, next) => {
         const newProduct = new Product({
             name: name.trim(),
             category: category.trim(),
+            // *** ADD shortDescription ***
+            shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerId: adminUserId,
+            sellerId: adminUserId, // Uploaded *by* admin
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
@@ -171,7 +174,6 @@ exports.uploadProduct = async (req, res, next) => {
         next(error);
     }
 };
-
 
 // --- Manage Products (Admin sees ALL - keep existing) ---
 exports.getManageProductsPage = async (req, res, next) => {
@@ -216,7 +218,8 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY - keep existing) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, reviewStatus, rejectionReason } = req.body;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
 
     // Validation (keep existing)
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
@@ -246,6 +249,8 @@ exports.updateProduct = async (req, res, next) => {
 
         product.name = name.trim();
         product.category = category.trim();
+        // *** ADD shortDescription ***
+        product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
@@ -299,6 +304,7 @@ exports.removeProduct = async (req, res, next) => {
 
 
 // --- Manage Orders (Admin sees ALL - keep existing) ---
+// ... (rest of manage orders code remains the same)
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -336,7 +342,9 @@ exports.getManageOrdersPage = async (req, res, next) => {
     }
 };
 
+
 // --- Admin Order Actions (keep existing) ---
+// ... (sendDirectDeliveryOtpByAdmin, confirmDirectDeliveryByAdmin, cancelOrderByAdmin remain the same)
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -446,6 +454,7 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
 
 // --- Manage Users (Admin - keep existing) ---
+// ... (getManageUsersPage, updateUserRole, removeUser remain the same)
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -537,9 +546,9 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-// --- *** NEW: Banner Management Controllers *** ---
 
-// GET request to render the banner management page
+// --- Banner Management Controllers ---
+// ... (getManageBannersPage, updateBanners remain the same)
 exports.getManageBannersPage = async (req, res, next) => {
     try {
         // Find the single banner configuration document (using the known key)
@@ -595,7 +604,6 @@ exports.updateBanners = async (req, res, next) => {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
-                // You might choose to break or continue collecting errors
             }
             // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
@@ -613,28 +621,21 @@ exports.updateBanners = async (req, res, next) => {
     }
 
     if (validationError) {
-         // Need to reconstruct the state for the view if validation fails
          const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
          return res.render('admin/manage-banners', {
              title: 'Manage Homepage Banners',
-             bannerConfig: { banners: displayBannersForError } // Pass back submitted data
-             // Flash message is already set
+             bannerConfig: { banners: displayBannersForError }
          });
     }
 
     try {
-        // Find and update (or create if doesn't exist) the banner config document
         await BannerConfig.findOneAndUpdate(
             { configKey: 'mainBanners' }, // Find by the key
             {
-                banners: newBanners, // Set the new array of banners
-                lastUpdatedBy: adminUserId // Track the update
+                banners: newBanners,
+                lastUpdatedBy: adminUserId
             },
-            {
-                new: true, // Return the updated document
-                upsert: true, // Create if document doesn't exist
-                runValidators: true // Ensure arrayLimit validator runs
-            }
+            { new: true, upsert: true, runValidators: true }
         );
 
         req.flash('success_msg', 'Homepage banners updated successfully.');
@@ -642,18 +643,17 @@ exports.updateBanners = async (req, res, next) => {
 
     } catch (error) {
         if (error.name === 'ValidationError') {
-             // Handle Mongoose validation errors (like array limit)
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', `Validation Error: ${errors.join(', ')}`);
              const displayBannersForError = Array.from({ length: 4 }).map((_, index) => bannerInputs[index]);
              return res.render('admin/manage-banners', {
                   title: 'Manage Homepage Banners',
-                 bannerConfig: { banners: displayBannersForError } // Pass back submitted data
+                 bannerConfig: { banners: displayBannersForError }
              });
          }
         console.error("Error updating banners:", error);
         req.flash('error_msg', 'Failed to update banners due to a server error.');
-        res.redirect('/admin/manage-banners'); // Redirect back even on other errors
+        res.redirect('/admin/manage-banners');
     }
 };
 
@@ -2559,7 +2559,7 @@ controllers/sellerController.js:
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
-const { sendEmail } = require('../config/mailer'); // Import sendEmail
+const { sendEmail } = require('../config/mailer');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPBySeller,
@@ -2567,7 +2567,6 @@ const {
 } = require('./orderController');
 const mongoose = require('mongoose');
 
-// --- NEW: Seller Cancellation Reasons ---
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
     "🚚 Unable to Fulfill/Ship",
@@ -2582,10 +2581,80 @@ exports.getSellerDashboard = (req, res) => {
 
 // Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    // Pass an empty product object or defaults if needed for rendering sticky form
     res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
 };
 
+// --- Product Management Actions ---
+exports.uploadProduct = async (req, res, next) => {
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    const sellerId = req.session.user._id;
+    const sellerEmail = req.session.user.email;
+
+     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+    }
+     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
+        req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+     }
+
+    try {
+        const newProduct = new Product({
+            name: name.trim(),
+            category: category.trim(),
+            // *** ADD shortDescription ***
+            shortDescription: shortDescription ? shortDescription.trim() : undefined,
+            price: Number(price),
+            stock: Number(stock),
+            imageUrl: imageUrl.trim(),
+            specifications: specifications ? specifications.trim() : '',
+            sellerId: sellerId,
+            sellerEmail: sellerEmail,
+            reviewStatus: 'pending' // Start as pending
+        });
+
+        await newProduct.save();
+        console.log(`Product ${newProduct._id} saved initially by seller ${sellerEmail}.`);
+
+        // Trigger Gemini review asynchronously
+        reviewProductWithGemini(newProduct).then(async reviewResult => {
+             try {
+                 const productToUpdate = await Product.findById(newProduct._id);
+                 if (productToUpdate) {
+                    productToUpdate.reviewStatus = reviewResult.status;
+                    productToUpdate.rejectionReason = reviewResult.reason;
+                    await productToUpdate.save();
+                    console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
+                 } else {
+                     console.warn(`Product ${newProduct._id} not found for status update after Gemini review.`);
+                 }
+             } catch (updateError) {
+                console.error(`Error updating product ${newProduct._id} after Gemini review:`, updateError);
+             }
+        }).catch(reviewError => {
+             console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
+              Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
+        });
+
+        req.flash('success_msg', `Product "${newProduct.name}" submitted for review.`);
+        res.redirect('/seller/products');
+
+    } catch (error) {
+        if (error.name === 'ValidationError') {
+           let errors = Object.values(error.errors).map(el => el.message);
+           req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
+           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+       }
+        console.error("Error uploading product:", error);
+        next(error);
+    }
+};
+
+
+// --- Rest of Seller Controller remains the same until updateProduct ---
+// (getManageProductsPage, getEditProductPage remain the same)
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -2604,14 +2673,11 @@ exports.getManageProductsPage = async (req, res, next) => {
 
 exports.getEditProductPage = async (req, res, next) => {
      try {
-        // isProductOwner middleware ensures ownership
         const product = await Product.findById(req.params.id).lean(); // Use lean here
         if (!product) {
            req.flash('error_msg', 'Product not found.');
            return res.redirect('/seller/products');
        }
-       // Ownership check already done by middleware
-
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
            product: product // Pass lean object
@@ -2625,82 +2691,15 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// Product Management Actions
-exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
-    const sellerId = req.session.user._id;
-    const sellerEmail = req.session.user.email;
-
-     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
-        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
-    }
-     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
-        req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
-     }
-
-    try {
-        const newProduct = new Product({
-            name: name.trim(),
-            category: category.trim(),
-            price: Number(price),
-            stock: Number(stock),
-            imageUrl: imageUrl.trim(),
-            specifications: specifications ? specifications.trim() : '',
-            sellerId: sellerId,
-            sellerEmail: sellerEmail,
-            reviewStatus: 'pending' // Start as pending
-        });
-
-        await newProduct.save();
-        console.log(`Product ${newProduct._id} saved initially by seller ${sellerEmail}.`);
-
-        // Trigger Gemini review asynchronously
-        reviewProductWithGemini(newProduct).then(async reviewResult => {
-             try {
-                 // Fetch the latest version of the product to update
-                 const productToUpdate = await Product.findById(newProduct._id);
-                 if (productToUpdate) {
-                    productToUpdate.reviewStatus = reviewResult.status;
-                    productToUpdate.rejectionReason = reviewResult.reason; // Might be null/undefined
-                    await productToUpdate.save();
-                    console.log(`Product ${newProduct._id} review status updated to ${reviewResult.status}.`);
-                 } else {
-                     console.warn(`Product ${newProduct._id} not found for status update after Gemini review.`);
-                 }
-             } catch (updateError) {
-                console.error(`Error updating product ${newProduct._id} after Gemini review:`, updateError);
-             }
-        }).catch(reviewError => {
-             console.error(`Error in Gemini review promise chain for product ${newProduct._id}:`, reviewError);
-             // Consider setting status back to 'pending' or a specific 'error' state
-             // Example: Mark as pending with a reason if review fails completely
-              Product.findByIdAndUpdate(newProduct._id, { reviewStatus: 'pending', rejectionReason: 'AI review process failed.' }).catch(err => console.error("Failed to mark product as pending after review error:", err));
-        });
-
-        req.flash('success_msg', `Product "${newProduct.name}" submitted for review.`);
-        res.redirect('/seller/products');
-
-    } catch (error) {
-        if (error.name === 'ValidationError') {
-           let errors = Object.values(error.errors).map(el => el.message);
-           req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
-       }
-        console.error("Error uploading product:", error);
-        next(error);
-    }
-};
 
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const sellerId = req.session.user._id; // For validation, though middleware handles access
-    const { name, category, price, stock, imageUrl, specifications } = req.body;
+    const sellerId = req.session.user._id;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        // Need to fetch product again to render edit page correctly
         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
@@ -2709,7 +2708,6 @@ exports.updateProduct = async (req, res, next) => {
      }
 
     try {
-        // Find product ensuring it belongs to the seller (redundant with middleware, but safe)
         const product = await Product.findOne({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2719,6 +2717,8 @@ exports.updateProduct = async (req, res, next) => {
 
          product.name = name.trim();
          product.category = category.trim();
+         // *** ADD shortDescription ***
+         product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
@@ -2761,6 +2761,8 @@ exports.updateProduct = async (req, res, next) => {
      }
  };
 
+// --- Rest of Seller Controller remains the same ---
+// (removeProduct, getManageOrdersPage, sendDirectDeliveryOtpBySeller, confirmDirectDeliveryBySeller, cancelOrderBySeller remain the same)
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
@@ -2786,7 +2788,6 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-// --- CORRECTED Seller Order Management Page ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -2817,7 +2818,6 @@ exports.getManageOrdersPage = async (req, res, next) => {
         orders.forEach(order => {
              order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             // *** NEW: Seller Cancellation Logic ***
              order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
 
              order.showDeliveryOtp = order.status === 'Pending' &&
@@ -2825,28 +2825,22 @@ exports.getManageOrdersPage = async (req, res, next) => {
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
-            // Format Items Summary (Highlight seller's items)
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
-                    // Ensure productId and sellerId exist before comparing
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
                     const productName = p.productId?.name || p.name || '[Product Name Missing]';
-
-                    // Highlight seller's item clearly
                     return `${isSellerItem ? '<strong class="text-success">' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Your Item)</strong>' : ''}`;
                 }).join('<br>');
             } else {
                  order.itemsSummary = 'No items found';
             }
         });
-
-        // *** Render the template, PASSING message as null and reasons ***
         res.render('seller/manage-orders', {
             title: 'Manage Your Orders',
             orders: orders,
-            message: null, // Pass null when orders exist
-            sellerCancellationReasons: sellerCancellationReasons // Pass reasons to the view
+            message: null,
+            sellerCancellationReasons: sellerCancellationReasons
         });
     } catch (error) {
         next(error);
@@ -2854,14 +2848,12 @@ exports.getManageOrdersPage = async (req, res, next) => {
 };
 
 
-// --- Seller Order Actions ---
 exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const sellerId = req.session.user._id;
 
     try {
-        // isOrderRelevantToSeller middleware should have already checked relevance
-        const order = await Order.findById(orderId); // Fetch order again if needed
+        const order = await Order.findById(orderId);
         if (!order) throw new Error("Order not found.");
         if (order.status !== 'Pending') throw new Error(`Cannot send OTP for order status ${order.status}.`);
 
@@ -2884,7 +2876,6 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     }
 
     try {
-         // isOrderRelevantToSeller middleware checks relevance
          const { order } = await confirmDirectDeliveryBySeller(orderId, sellerId, otp.trim(), res);
         req.flash('success_msg', `Order ${orderId} confirmed delivered by you.`);
     } catch (error) {
@@ -2893,14 +2884,12 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     res.redirect('/seller/orders');
 };
 
-// --- NEW: Seller Cancel Order ---
 exports.cancelOrderBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const { reason } = req.body;
     const sellerId = req.session.user._id;
-    const sellerEmail = req.session.user.email; // For logging
+    const sellerEmail = req.session.user.email;
 
-    // Validate reason
     if (!reason || !sellerCancellationReasons.includes(reason)) {
         req.flash('error_msg', 'Please select a valid seller reason for cancellation.');
         return res.redirect('/seller/orders');
@@ -2909,7 +2898,6 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     const sessionDB = await mongoose.startSession();
     sessionDB.startTransaction();
     try {
-        // Find the order and populate product sellerId
         const order = await Order.findById(orderId)
                                 .populate('products.productId', 'sellerId name _id') // Need sellerId and _id
                                 .populate('userId', 'email') // For notification
@@ -2921,14 +2909,12 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             return res.status(404).redirect('/seller/orders');
         }
 
-        // Check if order status is Pending
         if (order.status !== 'Pending') {
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', `Order status is '${order.status}'. Only 'Pending' orders can be cancelled by seller.`);
             return res.redirect('/seller/orders');
         }
 
-        // Double check relevance (middleware should handle this, but good practice)
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
              await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -2938,7 +2924,6 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         }
 
 
-        // --- Restore Stock ONLY for the seller's items ---
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
         const productStockRestorePromises = order.products
             .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
@@ -2961,27 +2946,21 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
         console.log(`Seller Cancel: Stock restoration attempts completed for seller ${sellerId} in order ${orderId}.`);
 
-        // Update Order Status and Reason
         order.status = 'Cancelled';
-        order.cancellationReason = `Cancelled by Seller: ${reason}`; // Add prefix
-        // Clear OTP fields etc. (pre-save hook might also do this)
+        order.cancellationReason = `Cancelled by Seller: ${reason}`;
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
-        order.cancellationAllowedUntil = undefined; // Remove cancellation window
+        order.cancellationAllowedUntil = undefined;
 
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // --- Send Email Notification (Outside Transaction) ---
         try {
             const customerEmail = order.userEmail || order.userId?.email;
             if(customerEmail) {
                 const subjectCust = `Update on Your Order (${order._id})`;
-                const htmlCust = `<p>Unfortunately, your order (${order._id}) has been cancelled by the seller.</p>
-                                <p><strong>Reason:</strong> ${reason}</p>
-                                <p>Any payment made (if applicable) will be refunded according to policy.</p>
-                                <p>We apologize for any inconvenience. Please contact support if you have questions.</p>`;
+                const htmlCust = `<p>Unfortunately, your order (${order._id}) has been cancelled by the seller.</p><p><strong>Reason:</strong> ${reason}</p><p>Any payment made (if applicable) will be refunded according to policy.</p><p>We apologize for any inconvenience. Please contact support if you have questions.</p>`;
                 const textCust = `Your order ${order._id} was cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
                 await sendEmail(customerEmail, subjectCust, textCust, htmlCust);
             } else {
@@ -3379,6 +3358,13 @@ const ProductSchema = new mongoose.Schema({
         trim: true,
         index: true // Added index for searching
     },
+    // *** NEW FIELD ***
+    shortDescription: {
+        type: String,
+        trim: true,
+        maxlength: 200 // Optional: Limit length
+    },
+    // *** END NEW FIELD ***
     category: {
         type: String,
         required: [true, 'Please provide a product category'],
@@ -3405,14 +3391,12 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    // *** UPDATED: Added sellerId reference ***
     sellerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true
     },
-    // Keep sellerEmail for potential display/legacy reasons, but sellerId is primary
     sellerEmail: {
         type: String,
         required: true,
@@ -3428,28 +3412,27 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    orderCount: { // Tracks how many times item appeared in orders
+    orderCount: {
         type: Number,
         default: 0,
     },
-    // *** NEW: Fields for Review Status ***
     reviewStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
-        index: true // Index for filtering visible products
+        index: true
     },
     rejectionReason: {
         type: String,
         trim: true
     }
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt
+    timestamps: true
 });
 
 // Calculate average rating and numReviews before saving
 ProductSchema.pre('save', function(next) {
-    if (this.isModified('ratings')) { // Only recalculate if ratings changed
+    if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
             this.numReviews = this.ratings.length;
             this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
@@ -3459,7 +3442,6 @@ ProductSchema.pre('save', function(next) {
         }
     }
 
-    // Ensure rejectionReason is cleared if status is not 'rejected'
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
@@ -3467,7 +3449,6 @@ ProductSchema.pre('save', function(next) {
     next();
 });
 
-// Define text index for searching multiple fields
 ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' });
 
 
@@ -6318,29 +6299,21 @@ module.exports = { generateOTP, setOTPExpiration };
 services/geminiService.js:
 // services/geminiService.js
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
-const axios = require('axios'); // Import axios for fetching image data
+const axios = require('axios');
 
-// --- Configuration ---
 const API_KEY = process.env.GEMINI_API_KEY;
-
-// Check if API key is set
 if (!API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
-
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-
-// *** Use the Vision model ***
 const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null;
 
-// Optional: Configure safety settings
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
-
 
 if (genAI && visionModel) {
     console.log("Gemini AI SDK Initialized successfully with Vision model.");
@@ -6362,7 +6335,6 @@ async function urlToGenerativePart(url) {
         }
 
         const contentType = response.headers['content-type'];
-        // Basic validation for common image types Gemini supports
         if (!contentType || !['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
             console.warn(`Invalid or unsupported image Content-Type: ${contentType} from URL: ${url}`);
             throw new Error(`Unsupported image type: ${contentType}`);
@@ -6378,66 +6350,50 @@ async function urlToGenerativePart(url) {
         };
     } catch (error) {
          console.error(`Error fetching image from ${url}: ${error.message}`);
-         // Determine if the error is network related, timeout, or status code
          if (axios.isAxiosError(error)) {
              if (error.response) {
-                 // Server responded with a status code outside 2xx range
                  throw new Error(`Failed to fetch image: Server responded with status ${error.response.status}`);
              } else if (error.request) {
-                 // Request was made but no response received (e.g., timeout, network issue)
                   throw new Error(`Failed to fetch image: No response received (Timeout or network issue)`);
              } else {
-                  // Something else happened in setting up the request
                  throw new Error(`Failed to fetch image: Request setup error (${error.message})`);
              }
          } else {
-            // Not an Axios error (e.g., validation error thrown above)
-             throw error; // Re-throw the original error
+             throw error;
          }
     }
 }
 
-
-/**
- * Reviews product text and image content using Gemini Vision API.
- * Fetches the image from the provided URL.
- *
- * @param {object} product - The product object (name, category, price, imageUrl, specifications).
- * @returns {Promise<{status: ('approved'|'rejected'|'pending'), reason: string | null}>} Review result.
- */
 const reviewProductWithGemini = async (product) => {
-    // Check if Vision model is available
     if (!visionModel) {
         console.log("Gemini Vision model not available. Skipping review, defaulting to 'pending'.");
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
 
-    const { name, category, price, specifications, imageUrl } = product;
+    // *** ADD shortDescription to destructuring ***
+    const { name, category, price, specifications, imageUrl, shortDescription } = product;
 
-    // --- 1. Fetch and Prepare Image Part ---
     let imagePart;
     try {
         imagePart = await urlToGenerativePart(imageUrl);
-        if (!imagePart) { // Should have thrown an error, but double-check
+        if (!imagePart) {
             throw new Error("Image processing failed unexpectedly.");
         }
          console.log(`Successfully prepared image part for ${name} from ${imageUrl}`);
     } catch (imageError) {
         console.error(`Cannot review product "${name}" due to image processing error: ${imageError.message}`);
-        // Reject if image fetch/processing fails critically
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
 
 
     // --- 2. Construct Text Prompt Part ---
-    // Update prompt to include image analysis instructions
     const textPrompt = `
         Analyze the following product details AND the provided image for an e-commerce store. Act as a strict content moderator.
 
         **Instructions:**
         1. Examine the IMAGE CONTENT closely.
-        2. Examine the TEXT DETAILS (Name, Category, Price, Specifications).
-        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category). Is it clearly the item described?
+        2. Examine the TEXT DETAILS (Name, Category, Short Description, Price, Specifications).
+        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category, short description). Is it clearly the item described?
         4. Check BOTH image and text for:
             - Explicit content (nudity, graphic violence).
             - Depictions of weapons (unless clearly a toy and stated category is 'Toys').
@@ -6454,6 +6410,7 @@ const reviewProductWithGemini = async (product) => {
         **Product Details (Text):**
         - Name: ${name}
         - Category: ${category}
+        - Short Description: ${shortDescription || 'Not provided'}  <%# *** ADDED LINE *** %>
         - Price: ₹${price?.toFixed(2) || 'N/A'}
         - Specifications: ${specifications || 'Not provided'}
         - Provided Image URL: ${imageUrl}
@@ -6475,7 +6432,6 @@ const reviewProductWithGemini = async (product) => {
         );
         const response = result?.response;
 
-        // Handle potential blocked response due to safety settings BEFORE checking text content
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            const safetyRatings = response?.promptFeedback?.safetyRatings || [];
@@ -6483,7 +6439,6 @@ const reviewProductWithGemini = async (product) => {
            return { status: 'rejected', reason: `Content blocked by AI safety filters (${blockReason}).` };
        }
 
-        // Process the successful response text
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Review Raw Response for "${name}": ${reviewText}`);
 
@@ -6491,27 +6446,22 @@ const reviewProductWithGemini = async (product) => {
             console.log(`Gemini Vision approved product: ${name}`);
             return { status: 'approved', reason: null };
         } else if (reviewText.startsWith('REJECT')) {
-            // Extract reason, provide default if missing after colon
             const reason = reviewText.split(':')[1]?.trim() || 'Rejected by AI model (no specific reason provided).';
             console.log(`Gemini Vision rejected product: ${name}. Reason: ${reason}`);
             return { status: 'rejected', reason: reason };
         } else {
-            // Handle unexpected valid response formats
             console.warn(`Unexpected Gemini Vision response format for "${name}": ${reviewText}. Defaulting to pending.`);
             return { status: 'pending', reason: 'AI review result unclear.' };
         }
 
     } catch (error) {
-        // Catch errors during the Gemini API call itself
         console.error(`Error during Gemini Vision API call for product "${name}":`, error);
         let reason = 'AI review failed due to an API error.';
-        // Check for specific safety errors sometimes caught here
         if (error.message && error.message.includes('SAFETY')) {
             reason = 'Content blocked by AI safety filters during API call.';
         } else if (error.message) {
-            reason = `AI API Error: ${error.message.substring(0, 100)}...`; // Keep reason brief
+            reason = `AI API Error: ${error.message.substring(0, 100)}...`;
         }
-        // Default to rejection on significant API errors? Or pending? Rejection is safer.
         return { status: 'rejected', reason: reason };
     }
 };
@@ -6612,27 +6562,34 @@ views/admin/edit-product.ejs:
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
         </div>
+
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+        </div>
+        <!-- *** END *** -->
 
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= product.category %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
         </div>
 
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
 
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
 
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
@@ -6640,7 +6597,7 @@ views/admin/edit-product.ejs:
 
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
         </div>
 
         <hr>
@@ -6674,7 +6631,6 @@ views/admin/edit-product.ejs:
             reasonGroup.style.display = 'none';
         }
     }
-
     document.addEventListener('DOMContentLoaded', () => {
         toggleRejectionReason(document.getElementById('reviewStatus').value);
     });
@@ -6969,7 +6925,7 @@ views/admin/manage-users.ejs:
 views/admin/upload-product.ejs:
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container"> <%# Reuse admin style %>
+<div class="admin-manage-container">
     <h1>Admin: Upload New Product</h1>
     <p class="text-muted small mb-3">Product will be submitted for automatic review upon upload.</p>
 
@@ -6978,6 +6934,12 @@ views/admin/upload-product.ejs:
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+        </div>
+        <!-- *** END *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
@@ -7303,12 +7265,12 @@ views/products/detail.ejs:
 <%# views/products/detail.ejs %>
 
 <%# --- Meta Description Preparation (Same as before) --- %>
-<% let metaDesc = `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %>
+<% let metaDesc = product.shortDescription || `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %> <%# Use short desc if available %>
 <% if (metaDesc.length > 160) { metaDesc = metaDesc.substring(0, 157) + '...'; } %>
 
 <%- include('../partials/header', {
     title: product.name,
-    metaTitle: product.name + ' - ' + defaultSiteName, // Use defaultSiteName
+    metaTitle: product.name + ' - ' + defaultSiteName,
     metaDescription: metaDesc,
     metaImageUrl: product.imageUrl,
     metaUrl: fullUrl,
@@ -7317,7 +7279,7 @@ views/products/detail.ejs:
 
 <div class="product-detail-container">
 
-   <%# --- Status Banner for Admin/Owner if Not Approved --- %>
+   <%# --- Status Banner --- %>
    <% if (!isApproved && (isAdminView || isOwnerView)) { %>
      <div class="alert alert-<%= product.reviewStatus === 'rejected' ? 'danger' : 'warning' %> mb-3" role="alert">
        <strong>Status:</strong> <span class="text-capitalize fw-bold"><%= product.reviewStatus %></span>
@@ -7326,22 +7288,18 @@ views/products/detail.ejs:
        <% } else if (product.reviewStatus === 'pending') { %>
           - This product is awaiting review and is not visible to customers.
        <% } %>
-       <% if (isOwnerView && product.reviewStatus !== 'approved') { %> <%# Show edit link only to owner if not approved %>
+       <% if (isOwnerView && product.reviewStatus !== 'approved') { %>
           <br><a href="/seller/products/edit/<%= product._id %>" class="alert-link">Edit and Resubmit for Review</a>
         <% } else if (isAdminView && product.reviewStatus !== 'approved') { %>
            <br><a href="/admin/manage-products/edit/<%= product._id %>" class="alert-link">Admin: Edit Status/Details</a>
        <% } %>
      </div>
    <% } else if (!isApproved && !isAdminView && !isOwnerView) { %>
-      <%# This block should technically not be reachable due to controller redirect, but acts as safety %>
       <div class="alert alert-danger">This product is currently unavailable.</div>
-      <%# Early exit or hide the rest of the content %>
-      </div> <%- /* End product-detail-container */ %>
+      </div>
       <%- include('../partials/footer') %>
-      <% return; %> <%# Stop rendering further %>
+      <% return; %>
    <% } %>
-   <%# --- End Status Banner --- %>
-
 
    <div class="product-detail-main">
         <div class="product-detail-image">
@@ -7349,6 +7307,13 @@ views/products/detail.ejs:
         </div>
        <div class="product-detail-info">
             <h1><%= product.name %></h1>
+
+            <!-- *** ADDED SHORT DESCRIPTION DISPLAY *** -->
+            <% if (product.shortDescription) { %>
+              <p class="product-short-description text-muted mb-2"><%= product.shortDescription %></p>
+            <% } %>
+            <!-- *** END *** -->
+
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
             <p class="detail-stock">
                 <% if (product.stock > 0) { %>
@@ -7356,45 +7321,51 @@ views/products/detail.ejs:
                 <% } else { %>
                     <span class="text-danger fw-bold">Out of Stock</span>
                 <% } %>
-            </p> <%# End of stock paragraph %>
+            </p>
 
             <%# === MOVED SHARE BUTTON HERE === %>
             <div class="share-section mt-2"> <%# Adjusted margin %>
-                <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
-                        data-title="<%= product.name %>"
-                        data-text="Check out this product: <%= product.name %>"
-                        data-url="<%= fullUrl %>">
-                    <i class="fas fa-share-alt"></i> Share
-                </button>
-                <div id="fallback-share-links" class="fallback-share-links hidden">
-                    <small>Share via:</small>
-                    <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
-                    <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
-                    <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
-                    <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
-                </div>
-            </div>
-            <%# === END MOVED SHARE BUTTON === %>
+                 <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
+                         data-title="<%= product.name %>"
+                         data-text="Check out this product: <%= product.name %>"
+                         data-url="<%= fullUrl %>">
+                     <i class="fas fa-share-alt"></i> Share
+                 </button>
+                 <div id="fallback-share-links" class="fallback-share-links hidden">
+                     <small>Share via:</small>
+                     <a href="https://www.facebook.com/sharer/sharer.php?u=<%= encodeURIComponent(fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><i class="fab fa-facebook-square"></i></a>
+                     <a href="https://twitter.com/intent/tweet?url=<%= encodeURIComponent(fullUrl) %>&text=<%= encodeURIComponent('Check out this product: ' + product.name) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on Twitter"><i class="fab fa-twitter-square"></i></a>
+                     <a href="https://api.whatsapp.com/send?text=<%= encodeURIComponent('Check out this product: ' + product.name + ' ' + fullUrl) %>" target="_blank" rel="noopener noreferrer" aria-label="Share on WhatsApp"><i class="fab fa-whatsapp-square"></i></a>
+                     <a href="mailto:?subject=<%= encodeURIComponent('Check out this product: ' + product.name) %>&body=<%= encodeURIComponent('I thought you might like this product:\n\n' + product.name + '\n' + fullUrl) %>" aria-label="Share via Email"><i class="fas fa-envelope-square"></i></a>
+                 </div>
+             </div>
 
-           <%# --- RATING DISPLAY BLOCK REMOVED FROM HERE --- %>
+            <%# --- RATING DISPLAY BLOCK (Moved below Purchase Actions) --- %>
+            <div class="mb-3 mt-2"> <%# Adjusted margin %>
+                 <% if (product.numReviews > 0) { %>
+                     <p class="detail-rating">
+                         Rating:
+                        <% for(let i=1; i<=5; i++) { %><i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i><% } %>
+                         (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
+                     </p>
+                 <% } else { %>
+                     <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
+                 <% } %>
+             </div>
 
            <%# --- Conditional Purchase Actions --- %>
            <% if (isApproved) { %>
                <div class="product-actions">
-                   <%# === MODIFIED Add to Cart Form === %>
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
-                       <div class="quantity-selector mb-2 d-inline-flex align-items-center"> <%# Added d-inline-flex and align-items-center %>
-                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label> <%# Kept text-muted style %>
+                       <div class="quantity-selector mb-2 d-inline-flex align-items-center">
+                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label>
                            <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;">
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                        </button>
                   </form>
-                  <%# === END MODIFIED Add to Cart Form === %>
-
-                   <%# Buy Now Form %>
                     <% if (product.stock > 0) { %>
                     <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
                           <input type="hidden" name="productId" value="<%= product._id %>">
@@ -7412,13 +7383,12 @@ views/products/detail.ejs:
                      <p class="text-muted small mt-2">This product is currently under review or unavailable.</p>
                  </div>
             <% } %>
-            <%# --- End Conditional Purchase Actions --- %>
 
             <%# Specifications %>
             <div class="product-specifications mt-3">
                  <h3>Specifications</h3>
                  <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
-            </div> <%# End of product-specifications div %>
+            </div>
 
             <%# === MOVED SELLER INFO HERE === %>
             <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
@@ -7430,7 +7400,7 @@ views/products/detail.ejs:
    <%# --- Conditional Rating Section --- %>
    <div class="product-rating-section mt-4 border-top pt-3">
         <h3>Rate This Product</h3>
-        <% if (isApproved) { %> <%# Only allow rating if approved %>
+        <% if (isApproved) { %>
             <% if (userCanRate) { %>
                 <form action="/products/<%= product._id %>/rate" method="POST" class="form-submit-spinner">
                     <div class="rating-stars">
@@ -7445,22 +7415,6 @@ views/products/detail.ejs:
              <p class="text-muted">Rating is unavailable until the product is approved.</p>
          <% } %>
    </div>
-   <%# --- End Conditional Rating Section --- %>
-
-    <%# --- RATING DISPLAY BLOCK PASTED HERE --- %>
-    <div class="mb-3"> <%# Removed mt-3, added mb-3 for spacing below %>
-        <% if (product.numReviews > 0) { %>
-            <p class="detail-rating">
-                Rating:
-               <% for(let i=1; i<=5; i++) { %><i class="fas fa-star<%= i <= product.averageRating ? '' : (i - 0.5 <= product.averageRating ? '-half-alt' : '-regular') %>"></i><% } %>
-                (<%= product.numReviews %> reviews) | <%= product.orderCount %> Ordered
-            </p>
-        <% } else { %>
-            <p class="detail-rating">No reviews yet | <%= product.orderCount %> Ordered</p>
-        <% } %>
-    </div>
-    <%# --- END PASTED RATING DISPLAY BLOCK --- %>
-
 
     <%# --- Rating Stats Display --- %>
     <div class="rating-stats-container mt-4 border-top pt-3">
@@ -7481,8 +7435,8 @@ views/products/detail.ejs:
                  %>
                      <div class="rating-bar-row">
                          <span class="rating-bar-label small"><%= i %> <i class="fas fa-star text-warning"></i></span>
-                         <div class="rating-bar-progress progress" style="height: 8px;"> <%# Use Bootstrap progress bar style %>
-                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div> <%# Start width at 0 %>
+                         <div class="rating-bar-progress progress" style="height: 8px;">
+                             <div class="rating-bar-fill progress-bar bg-success" role="progressbar" data-width="<%= percentage.toFixed(1) %>" aria-valuenow="<%= percentage.toFixed(1) %>" aria-valuemin="0" aria-valuemax="100" style="width: 0%;"></div>
                          </div>
                          <span class="rating-bar-count small text-muted"><%= count %></span>
                      </div>
@@ -7492,17 +7446,15 @@ views/products/detail.ejs:
             <p>No ratings yet for this product.</p>
          <% } %>
     </div>
-     <%# --- End Rating Stats Display --- %>
 
-</div> <%# End product-detail-container %>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Animate progress bars
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            setTimeout(() => { // Small delay for visual effect
+            setTimeout(() => {
                  el.style.width = width + '%';
             }, 100);
         }
@@ -7660,30 +7612,36 @@ views/seller/edit-product.ejs:
 
         <div class="form-group">
              <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
          </div>
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+        </div>
+        <!-- *** END *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-             <input type="text" id="category" name="category" value="<%= product.category %>" required>
+             <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
          </div>
          <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
          </div>
         <div class="form-group">
              <label for="stock">Stock Quantity:</label>
-             <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
          <div class="form-group">
              <label for="imageUrl">Image URL:</label>
-             <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
              <% if(product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border: 1px solid #ddd; padding: 2px;">
              <% } %>
          </div>
          <div class="form-group">
              <label for="specifications">Specifications (Optional):</label>
-             <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
         </div>
          <button type="submit" class="btn btn-primary">Update & Resubmit for Review</button>
          <a href="/seller/products" class="btn btn-secondary">Cancel</a>
@@ -7898,27 +7856,33 @@ views/seller/upload-product.ejs:
     <form action="/seller/products/upload" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+        </div>
+        <!-- *** END *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/seller/dashboard" class="btn btn-secondary">Cancel</a>

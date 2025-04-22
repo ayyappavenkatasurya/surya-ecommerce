@@ -1,6 +1,6 @@
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container"> <%# Reuse admin style %>
+<div class="admin-manage-container">
     <h1>Admin: Upload New Product</h1>
     <p class="text-muted small mb-3">Product will be submitted for automatic review upon upload.</p>
 
@@ -9,6 +9,12 @@
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+        </div>
+        <!-- *** END *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>

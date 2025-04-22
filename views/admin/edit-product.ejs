@@ -7,27 +7,34 @@
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
         </div>
+
+        <!-- *** ADDED Short Description Field *** -->
+        <div class="form-group">
+            <label for="shortDescription">Short Description (Optional):</label>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+        </div>
+        <!-- *** END *** -->
 
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" value="<%= product.category %>" required>
+            <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
         </div>
 
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
 
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
 
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
-            <input type="url" id="imageUrl" name="imageUrl" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
@@ -35,7 +42,7 @@
 
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" rows="5"><%= product.specifications %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
         </div>
 
         <hr>
@@ -69,7 +76,6 @@
             reasonGroup.style.display = 'none';
         }
     }
-
     document.addEventListener('DOMContentLoaded', () => {
         toggleRejectionReason(document.getElementById('reviewStatus').value);
     });

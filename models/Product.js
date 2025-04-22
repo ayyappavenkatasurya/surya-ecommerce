@@ -15,6 +15,13 @@ const ProductSchema = new mongoose.Schema({
         trim: true,
         index: true // Added index for searching
     },
+    // *** NEW FIELD ***
+    shortDescription: {
+        type: String,
+        trim: true,
+        maxlength: 200 // Optional: Limit length
+    },
+    // *** END NEW FIELD ***
     category: {
         type: String,
         required: [true, 'Please provide a product category'],
@@ -41,14 +48,12 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         trim: true,
     },
-    // *** UPDATED: Added sellerId reference ***
     sellerId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true
     },
-    // Keep sellerEmail for potential display/legacy reasons, but sellerId is primary
     sellerEmail: {
         type: String,
         required: true,
@@ -64,28 +69,27 @@ const ProductSchema = new mongoose.Schema({
         type: Number,
         default: 0,
     },
-    orderCount: { // Tracks how many times item appeared in orders
+    orderCount: {
         type: Number,
         default: 0,
     },
-    // *** NEW: Fields for Review Status ***
     reviewStatus: {
         type: String,
         enum: ['pending', 'approved', 'rejected'],
         default: 'pending',
-        index: true // Index for filtering visible products
+        index: true
     },
     rejectionReason: {
         type: String,
         trim: true
     }
 }, {
-    timestamps: true // Automatically adds createdAt and updatedAt
+    timestamps: true
 });
 
 // Calculate average rating and numReviews before saving
 ProductSchema.pre('save', function(next) {
-    if (this.isModified('ratings')) { // Only recalculate if ratings changed
+    if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
             this.numReviews = this.ratings.length;
             this.averageRating = this.ratings.reduce((acc, item) => item.rating + acc, 0) / this.ratings.length;
@@ -95,7 +99,6 @@ ProductSchema.pre('save', function(next) {
         }
     }
 
-    // Ensure rejectionReason is cleared if status is not 'rejected'
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
@@ -103,7 +106,6 @@ ProductSchema.pre('save', function(next) {
     next();
 });
 
-// Define text index for searching multiple fields
 ProductSchema.index({ name: 'text', category: 'text', specifications: 'text' });
 
 
