@@ -1739,7 +1739,7 @@ select.form-control-sm {
   width: 55px; /* Mobile size */
   height: 55px;
   margin-bottom: calc(var(--spacing-unit) * 0.4);
-  background-color: var(--light-color); /* Light background */
+  background-color: rgb(249, 249, 249); /* Light background */
   /* Key style for "circular square" */
   border-radius: 15px; /* Adjust this value for more/less rounding */
   display: flex;
@@ -1765,7 +1765,7 @@ select.form-control-sm {
   font-size: 0.7rem; /* Smaller text on mobile */
   font-weight: 400; /* Regular weight */
   line-height: 1.3;
-  color: var(--secondary-color); /* Muted color */
+  color: rgb(66, 66, 66); /* Muted color */
    /* Allow wrapping for longer names if needed */
    /* max-width: 100%; */
    /* overflow-wrap: break-word; */
