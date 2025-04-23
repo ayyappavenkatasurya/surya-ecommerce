@@ -1680,24 +1680,29 @@ select.form-control-sm {
 @media (min-width: 1200px) {
     .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns for very large screens */
 }
-/* Category Icons Section */
-.category-icons-section {
-  background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white background */
-  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 0.5);
-  border-radius: var(--border-radius);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-}
+
+/* public/css/style.css */
+
+/* ... existing styles ... */
+
+/* ============================ */
+/* Category Icons Section       */
+/* ============================ */
+
 
 .category-icons-section h2 {
-  font-size: 1.3rem;
+  font-size: 1.2rem; /* Slightly smaller heading */
   font-weight: 500;
   color: var(--dark-color);
+  text-align: center;
+  margin-bottom: calc(var(--spacing-unit) * 1); /* More space below heading */
 }
 
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr); /* Start with 4 columns */
-  gap: calc(var(--spacing-unit) * 0.5);
+  /* Mobile: 4 columns initially */
+  grid-template-columns: repeat(4, 1fr);
+  gap: calc(var(--spacing-unit) * 0.6); /* Adjust gap */
 }
 
 .category-item {
@@ -1705,75 +1710,103 @@ select.form-control-sm {
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: calc(var(--spacing-unit) * 0.5);
-  border-radius: var(--border-radius);
-  transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+  padding: calc(var(--spacing-unit) * 0.4); /* Slightly less padding */
+  border-radius: calc(var(--border-radius) * 0.8); /* Rounded corners for the item */
+  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out;
   color: var(--text-color);
   text-decoration: none;
+  cursor: pointer;
 }
 
-.category-item:hover,
-.category-item.active /* Style for selected category */ {
-  background-color: rgba(0, 0, 0, 0.04);
+.category-item:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* Subtle grey hover */
   text-decoration: none;
-  transform: translateY(-2px);
+  transform: translateY(-2px); /* Slight lift effect */
+}
+
+/* Style for the currently selected category filter */
+.category-item.active {
+  background-color: rgba(0, 123, 255, 0.1); /* Light primary color background */
+  transform: translateY(-1px); /* Keep it slightly distinct */
 }
 .category-item.active .category-name {
   color: var(--primary-color); /* Highlight name of active category */
-  font-weight: bold;
+  font-weight: 500; /* Make active name slightly bolder */
 }
 
 
 .category-icon-wrapper {
-  width: 50px; /* Adjust size as needed */
-  height: 50px;
-  margin-bottom: calc(var(--spacing-unit) * 0.3);
-  background-color: #f0f0f0; /* Light background for the circle */
-  border-radius: 50%;
+  width: 55px; /* Mobile size */
+  height: 55px;
+  margin-bottom: calc(var(--spacing-unit) * 0.4);
+  background-color: var(--light-color); /* Light background */
+  /* Key style for "circular square" */
+  border-radius: 15px; /* Adjust this value for more/less rounding */
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* Ensure image stays within circle */
-  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+  overflow: hidden; /* Ensure image stays within */
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1); /* Soft shadow */
+  border: 1px solid rgba(0,0,0,0.05); /* Very subtle border */
+  transition: box-shadow 0.2s ease;
+}
+.category-item:hover .category-icon-wrapper {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
 
 .category-icon {
-  max-width: 60%; /* Control icon size within the wrapper */
-  max-height: 60%;
-  object-fit: contain;
+  max-width: 65%; /* Control icon size within the wrapper */
+  max-height: 65%;
+  object-fit: contain; /* Ensure icon scales nicely */
+  display: block; /* Prevents potential extra space below img */
 }
 
 .category-name {
-  font-size: 0.75rem; /* Smaller text */
-  font-weight: 500;
+  font-size: 0.7rem; /* Smaller text on mobile */
+  font-weight: 400; /* Regular weight */
   line-height: 1.3;
-  color: var(--secondary-color);
+  color: var(--secondary-color); /* Muted color */
+   /* Allow wrapping for longer names if needed */
+   /* max-width: 100%; */
+   /* overflow-wrap: break-word; */
+   /* height: 1.9em; /* Limit name to roughly 2 lines */
+   /* overflow: hidden; */
+   /* text-overflow: ellipsis; */
 }
 
 /* Responsive adjustments for category grid */
-@media (min-width: 768px) {
-  .category-grid {
-      grid-template-columns: repeat(6, 1fr); /* 6 columns on tablet */
-      gap: calc(var(--spacing-unit) * 0.75);
-  }
-  .category-icon-wrapper { width: 60px; height: 60px; }
-  .category-name { font-size: 0.8rem; }
-  .category-icons-section { padding: calc(var(--spacing-unit) * 1.2); }
+@media (min-width: 576px) { /* Small devices (landscape phones, ) */
+    .category-grid {
+        grid-template-columns: repeat(5, 1fr); /* 5 columns */
+        gap: calc(var(--spacing-unit) * 0.75);
+    }
+    .category-icon-wrapper { width: 60px; height: 60px; border-radius: 18px; }
+    .category-name { font-size: 0.75rem; }
 }
 
-@media (min-width: 1024px) {
+@media (min-width: 768px) { /* Tablets */
   .category-grid {
-      grid-template-columns: repeat(8, 1fr); /* 8 columns on desktop */
+      grid-template-columns: repeat(6, 1fr); /* 6 columns */
+      gap: calc(var(--spacing-unit) * 0.8);
+  }
+  .category-icon-wrapper { width: 65px; height: 65px; border-radius: 20px; }
+  .category-name { font-size: 0.8rem; }
+  .category-icons-section { padding: calc(var(--spacing-unit) * 1.2); }
+  .category-icons-section h2 { font-size: 1.4rem; }
+}
+
+@media (min-width: 992px) { /* Desktops */
+  .category-grid {
+      grid-template-columns: repeat(8, 1fr); /* 8 columns */
       gap: var(--spacing-unit);
   }
-   .category-icon-wrapper { width: 65px; height: 65px; }
+   .category-icon-wrapper { width: 70px; height: 70px; border-radius: 22px; }
   .category-name { font-size: 0.85rem; }
    .category-icons-section { padding: calc(var(--spacing-unit) * 1.5); }
 }
 
-/* --- Ensure Select Dropdowns Take Full Width --- */
-/* This might already be covered by .form-control, but ensures it */
-select.form-control {
-  width: 100%;
-  display: block; /* Ensure it's block level */
+@media (min-width: 1200px) { /* Large Desktops */
+    /* Optional: increase columns further if needed */
+    /* .category-grid { grid-template-columns: repeat(10, 1fr); } */
+     .category-icon-wrapper { width: 75px; height: 75px; border-radius: 25px; }
 }

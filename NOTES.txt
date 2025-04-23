@@ -7462,10 +7462,34 @@ views/products/index.ejs:
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
+<%# --- Category Icons Section (Moved UP) --- %>
+<%# This section now appears first if categories exist %>
+<% if (typeof displayCategories !== 'undefined' && displayCategories.length > 0) { %>
+    <div class="category-icons-section mb-4">
+        <h2 class="text-center mb-3">Shop by Category</h2>
+        <div class="category-grid">
+            <% displayCategories.forEach(cat => { %>
+                <% let categoryUrl = '/?category=' + encodeURIComponent(cat.name); %>
+                <%# Keep search term if user is filtering category *after* a search %>
+                <% if (typeof searchTerm !== 'undefined' && searchTerm) { categoryUrl += '&search=' + encodeURIComponent(searchTerm); } %>
+                <a href="<%= categoryUrl %>" class="category-item <%= (typeof selectedCategory !== 'undefined' && selectedCategory === cat.name) ? 'active' : '' %>" title="Shop <%= cat.name %>">
+                    <div class="category-icon-wrapper">
+                         <img src="<%= cat.iconUrl %>" alt="<%= cat.name %> Icon" class="category-icon" loading="lazy">
+                    </div>
+                    <span class="category-name"><%= cat.name %></span>
+                </a>
+            <% }) %>
+        </div>
+    </div>
+<% } %>
+<%# --- End: Category Icons Section --- %>
+
+
 <%# --- Conditionally Display Banner Slider --- %>
-<%# Only show the banner if NO category is selected %>
-<% if (!selectedCategory) { %>
-    <%# --- Homepage Banner Slider Section (Original Check) --- %>
+<%# Only show the banner if NO category is selected AND NO search term is present %>
+<%# This ensures banner is only on the true "home" view %>
+<% if (!selectedCategory && (!searchTerm || searchTerm.trim() === '')) { %>
+    <%# --- Homepage Banner Slider Section (Check remains the same) --- %>
     <% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
         <div class="banner-slider-container mb-4" data-slider-container>
             <div class="banner-slides" data-slides>
@@ -7505,28 +7529,7 @@ views/products/index.ejs:
         </div>
     <% } %>
     <%# --- End: Homepage Banner Slider Section --- %>
-<% } %> <%# End of the check for !selectedCategory %>
-
-
-<%# --- Category Icons Section (Always shows if categories exist) --- %>
-<% if (typeof displayCategories !== 'undefined' && displayCategories.length > 0) { %>
-    <div class="category-icons-section mb-4">
-        <h2 class="text-center mb-3">Shop by Category</h2>
-        <div class="category-grid">
-            <% displayCategories.forEach(cat => { %>
-                <% let categoryUrl = '/?category=' + encodeURIComponent(cat.name); %>
-                <% if (typeof searchTerm !== 'undefined' && searchTerm) { categoryUrl += '&search=' + encodeURIComponent(searchTerm); } %>
-                <a href="<%= categoryUrl %>" class="category-item <%= (typeof selectedCategory !== 'undefined' && selectedCategory === cat.name) ? 'active' : '' %>" title="Shop <%= cat.name %>">
-                    <div class="category-icon-wrapper">
-                         <img src="<%= cat.iconUrl %>" alt="<%= cat.name %> Icon" class="category-icon" loading="lazy">
-                    </div>
-                    <span class="category-name"><%= cat.name %></span>
-                </a>
-            <% }) %>
-        </div>
-    </div>
-<% } %>
-<%# --- End: Category Icons Section --- %>
+<% } %> <%# End of the check for !selectedCategory and !searchTerm %>
 
 
 <div class="product-index-container">
@@ -7537,6 +7540,7 @@ views/products/index.ejs:
      <% } else if (searchTerm) { %>
          <h1 class="mb-3">Search Results for "<%= searchTerm %>"</h1>
      <% } else { %>
+          <%# Only show "New Launches" if neither category nor search is active %>
           <h1 class="mb-3">New Launches</h1>
      <% } %>
 
@@ -7559,7 +7563,7 @@ views/products/index.ejs:
                                     (<%= product.numReviews %>)
                                  </p>
                             <% } else { %>
-                                <p class="product-rating"> </p> <%# Keep space for alignment %>
+                                <p class="product-rating"> </p> <%# Keep space for alignment %>
                             <% } %>
                         </div>
                     </a>
