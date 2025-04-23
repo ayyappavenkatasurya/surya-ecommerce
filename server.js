@@ -11,7 +11,7 @@ const methodOverride = require('method-override');
 const connectDB = require('./config/database');
 const mainRouter = require('./routes/index');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-
+const { categories: siteCategories } = require('./config/categories'); // <<<--- IMPORT CATEGORIES
 
 connectDB();
 
@@ -139,6 +139,9 @@ app.use((req, res, next) => {
 
 
   res.locals.NODE_ENV = process.env.NODE_ENV;
+
+  // --- ADD CATEGORIES TO LOCALS ---
+  res.locals.siteCategories = siteCategories; // <<<--- ADD THIS LINE
 
   next();
 });

@@ -1,5 +1,7 @@
 // models/Product.js
 const mongoose = require('mongoose');
+// *** Import category names for validation ***
+const { categoryNames } = require('../config/categories');
 
 const RatingSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -13,20 +15,23 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a product name'],
         trim: true,
-        index: true // Added index for searching
+        index: true
     },
-    // *** NEW FIELD ***
     shortDescription: {
         type: String,
         trim: true,
-        maxlength: 200 // Optional: Limit length
+        maxlength: 200
     },
-    // *** END NEW FIELD ***
     category: {
         type: String,
-        required: [true, 'Please provide a product category'],
+        required: [true, 'Please select a product category'],
         trim: true,
-        index: true // Added index for searching
+        index: true,
+        // *** Use enum validation ***
+        enum: {
+            values: categoryNames,
+            message: '{VALUE} is not a supported category.'
+        }
     },
     price: {
         type: Number,

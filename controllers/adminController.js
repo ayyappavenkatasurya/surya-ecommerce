@@ -10,6 +10,9 @@ const {
     confirmDirectDeliveryByAdmin,
 } = require('./orderController');
 const mongoose = require('mongoose');
+// *** Import categories and names ***
+const categories = require('../config/categories');
+const { categoryNames } = require('../config/categories');
 
 const cancellationReasons = [
     "📞 Unable to contact the customer",
@@ -26,42 +29,52 @@ exports.getAdminDashboard = (req, res) => {
 
 // --- Admin Product Upload Page ---
 exports.getUploadProductPage = (req, res) => {
-    res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {} });
+    // *** Pass categories to the view ***
+    res.render('admin/upload-product', {
+        title: 'Admin: Upload New Product',
+        product: {},
+        categories: categories // Pass the full list
+    });
 };
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
-    // Basic Validation (keep existing)
+    // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+        // *** Pass categories back on error ***
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+        // *** Pass categories back on error ***
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
+    }
+    // *** Add Category Validation ***
+    if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(),
-            // *** ADD shortDescription ***
+            category: category.trim(), // Category is now validated
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerId: adminUserId, // Uploaded *by* admin
+            sellerId: adminUserId,
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
 
-        await newProduct.save();
+        await newProduct.save(); // This will trigger enum validation
         console.log(`Product ${newProduct._id} saved initially by ADMIN ${adminUserEmail}.`);
 
         // Send for Gemini Review (Asynchronous - keep existing)
@@ -89,7 +102,8 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+           // *** Pass categories back on error ***
+           return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product by Admin:", error);
         next(error);
@@ -112,7 +126,7 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product (Admin edits ANY - keep existing) ---
+// --- Edit Product (Admin edits ANY) ---
 exports.getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id)
@@ -122,10 +136,12 @@ exports.getEditProductPage = async (req, res, next) => {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
+        // *** Pass categories to the view ***
         res.render('admin/edit-product', {
             title: `Admin Edit: ${product.name}`,
             product: product,
-            isAdminView: true
+            isAdminView: true,
+            categories: categories // Pass the full list
         });
     } catch (error) {
         if (error.name === 'CastError') {
@@ -136,41 +152,45 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// --- Update Product (Admin updates ANY - keep existing) ---
+// --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
 
-    // Validation (keep existing)
+    // Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+        return res.render('admin/edit-product', renderOptions);
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+         return res.render('admin/edit-product', renderOptions);
+    }
+    // *** Add Category Validation ***
+    if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+         return res.render('admin/edit-product', renderOptions);
     }
     const allowedStatus = ['pending', 'approved', 'rejected'];
     if (reviewStatus && !allowedStatus.includes(reviewStatus)) {
         req.flash('error_msg', 'Invalid review status selected.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+         return res.render('admin/edit-product', renderOptions);
     }
     if (reviewStatus === 'rejected' && !rejectionReason?.trim()) {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+        return res.render('admin/edit-product', renderOptions);
     }
 
     try {
-        const product = await Product.findById(productId);
+        const product = await Product.findById(productId); // Fetch non-lean for saving
         if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.status(404).redirect('/admin/manage-products');
         }
 
         product.name = name.trim();
-        product.category = category.trim();
-        // *** ADD shortDescription ***
+        product.category = category.trim(); // Category validated
         product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
@@ -182,7 +202,7 @@ exports.updateProduct = async (req, res, next) => {
             product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined;
         }
 
-        await product.save();
+        await product.save(); // Will trigger enum validation
         req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
         res.redirect('/admin/manage-products');
 
@@ -190,7 +210,15 @@ exports.updateProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-            return res.redirect(`/admin/manage-products/edit/${productId}`);
+            // Fetch original product data again for rendering the edit page correctly on validation error
+             try {
+                 const originalProduct = await Product.findById(productId).lean();
+                 renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data
+             } catch (fetchErr) {
+                 console.error("Error refetching product on update validation fail:", fetchErr);
+                 // Use req.body as fallback
+             }
+             return res.render('admin/edit-product', renderOptions);
         }
         if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid product ID format.');
@@ -225,7 +253,6 @@ exports.removeProduct = async (req, res, next) => {
 
 
 // --- Manage Orders (Admin sees ALL - keep existing) ---
-// ... (rest of manage orders code remains the same)
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -265,7 +292,6 @@ exports.getManageOrdersPage = async (req, res, next) => {
 
 
 // --- Admin Order Actions (keep existing) ---
-// ... (sendDirectDeliveryOtpByAdmin, confirmDirectDeliveryByAdmin, cancelOrderByAdmin remain the same)
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -375,7 +401,6 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
 
 // --- Manage Users (Admin - keep existing) ---
-// ... (getManageUsersPage, updateUserRole, removeUser remain the same)
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -391,7 +416,6 @@ exports.getManageUsersPage = async (req, res, next) => {
     }
 };
 
-// --- Update User Role (Admin - keep existing) ---
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;
@@ -428,7 +452,6 @@ exports.updateUserRole = async (req, res, next) => {
     }
 };
 
-// --- Remove User (Admin - keep existing) ---
 exports.removeUser = async (req, res, next) => {
     const userId = req.params.id;
 
@@ -469,28 +492,18 @@ exports.removeUser = async (req, res, next) => {
 
 
 // --- Banner Management Controllers ---
-// ... (getManageBannersPage, updateBanners remain the same)
 exports.getManageBannersPage = async (req, res, next) => {
     try {
-        // Find the single banner configuration document (using the known key)
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
-
-        // If no config exists yet, create a default structure for the view
         if (!bannerConfig) {
-            bannerConfig = {
-                configKey: 'mainBanners',
-                banners: [] // Start with an empty array
-            };
+            bannerConfig = { configKey: 'mainBanners', banners: [] };
         }
-
-        // Ensure the banners array always has 4 potential slots for the form
         const displayBanners = Array.from({ length: 4 }).map((_, index) => {
-             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' };
          });
-
         res.render('admin/manage-banners', {
             title: 'Manage Homepage Banners',
-            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+            bannerConfig: { ...bannerConfig, banners: displayBanners }
         });
     } catch (error) {
         console.error("Error fetching banner configuration:", error);
@@ -498,13 +511,11 @@ exports.getManageBannersPage = async (req, res, next) => {
     }
 };
 
-// POST request to update the banner URLs
 exports.updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const adminUserId = req.session.user._id;
 
-    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
-    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const urlPattern = /^https?:\/\/.+/;
     const bannerInputs = [
         { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
         { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
@@ -520,13 +531,11 @@ exports.updateBanners = async (req, res, next) => {
         const trimmedLinkUrl = input.linkUrl?.trim();
         const trimmedTitle = input.title?.trim();
 
-        // Only add banner if image URL is provided
         if (trimmedImageUrl) {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
             }
-            // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
                  req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
                  validationError = true;
@@ -534,8 +543,8 @@ exports.updateBanners = async (req, res, next) => {
              if (!validationError) {
                 newBanners.push({
                      imageUrl: trimmedImageUrl,
-                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
-                     title: trimmedTitle || undefined    // Store undefined if empty
+                     linkUrl: trimmedLinkUrl || undefined,
+                     title: trimmedTitle || undefined
                  });
              }
         }
@@ -551,17 +560,12 @@ exports.updateBanners = async (req, res, next) => {
 
     try {
         await BannerConfig.findOneAndUpdate(
-            { configKey: 'mainBanners' }, // Find by the key
-            {
-                banners: newBanners,
-                lastUpdatedBy: adminUserId
-            },
+            { configKey: 'mainBanners' },
+            { banners: newBanners, lastUpdatedBy: adminUserId },
             { new: true, upsert: true, runValidators: true }
         );
-
         req.flash('success_msg', 'Homepage banners updated successfully.');
         res.redirect('/admin/manage-banners');
-
     } catch (error) {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);

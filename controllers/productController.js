@@ -1,53 +1,67 @@
 // controllers/productController.js
 const Product = require('../models/Product');
-const User = require('../models/User'); // Keep for user rating logic
+const User = require('../models/User');
+// *** Import category names ***
+const { categoryNames } = require('../config/categories');
 
-/**
- * Escapes special characters in a string for use in a regular expression.
- * @param {string} string - The input string.
- * @returns {string} The escaped string.
- */
+
 function escapeRegex(string) {
+  // Simple regex escape. Consider a more robust library if needed.
   return string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
 
-// --- Get Products (Handles both listing and search results with sequential matching) ---
+// --- Get Products (Handles listing, search, AND category filter) ---
 exports.getProducts = async (req, res, next) => {
   try {
-    const searchTerm = req.query.search || ''; // Get search term from query param 'search'
+    const searchTerm = req.query.search || '';
+    // *** Get category filter ***
+    const categoryFilter = req.query.category || '';
+
     let query = {
         reviewStatus: 'approved', // Always filter by approved
         stock: { $gt: 0 }         // Always filter by in-stock
     };
     let sort = { createdAt: -1 }; // Default sort
-    const projection = {}; // No text score projection needed for regex
+    const projection = {};
 
-    // --- NEW: Use Regex for sequential matching if searchTerm exists ---
+    // Use Regex for sequential matching if searchTerm exists
     if (searchTerm) {
-      const escapedSearchTerm = escapeRegex(searchTerm); // Escape special characters
-      const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
-
-      query.$or = [ // Match name OR category sequentially
+      const escapedSearchTerm = escapeRegex(searchTerm);
+      const regex = new RegExp(escapedSearchTerm, 'i');
+      query.$or = [
         { name: regex },
         { category: regex }
-        // Add { specifications: regex } here if you want to search specs sequentially too
       ];
-      // Optional: Change sort for search results, e.g., alphabetical
-      // sort = { name: 1 };
-      console.log(`Regex Search Query: ${JSON.stringify(query)}`); // Log the query
+      console.log(`Regex Search Query: ${JSON.stringify(query)}`);
     }
-    // --- End Regex modification ---
+    // Apply category filter ONLY if no search term is present
+    else if (categoryFilter && categoryNames.includes(categoryFilter)) {
+         query.category = categoryFilter;
+    } else if (categoryFilter) {
+         console.warn(`Invalid category filter attempted on /products route: ${categoryFilter}`);
+    }
+    // --- End Filter Logic ---
 
-    const products = await Product.find(query, projection) // Projection is now empty
+    const products = await Product.find(query, projection)
                                     .sort(sort)
-                                    .lean(); // Use lean for read-only performance
+                                    .lean();
 
-    // Render the same index page, passing search term for display
+    // Determine page title based on filters
+    let pageTitle = 'Products';
+    if (searchTerm) {
+        pageTitle = `Search Results for "${searchTerm}"`;
+    } else if (categoryFilter && categoryNames.includes(categoryFilter)) {
+        pageTitle = `Category: ${categoryFilter}`;
+    }
+
+    // Render the same index page, passing search term and category for display
     res.render('products/index', {
-      title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home', // Dynamic title
+      title: pageTitle,
       products: products,
-      searchTerm: searchTerm // Pass term back to view
-      // currentUser is available via res.locals
+      searchTerm: searchTerm,
+      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null, // Pass selected category
+      // Note: displayCategories are typically passed by getHomePage, not needed here unless specifically rendering categories on this route
+      // displayCategories: require('../config/categories') // Uncomment if needed here
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -60,37 +74,32 @@ exports.getProducts = async (req, res, next) => {
 exports.getProductDetails = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
-                                    .populate('sellerId', 'name email') // Populate seller
-                                    .lean(); // Use lean()
+                                    .populate('sellerId', 'name email')
+                                    .lean();
 
     if (!product) {
        const error = new Error('Product not found');
        error.status = 404;
-       return next(error); // Use central error handler
+       return next(error);
     }
 
-    // Check if product is viewable
     const isApproved = product.reviewStatus === 'approved';
     const user = req.session.user;
     const isAdmin = user?.role === 'admin';
     const isOwner = user && product.sellerId?._id && user._id.toString() === product.sellerId._id.toString();
 
-
     if (!isApproved && !isAdmin && !isOwner) {
-        // If product isn't approved, only admin or owner can see it
          const error = new Error('Product not available');
-         error.status = 404; // Or 403 Forbidden, but 404 is less revealing
+         error.status = 404;
          return next(error);
     }
 
-    // User rating logic
     let userRating = null;
     if (user) {
        const ratingData = product.ratings?.find(r => r.userId?.toString() === user._id.toString());
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // Rating stats calculation
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
@@ -103,7 +112,6 @@ exports.getProductDetails = async (req, res, next) => {
     }
     const displayTotalRatings = product.numReviews || totalRatings;
 
-
     res.render('products/detail', {
       title: product.name,
       product: product,
@@ -114,7 +122,6 @@ exports.getProductDetails = async (req, res, next) => {
       userCanRate: user ? true : false,
       ratingCounts: ratingCounts,
       totalRatings: displayTotalRatings
-      // Add other necessary variables like fullUrl etc. if needed by header partial
     });
   } catch (error) {
        if (error.name === 'CastError') {
@@ -122,7 +129,7 @@ exports.getProductDetails = async (req, res, next) => {
            notFoundError.status = 404;
            return next(notFoundError);
        }
-    next(error); // Pass other errors to central handler
+    next(error);
   }
 };
 
@@ -135,11 +142,11 @@ exports.getProductDetails = async (req, res, next) => {
 
      if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) {
          req.flash('error_msg', 'Please provide a valid rating between 1 and 5.');
-        return res.redirect('back'); // Redirect to previous page
+        return res.redirect('back');
      }
 
     try {
-        const product = await Product.findById(productId); // Not lean()
+        const product = await Product.findById(productId);
 
          if (!product) {
              req.flash('error_msg', 'Product not found.');
@@ -154,10 +161,10 @@ exports.getProductDetails = async (req, res, next) => {
             product.ratings.push({ userId, rating: Number(rating) });
          }
 
-        await product.save(); // Triggers pre-save hook for averageRating/numReviews
+        await product.save();
 
          req.flash('success_msg', 'Thank you for your rating!');
-         res.redirect(`/products/${productId}`); // Redirect back to product page
+         res.redirect(`/products/${productId}`);
 
      } catch (error) {
         if (error.name === 'CastError') {
@@ -165,45 +172,39 @@ exports.getProductDetails = async (req, res, next) => {
             return res.status(400).redirect('/');
         }
         console.error("Error rating product:", error);
-        next(error); // Central error handler
+        next(error);
      }
  };
 
- // --- Get Product Suggestions (Updated for sequential matching) ---
+ // --- Get Product Suggestions (Updated for sequential matching - no category changes needed here) ---
  exports.getProductSuggestions = async (req, res, next) => {
-    const searchTerm = req.query.q; // Get query from 'q' parameter
-    const limit = 8; // Max number of suggestions
+    const searchTerm = req.query.q;
+    const limit = 8;
 
     if (!searchTerm || searchTerm.trim().length < 2) {
-        return res.json([]); // Return empty if no/short query
+        return res.json([]);
     }
 
     try {
-        // --- NEW: Use Regex for sequential matching ---
-        const escapedSearchTerm = escapeRegex(searchTerm); // Escape special chars
-        const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+        const escapedSearchTerm = escapeRegex(searchTerm);
+        const regex = new RegExp(escapedSearchTerm, 'i');
 
         const query = {
-            $or: [ // Match name OR category sequentially
-                { name: regex },
-                { category: regex }
-            ],
-            reviewStatus: 'approved', // Only suggest approved products
-            stock: { $gt: 0 }         // Only suggest products in stock
+            $or: [ { name: regex }, { category: regex } ],
+            reviewStatus: 'approved',
+            stock: { $gt: 0 }
         };
-        // --- End Regex modification ---
 
         const suggestions = await Product.find(query)
-            .select('_id name imageUrl') // Select only needed fields
+            .select('_id name imageUrl')
             .limit(limit)
-            .sort({ name: 1 }) // Sort suggestions alphabetically
-            .lean(); // Use lean for performance
+            .sort({ name: 1 })
+            .lean();
 
-        res.json(suggestions); // Send results as JSON
+        res.json(suggestions);
 
     } catch (error) {
         console.error("Error fetching product suggestions:", error);
-        // Avoid sending full error details to client
         res.status(500).json({ error: 'Failed to fetch suggestions' });
     }
  };

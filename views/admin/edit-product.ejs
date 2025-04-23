@@ -9,29 +9,31 @@
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
         </div>
-
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** END *** -->
-
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
+            <select id="category" name="category" class="form-control" required>
+                <option value="" disabled <%= !product.category ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
         </div>
-
+        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
-
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
-
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
@@ -39,7 +41,6 @@
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
         </div>
-
         <div class="form-group">
             <label for="specifications">Specifications:</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
@@ -56,7 +57,6 @@
                 <option value="rejected" <%= product.reviewStatus === 'rejected' ? 'selected' : '' %>>Rejected</option>
             </select>
         </div>
-
         <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
             <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
             <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>

@@ -9,16 +9,23 @@
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** END *** -->
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <select id="category" name="category" class="form-control" required>
+                <option value="" disabled <%= !(typeof product !== 'undefined' && product.category) ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (typeof product !== 'undefined' && product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
         </div>
+        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>

@@ -1,54 +1,84 @@
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<%# --- UPDATED: Homepage Banner Slider Section --- %>
-<% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
-    <div class="banner-slider-container mb-4" data-slider-container>
-        <div class="banner-slides" data-slides>
-            <% homepageBanners.forEach((banner, index) => { %>
-                <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
-                    <%# --- MODIFICATION START --- %>
-                    <% if (banner.linkUrl) { %>
-                        <%# REMOVED target="_blank" from the next line %>
-                        <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
+<%# --- Conditionally Display Banner Slider --- %>
+<%# Only show the banner if NO category is selected %>
+<% if (!selectedCategory) { %>
+    <%# --- Homepage Banner Slider Section (Original Check) --- %>
+    <% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
+        <div class="banner-slider-container mb-4" data-slider-container>
+            <div class="banner-slides" data-slides>
+                <% homepageBanners.forEach((banner, index) => { %>
+                    <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide>
+                        <% if (banner.linkUrl) { %>
+                            <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
+                                <img src="<%= banner.imageUrl %>"
+                                     alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                                     class="banner-image"
+                                     loading="lazy">
+                            </a>
+                        <% } else { %>
                             <img src="<%= banner.imageUrl %>"
                                  alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                                  class="banner-image"
                                  loading="lazy">
-                        </a>
-                    <% } else { %>
-                        <%# Image without a link %>
-                        <img src="<%= banner.imageUrl %>"
-                             alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
-                             class="banner-image"
-                             loading="lazy">
-                    <% } %>
-                    <%# --- MODIFICATION END --- %>
-                </div>
-            <% }) %>
-        </div>
-
-        <%# Optional: Navigation Arrows (hide if only one banner) %>
-        <% if (homepageBanners.length > 1) { %>
-            <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
-            <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
-        <% } %>
-
-        <%# Optional: Navigation Dots (hide if only one banner) %>
-         <% if (homepageBanners.length > 1) { %>
-            <div class="banner-dots" data-slider-dots>
-                <% homepageBanners.forEach((_, index) => { %>
-                    <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                        <% } %>
+                    </div>
                 <% }) %>
             </div>
-        <% } %>
+
+            <%# Optional: Navigation Arrows %>
+            <% if (homepageBanners.length > 1) { %>
+                <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
+                <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
+            <% } %>
+
+            <%# Optional: Navigation Dots %>
+             <% if (homepageBanners.length > 1) { %>
+                <div class="banner-dots" data-slider-dots>
+                    <% homepageBanners.forEach((_, index) => { %>
+                        <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                    <% }) %>
+                </div>
+            <% } %>
+        </div>
+    <% } %>
+    <%# --- End: Homepage Banner Slider Section --- %>
+<% } %> <%# End of the check for !selectedCategory %>
+
+
+<%# --- Category Icons Section (Always shows if categories exist) --- %>
+<% if (typeof displayCategories !== 'undefined' && displayCategories.length > 0) { %>
+    <div class="category-icons-section mb-4">
+        <h2 class="text-center mb-3">Shop by Category</h2>
+        <div class="category-grid">
+            <% displayCategories.forEach(cat => { %>
+                <% let categoryUrl = '/?category=' + encodeURIComponent(cat.name); %>
+                <% if (typeof searchTerm !== 'undefined' && searchTerm) { categoryUrl += '&search=' + encodeURIComponent(searchTerm); } %>
+                <a href="<%= categoryUrl %>" class="category-item <%= (typeof selectedCategory !== 'undefined' && selectedCategory === cat.name) ? 'active' : '' %>" title="Shop <%= cat.name %>">
+                    <div class="category-icon-wrapper">
+                         <img src="<%= cat.iconUrl %>" alt="<%= cat.name %> Icon" class="category-icon" loading="lazy">
+                    </div>
+                    <span class="category-name"><%= cat.name %></span>
+                </a>
+            <% }) %>
+        </div>
     </div>
 <% } %>
-<%# --- End: Homepage Banner Slider Section --- %>
+<%# --- End: Category Icons Section --- %>
+
 
 <div class="product-index-container">
-    <br>
-        <h1>New Launches</h1>
+     <%# Display title based on filter/search %>
+     <% if (selectedCategory) { %>
+         <h1 class="mb-3">Category: <%= selectedCategory %></h1>
+         <p class="mb-3"><a href="/">« Back to All Products</a></p>
+     <% } else if (searchTerm) { %>
+         <h1 class="mb-3">Search Results for "<%= searchTerm %>"</h1>
+     <% } else { %>
+          <h1 class="mb-3">New Launches</h1>
+     <% } %>
+
 
     <% if (products.length > 0) { %>
         <div class="product-grid">
@@ -85,7 +115,9 @@
     <% } else { %>
          <p class="alert alert-info">
              <% if (typeof searchTerm !== 'undefined' && searchTerm) { %>
-                 No products found matching your search "<%= searchTerm %>".
+                 No products found matching your search "<%= searchTerm %>". <a href="/">View all products?</a>
+             <% } else if (typeof selectedCategory !== 'undefined' && selectedCategory) { %>
+                 No products found in the category "<%= selectedCategory %>". <a href="/">View all categories?</a>
              <% } else { %>
                  No products are currently available. Check back soon!
              <% } %>

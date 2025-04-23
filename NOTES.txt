@@ -1,4 +1,25 @@
 config/database.js:
+// config/categories.js
+// ** IMPORTANT: Replace these placeholder URLs with your actual external image URLs **
+const categories = [
+    { name: "Electronics", iconUrl: "https://img.icons8.com/ios/100/electronics.png" },
+    { name: "Fashion", iconUrl: "https://img.icons8.com/ios/100/clothes.png" },
+    { name: "Home & Kitchen", iconUrl: "https://img.icons8.com/ios/100/kitchen-room.png" },
+    { name: "Books", iconUrl: "https://img.icons8.com/ios/100/books.png" },
+    { name: "Sports & Outdoors", iconUrl: "https://img.icons8.com/ios/100/football2.png" },
+    { name: "Toys & Games", iconUrl: "https://img.icons8.com/ios/100/controller.png" },
+    { name: "Grocery", iconUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwXOntQInELZDYy4cC3ZoYx6llzPlV9urYoQ&s" },
+    { name: "Health & Beauty", iconUrl: "https://img.icons8.com/ios/100/lipstick.png" },
+    // Add or modify categories as needed
+  ];
+  
+  // Also export just the names for validation purposes
+  const categoryNames = categories.map(cat => cat.name);
+  
+  module.exports = categories;
+  module.exports.categoryNames = categoryNames; // Export names separately
+
+config/database.js:
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
@@ -89,6 +110,9 @@ const {
     confirmDirectDeliveryByAdmin,
 } = require('./orderController');
 const mongoose = require('mongoose');
+// *** Import categories and names ***
+const categories = require('../config/categories');
+const { categoryNames } = require('../config/categories');
 
 const cancellationReasons = [
     "📞 Unable to contact the customer",
@@ -105,42 +129,52 @@ exports.getAdminDashboard = (req, res) => {
 
 // --- Admin Product Upload Page ---
 exports.getUploadProductPage = (req, res) => {
-    res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {} });
+    // *** Pass categories to the view ***
+    res.render('admin/upload-product', {
+        title: 'Admin: Upload New Product',
+        product: {},
+        categories: categories // Pass the full list
+    });
 };
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
-    // Basic Validation (keep existing)
+    // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+        // *** Pass categories back on error ***
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+        // *** Pass categories back on error ***
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
+    }
+    // *** Add Category Validation ***
+    if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+        return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(),
-            // *** ADD shortDescription ***
+            category: category.trim(), // Category is now validated
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
             specifications: specifications ? specifications.trim() : '',
-            sellerId: adminUserId, // Uploaded *by* admin
+            sellerId: adminUserId,
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
 
-        await newProduct.save();
+        await newProduct.save(); // This will trigger enum validation
         console.log(`Product ${newProduct._id} saved initially by ADMIN ${adminUserEmail}.`);
 
         // Send for Gemini Review (Asynchronous - keep existing)
@@ -168,7 +202,8 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body });
+           // *** Pass categories back on error ***
+           return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product by Admin:", error);
         next(error);
@@ -191,7 +226,7 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product (Admin edits ANY - keep existing) ---
+// --- Edit Product (Admin edits ANY) ---
 exports.getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id)
@@ -201,10 +236,12 @@ exports.getEditProductPage = async (req, res, next) => {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
+        // *** Pass categories to the view ***
         res.render('admin/edit-product', {
             title: `Admin Edit: ${product.name}`,
             product: product,
-            isAdminView: true
+            isAdminView: true,
+            categories: categories // Pass the full list
         });
     } catch (error) {
         if (error.name === 'CastError') {
@@ -215,41 +252,45 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// --- Update Product (Admin updates ANY - keep existing) ---
+// --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
 
-    // Validation (keep existing)
+    // Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+        return res.render('admin/edit-product', renderOptions);
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+         return res.render('admin/edit-product', renderOptions);
+    }
+    // *** Add Category Validation ***
+    if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+         return res.render('admin/edit-product', renderOptions);
     }
     const allowedStatus = ['pending', 'approved', 'rejected'];
     if (reviewStatus && !allowedStatus.includes(reviewStatus)) {
         req.flash('error_msg', 'Invalid review status selected.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+         return res.render('admin/edit-product', renderOptions);
     }
     if (reviewStatus === 'rejected' && !rejectionReason?.trim()) {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
-        return res.redirect(`/admin/manage-products/edit/${productId}`);
+        return res.render('admin/edit-product', renderOptions);
     }
 
     try {
-        const product = await Product.findById(productId);
+        const product = await Product.findById(productId); // Fetch non-lean for saving
         if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.status(404).redirect('/admin/manage-products');
         }
 
         product.name = name.trim();
-        product.category = category.trim();
-        // *** ADD shortDescription ***
+        product.category = category.trim(); // Category validated
         product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
@@ -261,7 +302,7 @@ exports.updateProduct = async (req, res, next) => {
             product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined;
         }
 
-        await product.save();
+        await product.save(); // Will trigger enum validation
         req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
         res.redirect('/admin/manage-products');
 
@@ -269,7 +310,15 @@ exports.updateProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-            return res.redirect(`/admin/manage-products/edit/${productId}`);
+            // Fetch original product data again for rendering the edit page correctly on validation error
+             try {
+                 const originalProduct = await Product.findById(productId).lean();
+                 renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data
+             } catch (fetchErr) {
+                 console.error("Error refetching product on update validation fail:", fetchErr);
+                 // Use req.body as fallback
+             }
+             return res.render('admin/edit-product', renderOptions);
         }
         if (error.name === 'CastError') {
             req.flash('error_msg', 'Invalid product ID format.');
@@ -304,7 +353,6 @@ exports.removeProduct = async (req, res, next) => {
 
 
 // --- Manage Orders (Admin sees ALL - keep existing) ---
-// ... (rest of manage orders code remains the same)
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -344,7 +392,6 @@ exports.getManageOrdersPage = async (req, res, next) => {
 
 
 // --- Admin Order Actions (keep existing) ---
-// ... (sendDirectDeliveryOtpByAdmin, confirmDirectDeliveryByAdmin, cancelOrderByAdmin remain the same)
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -454,7 +501,6 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
 
 
 // --- Manage Users (Admin - keep existing) ---
-// ... (getManageUsersPage, updateUserRole, removeUser remain the same)
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -470,7 +516,6 @@ exports.getManageUsersPage = async (req, res, next) => {
     }
 };
 
-// --- Update User Role (Admin - keep existing) ---
 exports.updateUserRole = async (req, res, next) => {
     const userId = req.params.id;
     const { role } = req.body;
@@ -507,7 +552,6 @@ exports.updateUserRole = async (req, res, next) => {
     }
 };
 
-// --- Remove User (Admin - keep existing) ---
 exports.removeUser = async (req, res, next) => {
     const userId = req.params.id;
 
@@ -548,28 +592,18 @@ exports.removeUser = async (req, res, next) => {
 
 
 // --- Banner Management Controllers ---
-// ... (getManageBannersPage, updateBanners remain the same)
 exports.getManageBannersPage = async (req, res, next) => {
     try {
-        // Find the single banner configuration document (using the known key)
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
-
-        // If no config exists yet, create a default structure for the view
         if (!bannerConfig) {
-            bannerConfig = {
-                configKey: 'mainBanners',
-                banners: [] // Start with an empty array
-            };
+            bannerConfig = { configKey: 'mainBanners', banners: [] };
         }
-
-        // Ensure the banners array always has 4 potential slots for the form
         const displayBanners = Array.from({ length: 4 }).map((_, index) => {
-             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' }; // Provide default empty values
+             return bannerConfig.banners[index] || { imageUrl: '', linkUrl: '', title: '' };
          });
-
         res.render('admin/manage-banners', {
             title: 'Manage Homepage Banners',
-            bannerConfig: { ...bannerConfig, banners: displayBanners } // Pass the structured data
+            bannerConfig: { ...bannerConfig, banners: displayBanners }
         });
     } catch (error) {
         console.error("Error fetching banner configuration:", error);
@@ -577,13 +611,11 @@ exports.getManageBannersPage = async (req, res, next) => {
     }
 };
 
-// POST request to update the banner URLs
 exports.updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const adminUserId = req.session.user._id;
 
-    // Basic validation: Ensure at least one URL is somewhat valid-looking if provided
-    const urlPattern = /^https?:\/\/.+/; // Very basic check for http/https
+    const urlPattern = /^https?:\/\/.+/;
     const bannerInputs = [
         { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 },
         { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 },
@@ -599,13 +631,11 @@ exports.updateBanners = async (req, res, next) => {
         const trimmedLinkUrl = input.linkUrl?.trim();
         const trimmedTitle = input.title?.trim();
 
-        // Only add banner if image URL is provided
         if (trimmedImageUrl) {
             if (!urlPattern.test(trimmedImageUrl)) {
                 req.flash('error_msg', `Banner ${i + 1}: Image URL format is invalid.`);
                 validationError = true;
             }
-            // Also validate link URL if provided
             if (trimmedLinkUrl && !urlPattern.test(trimmedLinkUrl)) {
                  req.flash('error_msg', `Banner ${i + 1}: Link URL format is invalid.`);
                  validationError = true;
@@ -613,8 +643,8 @@ exports.updateBanners = async (req, res, next) => {
              if (!validationError) {
                 newBanners.push({
                      imageUrl: trimmedImageUrl,
-                     linkUrl: trimmedLinkUrl || undefined, // Store undefined if empty
-                     title: trimmedTitle || undefined    // Store undefined if empty
+                     linkUrl: trimmedLinkUrl || undefined,
+                     title: trimmedTitle || undefined
                  });
              }
         }
@@ -630,17 +660,12 @@ exports.updateBanners = async (req, res, next) => {
 
     try {
         await BannerConfig.findOneAndUpdate(
-            { configKey: 'mainBanners' }, // Find by the key
-            {
-                banners: newBanners,
-                lastUpdatedBy: adminUserId
-            },
+            { configKey: 'mainBanners' },
+            { banners: newBanners, lastUpdatedBy: adminUserId },
             { new: true, upsert: true, runValidators: true }
         );
-
         req.flash('success_msg', 'Homepage banners updated successfully.');
         res.redirect('/admin/manage-banners');
-
     } catch (error) {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
@@ -661,11 +686,15 @@ controllers/authController.js:
 // controllers/authController.js
 const User = require('../models/User');
 const Product = require('../models/Product');
-const BannerConfig = require('../models/BannerConfig'); // *** <<< ADD THIS LINE ***
+const BannerConfig = require('../models/BannerConfig');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 const { sendEmail } = require('../config/mailer');
+// *** Import categories and names ***
+const categories = require('../config/categories');
+const { categoryNames } = require('../config/categories');
+
 
 // --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. (No changes needed) ---
 exports.getLoginPage = (req, res) => {
@@ -688,7 +717,7 @@ exports.getVerifyOtpPage = (req, res) => {
         req.flash('error_msg', 'Email required for OTP verification.');
         return res.redirect('/auth/register');
     }
-     if (req.session.user) { // Redirect if already logged in, even on OTP page? Controversial but prevents odd states.
+     if (req.session.user) { // Redirect if already logged in
         return res.redirect('/');
    }
     res.render('auth/verify-otp', { title: 'Verify Email', email });
@@ -702,396 +731,258 @@ exports.getForgotPasswordPage = (req, res) => {
 };
 
 exports.getResetPasswordPage = async (req, res, next) => {
-     if (req.session.user) { // Should logged-in users be able to reset password this way? Probably redirect.
+     if (req.session.user) {
          req.flash('info_msg', 'You are already logged in.');
          return res.redirect('/');
     }
     try {
-        // Find user by token and check expiration
         const user = await User.findOne({
             resetPasswordToken: req.params.token,
-            resetPasswordExpires: { $gt: Date.now() }, // Ensure token is not expired
+            resetPasswordExpires: { $gt: Date.now() },
         });
 
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired.');
             return res.redirect('/auth/forgot-password');
         }
-        // Token is valid, render the reset form
         res.render('auth/reset-password', { title: 'Reset Password', token: req.params.token });
     } catch (error) {
-        next(error); // Pass errors to the error handler
+        next(error);
     }
 };
 
-// --- registerUser, verifyOtp, resendOtp, loginUser (No changes needed from previous version) ---
+// --- registerUser, verifyOtp, resendOtp, loginUser (No changes needed) ---
 exports.registerUser = async (req, res, next) => {
      if (req.session.user) {
-        return res.redirect('/'); // Redirect if already logged in
+        return res.redirect('/');
     }
     const { name, email, password, confirmPassword } = req.body;
 
-    // --- Input Validation ---
     let errors = [];
-    if (!name || !email || !password || !confirmPassword) {
-        errors.push('Please fill in all fields.');
-    }
-    if (password !== confirmPassword) {
-        errors.push('Passwords do not match.');
-    }
-    if (password && password.length < 6) {
-        errors.push('Password must be at least 6 characters.');
-    }
-    // Basic email format check (consider using a library for more robust validation)
-    if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-        errors.push('Please enter a valid email address.');
-    }
+    if (!name || !email || !password || !confirmPassword) { errors.push('Please fill in all fields.'); }
+    if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
+    if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
+    if (email && !/^\S+@\S+\.\S+$/.test(email)) { errors.push('Please enter a valid email address.'); }
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        // Render the form again with entered values (except passwords)
-        return res.render('auth/register', {
-            title: 'Register',
-            name: name,
-            email: email, // Pass back email and name
-            error_msg: req.flash('error_msg') // Ensure message is passed to view context
-        });
+        return res.render('auth/register', { title: 'Register', name: name, email: email, error_msg: req.flash('error_msg') });
     }
 
-    // --- Registration Logic ---
     try {
         const lowerCaseEmail = email.toLowerCase();
         let user = await User.findOne({ email: lowerCaseEmail });
 
-        // Handle existing users (verified or not)
         if (user && user.isVerified) {
             req.flash('error_msg', 'Email is already registered and verified. Please login.');
             return res.redirect('/auth/login');
         }
 
-        // Generate OTP and Expiration
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10); // 10 minutes expiry
+        const otpExpires = setOTPExpiration(10);
 
-        // Update unverified existing user or create new one
         if (user && !user.isVerified) {
-            // Update existing unverified user record
             user.name = name;
-            if (password) { user.password = password; } // Hash happens on save via pre-hook
+            if (password) { user.password = password; }
             user.otp = otp;
             user.otpExpires = otpExpires;
-            user.isVerified = false; // Ensure it's false
-            // Skip validation if just updating OTP fields on existing unverified doc
+            user.isVerified = false;
             await user.save({ validateBeforeSave: false });
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
-            // Create a new user instance
-            user = new User({
-                name,
-                email: lowerCaseEmail,
-                password, // Hash happens on save via pre-hook
-                otp,
-                otpExpires,
-                isVerified: false,
-                // Role defaults to 'user' as defined in schema
-            });
-            await user.save(); // This will trigger pre-save hooks (password hashing)
+            user = new User({ name, email: lowerCaseEmail, password, otp, otpExpires, isVerified: false });
+            await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
-        // --- Send Verification Email ---
         const subject = 'Verify Your Email Address';
         const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
         const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
-
         const emailSent = await sendEmail(user.email, subject, text, html);
 
         if (emailSent) {
             req.flash('success_msg', `An OTP has been sent to ${user.email}. Please check your inbox and verify.`);
-            // Redirect to OTP verification page with email pre-filled
             res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
         } else {
-             // If email fails, consider cleanup for newly created, unverified users to prevent orphans
-             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { // Basic check for very new user
+             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) {
                 try {
-                    // Only delete if not verified AND potentially newly created
                     await User.deleteOne({ _id: user._id, isVerified: false });
                     console.log(`Cleaned up unverified user ${user.email} due to failed email send.`);
-                } catch (deleteError) {
-                    console.error(`Error cleaning up unverified user ${user.email}:`, deleteError);
-                }
+                } catch (deleteError) { console.error(`Error cleaning up unverified user ${user.email}:`, deleteError); }
              }
             req.flash('error_msg', 'Could not send OTP email. Please try registering again or contact support.');
-            // Redirect back to registration page
             res.redirect('/auth/register');
         }
-
     } catch (error) {
-        // Handle potential database errors
-        if (error.code === 11000) { // Duplicate key error (email)
+        if (error.code === 11000) {
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-            // Render form again with entered values
             return res.render('auth/register', { title: 'Register', name: name, email: email });
         }
-        if (error.name === 'ValidationError') { // Mongoose validation errors
+        if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
-            // Render form again with entered values
             return res.render('auth/register', { title: 'Register', name: name, email: email });
        }
-        // For other errors, pass to the central error handler
         next(error);
     }
 };
 
 exports.verifyOtp = async (req, res, next) => {
     const { email, otp } = req.body;
-
-     // Redirect logged-in users
-     if (req.session.user) {
-        return res.redirect('/');
-    }
-
+     if (req.session.user) { return res.redirect('/'); }
     if (!email || !otp) {
         req.flash('error_msg', 'Email and OTP are required.');
-         // Redirect back to verify page, keeping email in query param if possible
          return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email || '')}`);
     }
-
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user matching email, OTP, and non-expired OTP
-        const user = await User.findOne({
-            email: lowerCaseEmail,
-            otp: otp.trim(), // Trim OTP input
-            otpExpires: { $gt: Date.now() }, // Check expiry
-        }).select('+password'); // Include password for potential immediate login
+        const user = await User.findOne({ email: lowerCaseEmail, otp: otp.trim(), otpExpires: { $gt: Date.now() }, }).select('+password');
 
-        // --- Handle User Not Found or Invalid OTP ---
         if (!user) {
             const existingUser = await User.findOne({ email: lowerCaseEmail });
-            let errorMessage = 'Invalid or expired OTP. Please try again or resend.'; // Default message
-
+            let errorMessage = 'Invalid or expired OTP. Please try again or resend.';
             if (existingUser && existingUser.isVerified) {
                  errorMessage = 'This account is already verified. Please login.';
                  req.flash('error_msg', errorMessage);
                  return res.redirect('/auth/login');
             } else if (!existingUser) {
-                 // If user doesn't exist at all (perhaps deleted during retry?)
                  errorMessage = 'Verification failed. Account not found. Please register again.';
                  req.flash('error_msg', errorMessage);
                  return res.redirect('/auth/register');
             }
-            // If user exists but OTP is wrong/expired
              req.flash('error_msg', errorMessage);
-            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`); // Keep email in query
+            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
         }
 
-        // --- Handle Successful OTP Verification ---
-
-         // Check if this OTP verification is part of a password reset flow
          const isPasswordReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
-
-         // Update user status
          user.isVerified = true;
-         user.otp = undefined; // Clear OTP fields
+         user.otp = undefined;
          user.otpExpires = undefined;
 
-         // --- Password Reset Flow ---
          if (isPasswordReset) {
-             // Save user without validating (password not being changed here)
              await user.save({ validateBeforeSave: false });
-
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
-             // Redirect to the reset password form using the token
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
-         // --- Standard Registration Flow ---
          else {
-            // Save updated user (password validation not needed here either)
             await user.save({ validateBeforeSave: false });
-
-            // --- Log the user in automatically ---
-             req.session.regenerate(err => { // Regenerate session to prevent fixation
+             req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
                      req.flash('error_msg', 'Verification successful, but auto-login failed. Please login manually.');
-                     return res.redirect('/auth/login'); // Redirect to login on session error
+                     return res.redirect('/auth/login');
                  }
-
-                // Populate session with user data (excluding sensitive fields)
-                req.session.user = {
-                    _id: user._id,
-                    name: user.name,
-                    email: user.email,
-                    role: user.role,
-                    address: user.address, // Include address if available
-                    cart: user.cart || []   // Include cart if available
-                 };
-
-                // Save the session before redirecting
+                req.session.user = { _id: user._id, name: user.name, email: user.email, role: user.role, address: user.address, cart: user.cart || [] };
                 req.session.save(err => {
                    if (err) {
                         console.error("Session save error after OTP verify login:", err);
                          req.flash('error_msg', 'Verification successful, but auto-login failed. Please login manually.');
                         return res.redirect('/auth/login');
                     }
-                    // Redirect to intended page or home
                     req.flash('success_msg', 'Email verified successfully! You are now logged in.');
-                    const returnTo = req.session.returnTo || '/'; // Use stored return path or default to home
-                    delete req.session.returnTo; // Clear stored path
+                    const returnTo = req.session.returnTo || '/';
+                    delete req.session.returnTo;
                     res.redirect(returnTo);
                  });
              });
          }
-
     } catch (error) {
-        next(error); // Pass errors to central handler
+        next(error);
     }
 };
 
 exports.resendOtp = async (req, res, next) => {
     const { email } = req.body;
-
-    // Redirect logged-in users
-     if (req.session.user) {
-        return res.redirect('/');
-    }
-
+     if (req.session.user) { return res.redirect('/'); }
     if (!email) {
         req.flash('error_msg', 'Email is required to resend OTP.');
-        // Try to redirect back to verify page with email if possible from query
          return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(req.query.email || '')}`);
     }
-
     try {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
 
-        // User not found case - send generic message to avoid user enumeration
         if (!user) {
-            // Log the attempt for monitoring if needed
             console.log(`Resend OTP attempt for non-existent email: ${lowerCaseEmail}`);
-            req.flash('info_msg', 'If your email is registered, a new OTP will be sent. Please check your inbox.'); // Use info message
-            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`); // Redirect back to OTP page
+            req.flash('info_msg', 'If your email is registered, a new OTP will be sent. Please check your inbox.');
+            return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(email)}`);
         }
 
-        // Determine context: Password Reset or Initial Verification
         const isForReset = user.resetPasswordToken && user.resetPasswordExpires && user.resetPasswordExpires > Date.now();
 
-        // Account already verified (and not for password reset)
         if(user.isVerified && !isForReset) {
              req.flash('error_msg', 'This account is already verified. Please login.');
             return res.redirect('/auth/login');
         }
 
-        // Generate new OTP and expiry
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(10); // 10 minutes
-
+        const otpExpires = setOTPExpiration(10);
         user.otp = otp;
         user.otpExpires = otpExpires;
-        // If it's a reset request, maybe don't save immediately if email fails?
-        // But for verification, saving first is generally fine.
-        await user.save({ validateBeforeSave: false }); // Save new OTP
+        await user.save({ validateBeforeSave: false });
 
-        // Prepare email content based on context
         let subject, text, html;
         if (isForReset) {
             subject = 'Your New Password Reset OTP';
-             text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
+            text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
             html = `<p>Your new password reset OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
-        } else { // Initial verification
+        } else {
              subject = 'Your New Verification OTP';
              text = `Your new verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
             html = `<p>Your new verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
         }
 
-        // Send the email
         const emailSent = await sendEmail(user.email, subject, text, html);
-
-        // Redirect back to the verify OTP page, potentially adding reason query param
         const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
 
         if (emailSent) {
             req.flash('success_msg', `A new OTP has been sent to ${user.email}. Please check your inbox.`);
         } else {
-            // Consider if OTP should be rolled back if email fails, complex. Let's just inform user.
             console.error(`Failed to resend OTP email to ${user.email}`);
             req.flash('error_msg', 'Could not resend OTP email. Please try again later or contact support.');
         }
         res.redirect(redirectUrl);
-
     } catch (error) {
-        next(error); // Pass errors to central handler
+        next(error);
     }
 };
 
 exports.loginUser = async (req, res, next) => {
-     if (req.session.user) {
-        return res.redirect('/'); // Redirect if already logged in
-    }
+     if (req.session.user) { return res.redirect('/'); }
     const { email, password } = req.body;
-
     if (!email || !password) {
         req.flash('error_msg', 'Please provide both email and password.');
-        // Render login page again, passing back email
         return res.render('auth/login', { title: 'Login', email: email });
     }
-
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user by email, include password, and populate cart for session
-        const user = await User.findOne({ email: lowerCaseEmail })
-                             .select('+password') // Explicitly select password
-                             .populate('cart.productId', 'name price imageUrl'); // Populate basic cart details needed for session/badge
+        const user = await User.findOne({ email: lowerCaseEmail }).select('+password').populate('cart.productId', 'name price imageUrl');
 
-        // User not found
         if (!user) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
-
-        // User found but not verified
          if (!user.isVerified) {
-            // Guide user to verify
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
-            // Redirect to verify page with email pre-filled
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
-
-        // Check password match
         const isMatch = await user.matchPassword(password);
-
         if (!isMatch) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
-        // --- Password is Correct - Login User ---
-         req.session.regenerate(err => { // Prevent session fixation
+         req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
-
-            // Populate session (exclude password!)
             req.session.user = {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                address: user.address ? user.address.toObject() : undefined, // Store plain address object
-                // Store only essential cart info (productId, quantity) in session
-                cart: user.cart ? user.cart.map(item => ({
-                    productId: item.productId?._id, // Store only ID
-                    quantity: item.quantity
-                })) : []
+                _id: user._id, name: user.name, email: user.email, role: user.role,
+                address: user.address ? user.address.toObject() : undefined,
+                cart: user.cart ? user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
              };
-
-
-            // Save session before redirect
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -1099,95 +990,71 @@ exports.loginUser = async (req, res, next) => {
                       return res.render('auth/login', { title: 'Login', email: email });
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
-                 // Redirect to originally requested URL or home
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo; // Clean up returnTo
+                 delete req.session.returnTo;
                  res.redirect(returnTo);
             });
         });
-
     } catch (error) {
-        next(error); // Pass to error handler
+        next(error);
     }
 };
 
-
 // --- UPDATED logoutUser ---
 exports.logoutUser = (req, res, next) => {
-    // --- Step 1: Set the flash message BEFORE destroying the session ---
     req.flash('success_msg', 'You have been logged out successfully.');
-
-    // --- Step 2: Destroy the session ---
     req.session.destroy(err => {
         if (err) {
-            // Log the error, but don't try to flash another message.
             console.error('Session destruction error:', err);
              return res.redirect('/auth/login');
         }
-
-        // --- Step 3: Clear the session cookie from the browser ---
-        res.clearCookie(req.app.get('session cookie name') || 'connect.sid'); // Safely get name or use default
-
-        // --- Step 4: Redirect ---
+        res.clearCookie(req.app.get('session cookie name') || 'connect.sid');
         res.redirect('/auth/login');
     });
 };
 
 
-// --- forgotPassword, resetPassword, getHomePage (No changes needed from previous version, except getHomePage) ---
+// --- forgotPassword, resetPassword (No changes needed) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
         req.flash('error_msg', 'Please provide an email address.');
         return res.redirect('/auth/forgot-password');
     }
-
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Find user by email
         const user = await User.findOne({ email: lowerCaseEmail });
-
-        // Generic message to prevent user enumeration attacks
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage); // Use info or success flash
+        req.flash('info_msg', genericMessage);
 
-        // Only proceed if user exists AND is verified
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
-            return res.redirect('/auth/forgot-password'); // Redirect back
+            return res.redirect('/auth/forgot-password');
         }
 
-        // Generate OTP and Reset Token with Expirations
          const otp = generateOTP();
-         const resetToken = crypto.randomBytes(20).toString('hex'); // For the actual reset link/form later
-        const otpExpires = setOTPExpiration(10); // OTP expires in 10 minutes
-        const resetExpires = setOTPExpiration(60); // Reset capability expires in 60 minutes
+         const resetToken = crypto.randomBytes(20).toString('hex');
+        const otpExpires = setOTPExpiration(10);
+        const resetExpires = setOTPExpiration(60);
 
-        // Set fields on user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false }); // Save OTP and token info
+        await user.save({ validateBeforeSave: false });
 
-        // Send OTP email
         const subject = 'Password Reset Request - Verify OTP';
         const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
         const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
-
          const emailSent = await sendEmail(user.email, subject, text, html);
 
-        // Handle Email Sending Result
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
-             // Redirect to OTP verification page, marking it as reset context
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
-            // If email failed, consider rolling back the OTP/token? Or just log and rely on expiry?
             console.error(`Failed to send password reset OTP email to ${user.email}`);
             res.redirect('/auth/forgot-password');
         }
-
     } catch (error) {
         console.error("Error in forgotPassword:", error);
         req.flash('error_msg', 'An error occurred while processing your request. Please try again later.');
@@ -1199,80 +1066,58 @@ exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
 
-    // --- Input Validation ---
     let errors = [];
-    if (!password || !confirmPassword) {
-        errors.push('Please enter and confirm your new password.');
-    }
-    if (password !== confirmPassword) {
-        errors.push('Passwords do not match.');
-    }
-     if (password && password.length < 6) {
-         errors.push('Password must be at least 6 characters.');
-    }
+    if (!password || !confirmPassword) { errors.push('Please enter and confirm your new password.'); }
+    if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
+     if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
          return res.redirect(`/auth/reset-password/${token}`);
     }
 
-    // --- Password Reset Logic ---
     try {
-        // Find user by token and ensure it's still valid
-        const user = await User.findOne({
-            resetPasswordToken: token,
-            resetPasswordExpires: { $gt: Date.now() },
-         }).select('+password');
-
+        const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: Date.now() }, }).select('+password');
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
             return res.redirect('/auth/forgot-password');
         }
 
-        // Update password and clear reset/OTP fields
-        user.password = password; // Pre-save hook will hash it
+        user.password = password;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
-        user.otp = undefined; // Also clear OTP fields used for verification step
+        user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true; // Ensure user is marked verified
+        user.isVerified = true;
+        await user.save();
 
-        await user.save(); // This triggers password hashing
-
-        // --- Log the user in automatically after successful reset ---
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
-             // Populate session
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
                   cart: user.cart ? user.cart.map(item => ({ productId: item.productId, quantity: item.quantity })) : []
               };
-
-            // Save session
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
                      req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                     return res.redirect('/auth/login');
                  }
-                 // Success: Password reset and logged in
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
                 res.redirect('/');
              });
          });
-
     } catch (error) {
-        // Handle validation errors during save
         if (error.name === 'ValidationError') {
            let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', validationErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        next(error); // Pass other errors to handler
+        next(error);
     }
 };
 
@@ -1281,6 +1126,9 @@ exports.resetPassword = async (req, res, next) => {
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
+    // *** Get category from query ***
+    const categoryFilter = req.query.category || '';
+
     let query = {
         reviewStatus: 'approved',
         stock: { $gt: 0 }
@@ -1289,31 +1137,45 @@ exports.getHomePage = async (req, res, next) => {
     if (searchTerm) {
          query.$text = { $search: searchTerm };
     }
+    // *** Add category to query if valid ***
+    if (categoryFilter && categoryNames.includes(categoryFilter)) {
+        query.category = categoryFilter;
+    } else if (categoryFilter) {
+        console.warn(`Invalid category filter attempted: ${categoryFilter}`);
+    }
 
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
-    // Fetch Products and Banners concurrently
+    // Fetch Products, Banners concurrently
     const [products, bannerConfig] = await Promise.all([
         Product.find(query, projection).sort(sort).lean(),
-        BannerConfig.findOne({ configKey: 'mainBanners' }).lean() // Fetch banners using the imported model
+        BannerConfig.findOne({ configKey: 'mainBanners' }).lean()
     ]);
 
-    // Extract banner URLs (provide empty array if none found)
+    // Extract banner URLs
     const banners = bannerConfig?.banners || [];
-    // Filter out any banners that might somehow be saved without an imageUrl
     const validBanners = banners.filter(banner => banner.imageUrl);
 
+    // Determine page title based on filters
+    let pageTitle = 'Home';
+    if (searchTerm) {
+        pageTitle = `Search Results for "${searchTerm}"`;
+    } else if (categoryFilter && categoryNames.includes(categoryFilter)) {
+        pageTitle = `Category: ${categoryFilter}`;
+    }
 
     res.render('products/index', {
-      title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home',
+      title: pageTitle,
       products: products,
       searchTerm: searchTerm,
-      homepageBanners: validBanners // Pass banners to the view
-      // currentUser is available via res.locals
+      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null, // Pass selected category
+      homepageBanners: validBanners,
+      // *** Pass display categories to the view ***
+      displayCategories: categories
     });
   } catch (error) {
-    console.error("Error fetching products/banners for home page:", error);
+    console.error("Error fetching products/banners/categories for home page:", error);
     next(error);
   }
 };
@@ -1792,54 +1654,68 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
 controllers/productController.js:
 // controllers/productController.js
 const Product = require('../models/Product');
-const User = require('../models/User'); // Keep for user rating logic
+const User = require('../models/User');
+// *** Import category names ***
+const { categoryNames } = require('../config/categories');
 
-/**
- * Escapes special characters in a string for use in a regular expression.
- * @param {string} string - The input string.
- * @returns {string} The escaped string.
- */
+
 function escapeRegex(string) {
+  // Simple regex escape. Consider a more robust library if needed.
   return string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 }
 
-// --- Get Products (Handles both listing and search results with sequential matching) ---
+// --- Get Products (Handles listing, search, AND category filter) ---
 exports.getProducts = async (req, res, next) => {
   try {
-    const searchTerm = req.query.search || ''; // Get search term from query param 'search'
+    const searchTerm = req.query.search || '';
+    // *** Get category filter ***
+    const categoryFilter = req.query.category || '';
+
     let query = {
         reviewStatus: 'approved', // Always filter by approved
         stock: { $gt: 0 }         // Always filter by in-stock
     };
     let sort = { createdAt: -1 }; // Default sort
-    const projection = {}; // No text score projection needed for regex
+    const projection = {};
 
-    // --- NEW: Use Regex for sequential matching if searchTerm exists ---
+    // Use Regex for sequential matching if searchTerm exists
     if (searchTerm) {
-      const escapedSearchTerm = escapeRegex(searchTerm); // Escape special characters
-      const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
-
-      query.$or = [ // Match name OR category sequentially
+      const escapedSearchTerm = escapeRegex(searchTerm);
+      const regex = new RegExp(escapedSearchTerm, 'i');
+      query.$or = [
         { name: regex },
         { category: regex }
-        // Add { specifications: regex } here if you want to search specs sequentially too
       ];
-      // Optional: Change sort for search results, e.g., alphabetical
-      // sort = { name: 1 };
-      console.log(`Regex Search Query: ${JSON.stringify(query)}`); // Log the query
+      console.log(`Regex Search Query: ${JSON.stringify(query)}`);
     }
-    // --- End Regex modification ---
+    // Apply category filter ONLY if no search term is present
+    else if (categoryFilter && categoryNames.includes(categoryFilter)) {
+         query.category = categoryFilter;
+    } else if (categoryFilter) {
+         console.warn(`Invalid category filter attempted on /products route: ${categoryFilter}`);
+    }
+    // --- End Filter Logic ---
 
-    const products = await Product.find(query, projection) // Projection is now empty
+    const products = await Product.find(query, projection)
                                     .sort(sort)
-                                    .lean(); // Use lean for read-only performance
+                                    .lean();
 
-    // Render the same index page, passing search term for display
+    // Determine page title based on filters
+    let pageTitle = 'Products';
+    if (searchTerm) {
+        pageTitle = `Search Results for "${searchTerm}"`;
+    } else if (categoryFilter && categoryNames.includes(categoryFilter)) {
+        pageTitle = `Category: ${categoryFilter}`;
+    }
+
+    // Render the same index page, passing search term and category for display
     res.render('products/index', {
-      title: searchTerm ? `Search Results for "${searchTerm}"` : 'Home', // Dynamic title
+      title: pageTitle,
       products: products,
-      searchTerm: searchTerm // Pass term back to view
-      // currentUser is available via res.locals
+      searchTerm: searchTerm,
+      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null, // Pass selected category
+      // Note: displayCategories are typically passed by getHomePage, not needed here unless specifically rendering categories on this route
+      // displayCategories: require('../config/categories') // Uncomment if needed here
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -1852,37 +1728,32 @@ exports.getProducts = async (req, res, next) => {
 exports.getProductDetails = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
-                                    .populate('sellerId', 'name email') // Populate seller
-                                    .lean(); // Use lean()
+                                    .populate('sellerId', 'name email')
+                                    .lean();
 
     if (!product) {
        const error = new Error('Product not found');
        error.status = 404;
-       return next(error); // Use central error handler
+       return next(error);
     }
 
-    // Check if product is viewable
     const isApproved = product.reviewStatus === 'approved';
     const user = req.session.user;
     const isAdmin = user?.role === 'admin';
     const isOwner = user && product.sellerId?._id && user._id.toString() === product.sellerId._id.toString();
 
-
     if (!isApproved && !isAdmin && !isOwner) {
-        // If product isn't approved, only admin or owner can see it
          const error = new Error('Product not available');
-         error.status = 404; // Or 403 Forbidden, but 404 is less revealing
+         error.status = 404;
          return next(error);
     }
 
-    // User rating logic
     let userRating = null;
     if (user) {
        const ratingData = product.ratings?.find(r => r.userId?.toString() === user._id.toString());
        userRating = ratingData ? ratingData.rating : null;
     }
 
-    // Rating stats calculation
     const ratingCounts = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
     let totalRatings = 0;
     if (product.ratings && product.ratings.length > 0) {
@@ -1895,7 +1766,6 @@ exports.getProductDetails = async (req, res, next) => {
     }
     const displayTotalRatings = product.numReviews || totalRatings;
 
-
     res.render('products/detail', {
       title: product.name,
       product: product,
@@ -1906,7 +1776,6 @@ exports.getProductDetails = async (req, res, next) => {
       userCanRate: user ? true : false,
       ratingCounts: ratingCounts,
       totalRatings: displayTotalRatings
-      // Add other necessary variables like fullUrl etc. if needed by header partial
     });
   } catch (error) {
        if (error.name === 'CastError') {
@@ -1914,7 +1783,7 @@ exports.getProductDetails = async (req, res, next) => {
            notFoundError.status = 404;
            return next(notFoundError);
        }
-    next(error); // Pass other errors to central handler
+    next(error);
   }
 };
 
@@ -1927,11 +1796,11 @@ exports.getProductDetails = async (req, res, next) => {
 
      if (!rating || isNaN(Number(rating)) || rating < 1 || rating > 5) {
          req.flash('error_msg', 'Please provide a valid rating between 1 and 5.');
-        return res.redirect('back'); // Redirect to previous page
+        return res.redirect('back');
      }
 
     try {
-        const product = await Product.findById(productId); // Not lean()
+        const product = await Product.findById(productId);
 
          if (!product) {
              req.flash('error_msg', 'Product not found.');
@@ -1946,10 +1815,10 @@ exports.getProductDetails = async (req, res, next) => {
             product.ratings.push({ userId, rating: Number(rating) });
          }
 
-        await product.save(); // Triggers pre-save hook for averageRating/numReviews
+        await product.save();
 
          req.flash('success_msg', 'Thank you for your rating!');
-         res.redirect(`/products/${productId}`); // Redirect back to product page
+         res.redirect(`/products/${productId}`);
 
      } catch (error) {
         if (error.name === 'CastError') {
@@ -1957,45 +1826,39 @@ exports.getProductDetails = async (req, res, next) => {
             return res.status(400).redirect('/');
         }
         console.error("Error rating product:", error);
-        next(error); // Central error handler
+        next(error);
      }
  };
 
- // --- Get Product Suggestions (Updated for sequential matching) ---
+ // --- Get Product Suggestions (Updated for sequential matching - no category changes needed here) ---
  exports.getProductSuggestions = async (req, res, next) => {
-    const searchTerm = req.query.q; // Get query from 'q' parameter
-    const limit = 8; // Max number of suggestions
+    const searchTerm = req.query.q;
+    const limit = 8;
 
     if (!searchTerm || searchTerm.trim().length < 2) {
-        return res.json([]); // Return empty if no/short query
+        return res.json([]);
     }
 
     try {
-        // --- NEW: Use Regex for sequential matching ---
-        const escapedSearchTerm = escapeRegex(searchTerm); // Escape special chars
-        const regex = new RegExp(escapedSearchTerm, 'i'); // 'i' for case-insensitive sequential match
+        const escapedSearchTerm = escapeRegex(searchTerm);
+        const regex = new RegExp(escapedSearchTerm, 'i');
 
         const query = {
-            $or: [ // Match name OR category sequentially
-                { name: regex },
-                { category: regex }
-            ],
-            reviewStatus: 'approved', // Only suggest approved products
-            stock: { $gt: 0 }         // Only suggest products in stock
+            $or: [ { name: regex }, { category: regex } ],
+            reviewStatus: 'approved',
+            stock: { $gt: 0 }
         };
-        // --- End Regex modification ---
 
         const suggestions = await Product.find(query)
-            .select('_id name imageUrl') // Select only needed fields
+            .select('_id name imageUrl')
             .limit(limit)
-            .sort({ name: 1 }) // Sort suggestions alphabetically
-            .lean(); // Use lean for performance
+            .sort({ name: 1 })
+            .lean();
 
-        res.json(suggestions); // Send results as JSON
+        res.json(suggestions);
 
     } catch (error) {
         console.error("Error fetching product suggestions:", error);
-        // Avoid sending full error details to client
         res.status(500).json({ error: 'Failed to fetch suggestions' });
     }
  };
@@ -2566,6 +2429,9 @@ const {
     confirmDirectDeliveryBySeller
 } = require('./orderController');
 const mongoose = require('mongoose');
+// *** Import categories and names ***
+const categories = require('../config/categories');
+const { categoryNames } = require('../config/categories');
 
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
@@ -2581,30 +2447,40 @@ exports.getSellerDashboard = (req, res) => {
 
 // Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    res.render('seller/upload-product', { title: 'Upload New Product', product: {} });
+    // *** Pass categories to the view ***
+    res.render('seller/upload-product', {
+        title: 'Upload New Product',
+        product: {},
+        categories: categories // Pass the full list
+    });
 };
 
 // --- Product Management Actions ---
 exports.uploadProduct = async (req, res, next) => {
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
-        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+        // *** Pass categories back on error ***
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+         // *** Pass categories back on error ***
+         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
      }
+     // *** Add Category Validation ***
+     if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+        return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
+    }
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(),
-            // *** ADD shortDescription ***
+            category: category.trim(), // Category validated
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
@@ -2612,10 +2488,10 @@ exports.uploadProduct = async (req, res, next) => {
             specifications: specifications ? specifications.trim() : '',
             sellerId: sellerId,
             sellerEmail: sellerEmail,
-            reviewStatus: 'pending' // Start as pending
+            reviewStatus: 'pending'
         });
 
-        await newProduct.save();
+        await newProduct.save(); // Trigger enum validation
         console.log(`Product ${newProduct._id} saved initially by seller ${sellerEmail}.`);
 
         // Trigger Gemini review asynchronously
@@ -2645,7 +2521,8 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body });
+            // *** Pass categories back on error ***
+           return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product:", error);
         next(error);
@@ -2653,8 +2530,7 @@ exports.uploadProduct = async (req, res, next) => {
 };
 
 
-// --- Rest of Seller Controller remains the same until updateProduct ---
-// (getManageProductsPage, getEditProductPage remain the same)
+// --- Manage Products Page (Seller) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -2671,16 +2547,20 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
+// --- Edit Product Page (Seller) ---
 exports.getEditProductPage = async (req, res, next) => {
      try {
-        const product = await Product.findById(req.params.id).lean(); // Use lean here
+        const product = await Product.findById(req.params.id)
+                                     .lean();
         if (!product) {
-           req.flash('error_msg', 'Product not found.');
+           req.flash('error_msg', 'Product not found or access denied.');
            return res.redirect('/seller/products');
        }
+       // *** Pass categories to the view ***
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
-           product: product // Pass lean object
+           product: product,
+           categories: categories // Pass the full list
        });
    } catch (error) {
         if (error.name === 'CastError') {
@@ -2691,24 +2571,33 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-
+// --- Update Product Action (Seller) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
-    // *** ADD shortDescription to destructuring ***
     const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    const renderOptions = { title: `Edit Product Error`, product: { _id: productId, ...req.body }, categories: categories }; // For re-rendering on error
+
 
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
-        try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+        try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
+        return res.render('seller/edit-product', renderOptions);
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
          req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-         try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+         try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
+         return res.render('seller/edit-product', renderOptions);
      }
+      // *** Add Category Validation ***
+     if (!categoryNames.includes(category)) {
+        req.flash('error_msg', 'Invalid category selected.');
+         try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
+        return res.render('seller/edit-product', renderOptions);
+    }
 
     try {
-        const product = await Product.findOne({ _id: productId, sellerId: sellerId });
+        const product = await Product.findOne({ _id: productId, sellerId: sellerId }); // Fetch non-lean
 
         if (!product) {
             req.flash('error_msg', 'Product not found or access denied.');
@@ -2716,8 +2605,7 @@ exports.updateProduct = async (req, res, next) => {
          }
 
          product.name = name.trim();
-         product.category = category.trim();
-         // *** ADD shortDescription ***
+         product.category = category.trim(); // Category validated
          product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
          product.price = Number(price);
          product.stock = Number(stock);
@@ -2726,13 +2614,13 @@ exports.updateProduct = async (req, res, next) => {
          product.reviewStatus = 'pending'; // Reset status on update
          product.rejectionReason = undefined;
 
-         await product.save();
+         await product.save(); // Trigger enum validation
          console.log(`Product ${productId} updated by seller, set to pending review.`);
 
         // Trigger Gemini review asynchronously
         reviewProductWithGemini(product).then(async reviewResult => {
              try {
-                 const productToUpdate = await Product.findById(product._id); // Fetch again to update
+                 const productToUpdate = await Product.findById(product._id);
                  if (productToUpdate) {
                     productToUpdate.reviewStatus = reviewResult.status;
                     productToUpdate.rejectionReason = reviewResult.reason;
@@ -2754,21 +2642,20 @@ exports.updateProduct = async (req, res, next) => {
          if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
              req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-             try { const product = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); return res.render('seller/edit-product', { title: `Edit Product: ${product?.name || 'Error'}`, product: product || { _id: productId, ...req.body } }); } catch { return res.redirect(`/seller/products/edit/${productId}`); }
+              try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
+             return res.render('seller/edit-product', renderOptions);
          }
          console.error("Error updating product:", error);
          next(error);
      }
  };
 
-// --- Rest of Seller Controller remains the same ---
-// (removeProduct, getManageOrdersPage, sendDirectDeliveryOtpBySeller, confirmDirectDeliveryBySeller, cancelOrderBySeller remain the same)
+// --- Remove Product (Seller) ---
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
 
     try {
-         // Middleware verifies ownership, find and delete in one step
          const product = await Product.findOneAndDelete({ _id: productId, sellerId: sellerId });
 
         if (!product) {
@@ -2788,37 +2675,34 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
+// --- Manage Orders (Seller) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
 
-        // 1. Find product IDs sold by this seller
         const sellerProductRefs = await Product.find({ sellerId: sellerId }).select('_id').lean();
         const sellerProductIds = sellerProductRefs.map(p => p._id);
 
-        // Handle case where seller has no products
         if (sellerProductIds.length === 0) {
              return res.render('seller/manage-orders', {
                  title: 'Manage Your Orders',
                  orders: [],
                  message: 'You have no products listed, so no orders to manage yet.',
-                 sellerCancellationReasons: sellerCancellationReasons // Pass reasons even if no orders
+                 sellerCancellationReasons: sellerCancellationReasons
              });
         }
 
-        // 2. Find orders containing any of these products
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
                                    .populate('products.productId', 'name imageUrl _id price sellerId')
-                                   .populate('userId', 'name email') // Populate user for display if needed
+                                   .populate('userId', 'name email')
                                    .lean();
 
-        // 3. Add flags specific to seller actions and format items summary
         const now = Date.now();
         orders.forEach(order => {
              order.isRelevantToSeller = true;
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
-             order.canBeCancelledBySeller = order.status === 'Pending'; // Simple check for now
+             order.canBeCancelledBySeller = order.status === 'Pending';
 
              order.showDeliveryOtp = order.status === 'Pending' &&
                                      !!order.orderOTP &&
@@ -2848,6 +2732,7 @@ exports.getManageOrdersPage = async (req, res, next) => {
 };
 
 
+// --- Seller Order Actions ---
 exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const sellerId = req.session.user._id;
@@ -2899,8 +2784,8 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     sessionDB.startTransaction();
     try {
         const order = await Order.findById(orderId)
-                                .populate('products.productId', 'sellerId name _id') // Need sellerId and _id
-                                .populate('userId', 'email') // For notification
+                                .populate('products.productId', 'sellerId name _id')
+                                .populate('userId', 'email')
                                 .session(sessionDB);
 
         if (!order) {
@@ -2926,7 +2811,7 @@ exports.cancelOrderBySeller = async (req, res, next) => {
 
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
         const productStockRestorePromises = order.products
-            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
+            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString())
             .map(item => {
                 const quantityToRestore = Number(item.quantity);
                  if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -2936,7 +2821,7 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                 console.log(`Seller Cancel: Restoring ${quantityToRestore} stock for P.ID ${item.productId._id}`);
                  return Product.updateOne(
                      { _id: item.productId._id },
-                     { $inc: { stock: quantityToRestore, orderCount: -1 } }, // Restore stock, decrement order count
+                     { $inc: { stock: quantityToRestore, orderCount: -1 } },
                      { session: sessionDB }
                  ).catch(err => {
                     console.error(`Seller Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
@@ -3343,6 +3228,8 @@ module.exports = Order;
 models/Product.js:
 // models/Product.js
 const mongoose = require('mongoose');
+// *** Import category names for validation ***
+const { categoryNames } = require('../config/categories');
 
 const RatingSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -3356,20 +3243,23 @@ const ProductSchema = new mongoose.Schema({
         type: String,
         required: [true, 'Please provide a product name'],
         trim: true,
-        index: true // Added index for searching
+        index: true
     },
-    // *** NEW FIELD ***
     shortDescription: {
         type: String,
         trim: true,
-        maxlength: 200 // Optional: Limit length
+        maxlength: 200
     },
-    // *** END NEW FIELD ***
     category: {
         type: String,
-        required: [true, 'Please provide a product category'],
+        required: [true, 'Please select a product category'],
         trim: true,
-        index: true // Added index for searching
+        index: true,
+        // *** Use enum validation ***
+        enum: {
+            values: categoryNames,
+            message: '{VALUE} is not a supported category.'
+        }
     },
     price: {
         type: Number,
@@ -5240,6 +5130,103 @@ select.form-control-sm {
 @media (min-width: 1200px) {
     .admin-actions-grid { grid-template-columns: repeat(4, 1fr); } /* 4 columns for very large screens */
 }
+/* Category Icons Section */
+.category-icons-section {
+  background-color: rgba(255, 255, 255, 0.8); /* Semi-transparent white background */
+  padding: calc(var(--spacing-unit) * 1) calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.category-icons-section h2 {
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--dark-color);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* Start with 4 columns */
+  gap: calc(var(--spacing-unit) * 0.5);
+}
+
+.category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 0.5);
+  border-radius: var(--border-radius);
+  transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+  color: var(--text-color);
+  text-decoration: none;
+}
+
+.category-item:hover,
+.category-item.active /* Style for selected category */ {
+  background-color: rgba(0, 0, 0, 0.04);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+.category-item.active .category-name {
+  color: var(--primary-color); /* Highlight name of active category */
+  font-weight: bold;
+}
+
+
+.category-icon-wrapper {
+  width: 50px; /* Adjust size as needed */
+  height: 50px;
+  margin-bottom: calc(var(--spacing-unit) * 0.3);
+  background-color: #f0f0f0; /* Light background for the circle */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden; /* Ensure image stays within circle */
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.category-icon {
+  max-width: 60%; /* Control icon size within the wrapper */
+  max-height: 60%;
+  object-fit: contain;
+}
+
+.category-name {
+  font-size: 0.75rem; /* Smaller text */
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--secondary-color);
+}
+
+/* Responsive adjustments for category grid */
+@media (min-width: 768px) {
+  .category-grid {
+      grid-template-columns: repeat(6, 1fr); /* 6 columns on tablet */
+      gap: calc(var(--spacing-unit) * 0.75);
+  }
+  .category-icon-wrapper { width: 60px; height: 60px; }
+  .category-name { font-size: 0.8rem; }
+  .category-icons-section { padding: calc(var(--spacing-unit) * 1.2); }
+}
+
+@media (min-width: 1024px) {
+  .category-grid {
+      grid-template-columns: repeat(8, 1fr); /* 8 columns on desktop */
+      gap: var(--spacing-unit);
+  }
+   .category-icon-wrapper { width: 65px; height: 65px; }
+  .category-name { font-size: 0.85rem; }
+   .category-icons-section { padding: calc(var(--spacing-unit) * 1.5); }
+}
+
+/* --- Ensure Select Dropdowns Take Full Width --- */
+/* This might already be covered by .form-control, but ensures it */
+select.form-control {
+  width: 100%;
+  display: block; /* Ensure it's block level */
+}
 
 public/js/main.js:
 // public/js/main.js
@@ -6564,29 +6551,31 @@ views/admin/edit-product.ejs:
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
         </div>
-
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** END *** -->
-
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
+            <select id="category" name="category" class="form-control" required>
+                <option value="" disabled <%= !product.category ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
         </div>
-
+        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
         </div>
-
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
-
         <div class="form-group">
             <label for="imageUrl">Image URL:</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
@@ -6594,7 +6583,6 @@ views/admin/edit-product.ejs:
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
         </div>
-
         <div class="form-group">
             <label for="specifications">Specifications:</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
@@ -6611,7 +6599,6 @@ views/admin/edit-product.ejs:
                 <option value="rejected" <%= product.reviewStatus === 'rejected' ? 'selected' : '' %>>Rejected</option>
             </select>
         </div>
-
         <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
             <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
             <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>
@@ -6934,16 +6921,23 @@ views/admin/upload-product.ejs:
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** END *** -->
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <select id="category" name="category" class="form-control" required>
+                <option value="" disabled <%= !(typeof product !== 'undefined' && product.category) ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (typeof product !== 'undefined' && product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
         </div>
+        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -7468,54 +7462,84 @@ views/products/index.ejs:
 <%# views/products/index.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<%# --- UPDATED: Homepage Banner Slider Section --- %>
-<% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
-    <div class="banner-slider-container mb-4" data-slider-container>
-        <div class="banner-slides" data-slides>
-            <% homepageBanners.forEach((banner, index) => { %>
-                <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide> <%# First slide is active initially %>
-                    <%# --- MODIFICATION START --- %>
-                    <% if (banner.linkUrl) { %>
-                        <%# REMOVED target="_blank" from the next line %>
-                        <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
+<%# --- Conditionally Display Banner Slider --- %>
+<%# Only show the banner if NO category is selected %>
+<% if (!selectedCategory) { %>
+    <%# --- Homepage Banner Slider Section (Original Check) --- %>
+    <% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
+        <div class="banner-slider-container mb-4" data-slider-container>
+            <div class="banner-slides" data-slides>
+                <% homepageBanners.forEach((banner, index) => { %>
+                    <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide>
+                        <% if (banner.linkUrl) { %>
+                            <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
+                                <img src="<%= banner.imageUrl %>"
+                                     alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
+                                     class="banner-image"
+                                     loading="lazy">
+                            </a>
+                        <% } else { %>
                             <img src="<%= banner.imageUrl %>"
                                  alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
                                  class="banner-image"
                                  loading="lazy">
-                        </a>
-                    <% } else { %>
-                        <%# Image without a link %>
-                        <img src="<%= banner.imageUrl %>"
-                             alt="<%= banner.title || `Promotional Banner ${index + 1}` %>"
-                             class="banner-image"
-                             loading="lazy">
-                    <% } %>
-                    <%# --- MODIFICATION END --- %>
-                </div>
-            <% }) %>
-        </div>
-
-        <%# Optional: Navigation Arrows (hide if only one banner) %>
-        <% if (homepageBanners.length > 1) { %>
-            <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
-            <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
-        <% } %>
-
-        <%# Optional: Navigation Dots (hide if only one banner) %>
-         <% if (homepageBanners.length > 1) { %>
-            <div class="banner-dots" data-slider-dots>
-                <% homepageBanners.forEach((_, index) => { %>
-                    <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                        <% } %>
+                    </div>
                 <% }) %>
             </div>
-        <% } %>
+
+            <%# Optional: Navigation Arrows %>
+            <% if (homepageBanners.length > 1) { %>
+                <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
+                <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
+            <% } %>
+
+            <%# Optional: Navigation Dots %>
+             <% if (homepageBanners.length > 1) { %>
+                <div class="banner-dots" data-slider-dots>
+                    <% homepageBanners.forEach((_, index) => { %>
+                        <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                    <% }) %>
+                </div>
+            <% } %>
+        </div>
+    <% } %>
+    <%# --- End: Homepage Banner Slider Section --- %>
+<% } %> <%# End of the check for !selectedCategory %>
+
+
+<%# --- Category Icons Section (Always shows if categories exist) --- %>
+<% if (typeof displayCategories !== 'undefined' && displayCategories.length > 0) { %>
+    <div class="category-icons-section mb-4">
+        <h2 class="text-center mb-3">Shop by Category</h2>
+        <div class="category-grid">
+            <% displayCategories.forEach(cat => { %>
+                <% let categoryUrl = '/?category=' + encodeURIComponent(cat.name); %>
+                <% if (typeof searchTerm !== 'undefined' && searchTerm) { categoryUrl += '&search=' + encodeURIComponent(searchTerm); } %>
+                <a href="<%= categoryUrl %>" class="category-item <%= (typeof selectedCategory !== 'undefined' && selectedCategory === cat.name) ? 'active' : '' %>" title="Shop <%= cat.name %>">
+                    <div class="category-icon-wrapper">
+                         <img src="<%= cat.iconUrl %>" alt="<%= cat.name %> Icon" class="category-icon" loading="lazy">
+                    </div>
+                    <span class="category-name"><%= cat.name %></span>
+                </a>
+            <% }) %>
+        </div>
     </div>
 <% } %>
-<%# --- End: Homepage Banner Slider Section --- %>
+<%# --- End: Category Icons Section --- %>
+
 
 <div class="product-index-container">
-    <br>
-        <h1>New Launches</h1>
+     <%# Display title based on filter/search %>
+     <% if (selectedCategory) { %>
+         <h1 class="mb-3">Category: <%= selectedCategory %></h1>
+         <p class="mb-3"><a href="/">« Back to All Products</a></p>
+     <% } else if (searchTerm) { %>
+         <h1 class="mb-3">Search Results for "<%= searchTerm %>"</h1>
+     <% } else { %>
+          <h1 class="mb-3">New Launches</h1>
+     <% } %>
+
 
     <% if (products.length > 0) { %>
         <div class="product-grid">
@@ -7552,7 +7576,9 @@ views/products/index.ejs:
     <% } else { %>
          <p class="alert alert-info">
              <% if (typeof searchTerm !== 'undefined' && searchTerm) { %>
-                 No products found matching your search "<%= searchTerm %>".
+                 No products found matching your search "<%= searchTerm %>". <a href="/">View all products?</a>
+             <% } else if (typeof selectedCategory !== 'undefined' && selectedCategory) { %>
+                 No products found in the category "<%= selectedCategory %>". <a href="/">View all categories?</a>
              <% } else { %>
                  No products are currently available. Check back soon!
              <% } %>
@@ -7602,7 +7628,6 @@ views/seller/edit-product.ejs:
     <p class="text-muted small mb-3">Updating the product will reset its status to 'pending' and trigger a new review.</p>
 
      <form action="/seller/products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
-        <%# Display current status (read-only) %>
          <div class="alert alert-<%= product.reviewStatus === 'approved' ? 'success' : (product.reviewStatus === 'rejected' ? 'danger' : 'warning') %>" role="alert">
            <strong>Current Status:</strong> <span class="text-capitalize"><%= product.reviewStatus %></span>
            <% if(product.reviewStatus === 'rejected' && product.rejectionReason) { %>
@@ -7614,16 +7639,23 @@ views/seller/edit-product.ejs:
              <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
          </div>
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** END *** -->
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-             <input type="text" id="category" name="category" class="form-control" value="<%= product.category %>" required>
-         </div>
+            <select id="category" name="category" class="form-control" required>
+                <option value="" disabled <%= !product.category ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
+        </div>
+        <!-- *** End Category Dropdown *** -->
          <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
@@ -7858,16 +7890,23 @@ views/seller/upload-product.ejs:
             <label for="name">Product Name:</label>
             <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
         </div>
-        <!-- *** ADDED Short Description Field *** -->
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** END *** -->
+        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
-            <input type="text" id="category" name="category" class="form-control" value="<%= typeof product !== 'undefined' ? product.category : '' %>" required>
+            <select id="category" name="category" class="form-control" required>
+                 <option value="" disabled <%= !(typeof product !== 'undefined' && product.category) ? 'selected' : '' %>>Select a Category</option>
+                <% if (typeof categories !== 'undefined') { %>
+                    <% categories.forEach(cat => { %>
+                        <option value="<%= cat.name %>" <%= (typeof product !== 'undefined' && product.category === cat.name) ? 'selected' : '' %>><%= cat.name %></option>
+                    <% }) %>
+                <% } %>
+            </select>
         </div>
+        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -8417,7 +8456,7 @@ const methodOverride = require('method-override');
 const connectDB = require('./config/database');
 const mainRouter = require('./routes/index');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
-
+const { categories: siteCategories } = require('./config/categories'); // <<<--- IMPORT CATEGORIES
 
 connectDB();
 
@@ -8545,6 +8584,9 @@ app.use((req, res, next) => {
 
 
   res.locals.NODE_ENV = process.env.NODE_ENV;
+
+  // --- ADD CATEGORIES TO LOCALS ---
+  res.locals.siteCategories = siteCategories; // <<<--- ADD THIS LINE
 
   next();
 });
