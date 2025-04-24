@@ -1739,7 +1739,7 @@ select.form-control-sm {
   width: 55px; /* Mobile size */
   height: 55px;
   margin-bottom: calc(var(--spacing-unit) * 0.4);
-  background-color: rgb(249, 249, 249); /* Light background */
+  background-color: rgb(255, 255, 255); /* Light background */
   /* Key style for "circular square" */
   border-radius: 15px; /* Adjust this value for more/less rounding */
   display: flex;

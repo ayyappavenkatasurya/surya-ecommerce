@@ -75,8 +75,7 @@
 <div class="product-index-container">
      <%# Display title based on filter/search %>
      <% if (selectedCategory) { %>
-         <h1 class="mb-3">Category: <%= selectedCategory %></h1>
-         <p class="mb-3"><a href="/">« Back to All Products</a></p> <%# Link to clear category filter %>
+         <h1 class="mb-3"><%= selectedCategory %> Products</h1>
      <% } else if (searchTerm) { %>
          <h1 class="mb-3">Search Results for "<%= searchTerm %>"</h1>
      <% } else { %>
@@ -128,9 +127,9 @@
          <%# Display message if no products match filters or none exist %>
          <p class="alert alert-info mt-3"> <%# Added margin-top %>
              <% if (typeof searchTerm !== 'undefined' && searchTerm) { %>
-                 No products found matching your search "<%= searchTerm %>". <a href="/" class="alert-link">View all products?</a>
+                 No products found matching your search "<%= searchTerm %>". <a href="/" class="alert-link">Check back soon!</a>
              <% } else if (typeof selectedCategory !== 'undefined' && selectedCategory) { %>
-                 No products found in the category "<%= selectedCategory %>". <a href="/" class="alert-link">View all products?</a>
+                 No products found in the category "<%= selectedCategory %>". <a href="/" class="alert-link">Check back soon!</a>
              <% } else { %>
                  No products are currently available. Check back soon!
              <% } %>

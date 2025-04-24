@@ -2,14 +2,14 @@
 
 // ** IMPORTANT: Replace these placeholder URLs with your actual external image URLs **
 const categories = [
-    { name: "Electronics", iconUrl: "https://img.icons8.com/ios/100/electronics.png" },
-    { name: "Fashion", iconUrl: "https://img.icons8.com/ios/100/clothes.png" },
-    { name: "Home & Kitchen", iconUrl: "https://img.icons8.com/ios/100/kitchen-room.png" },
-    { name: "Books", iconUrl: "https://img.icons8.com/ios/100/books.png" },
-    { name: "Sports & Outdoors", iconUrl: "https://img.icons8.com/ios/100/football2.png" },
-    { name: "Toys & Games", iconUrl: "https://img.icons8.com/ios/100/controller.png" },
-    { name: "Grocery", iconUrl: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRwXOntQInELZDYy4cC3ZoYx6llzPlV9urYoQ&s" },
-    { name: "Health & Beauty", iconUrl: "https://img.icons8.com/ios/100/lipstick.png" },
+    { name: "Electronics", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/electronics-industry-4494765-3725864.png?f=webp&w=512" },
+    { name: "Fashion", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/fashion-8232047-6530232.png?f=webp&w=512" },
+    { name: "Home & Kitchen", iconUrl: "https://cdn.iconscout.com/icon/free/png-512/free-kitchen-icon-download-in-svg-png-gif-file-formats--appliances-stove-digital-electric-cooking-online-store-pack-miscellaneous-icons-288069.png?f=webp&w=512" },
+    { name: "Books", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/books-3166435-2641511.png?f=webp&w=512" },
+    { name: "Sports & Outdoors", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/sports-3552379-2971891.png?f=webp&w=512" },
+    { name: "Toys & Games", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/games-3407099-2833026.png?f=webp&w=512" },
+    { name: "Grocery", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/grocery-9471761-7699268.png?f=webp&w=512" },
+    { name: "Health & Beauty", iconUrl: "https://cdn.iconscout.com/icon/free/png-512/free-beauty-icon-download-in-svg-png-gif-file-formats--care-cosmetics-makeup-and-pack-icons-804.png?f=webp&w=512" },
     // Add or modify categories as needed
   ];
   
