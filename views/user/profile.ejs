@@ -7,7 +7,8 @@
         <h1 class="mb-0 me-3">My Profile</h1> <%# Removed bottom margin from h1 %>
         <div class="d-flex align-items-center">
              <%# Display current name - initially visible %>
-             <span id="saved-name-display" class="fs-5 me-2">Hi, <%= user.name %></span>
+             <%# --- UPDATED: Added strong tag with ID --- %>
+             <span id="saved-name-display" class="fs-5 me-2">Hi, <strong id="display-user-name"><%= user.name %></strong></span>
              <%# Edit button (icon) - initially visible %>
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
 
@@ -61,7 +62,7 @@
                 <button type="button" id="edit-address-btn" class="btn btn-outline-secondary btn-sm mt-2">Edit Address</button>
             <% } else { %>
                 <p class="text-muted">No address saved yet.</p>
-                 <button type="button" id="add-address-btn" class="btn btn-outline-primary btn-sm mt-2">Add Address</button>
+                 <button type="button" id="add-address-btn" class="btn btn-outline-primary btn-sm mt-2 hidden">Add Address</button> <%# Hide initially, JS will show %>
             <% } %>
         </div>
 
@@ -70,24 +71,24 @@
              <h3 class="h5"><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
              <input type="hidden" name="source" value="profile">
              <div class="form-group">
-                 <label for="name" class="form-label small">Full Name:</label>
-                 <input type="text" id="name" name="name" class="form-control" value="<%= user.address?.name || '' %>" required autocomplete="name">
+                 <label for="profile-name-addr" class="form-label small">Full Name:</label> <%# Changed ID %>
+                 <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= user.address?.name || '' %>" required autocomplete="name">
              </div>
              <div class="form-group">
-                 <label for="phone" class="form-label small">Phone Number:</label>
-                 <input type="tel" id="phone" name="phone" class="form-control" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                 <label for="profile-phone" class="form-label small">Phone Number:</label> <%# Changed ID %>
+                 <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
              </div>
              <div class="form-group">
-                 <label for="pincode" class="form-label small">Pincode:</label>
-                 <input type="text" id="pincode" name="pincode" class="form-control" value="<%= user.address?.pincode || '' %>" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
+                 <label for="profile-pincode" class="form-label small">Pincode:</label> <%# Changed ID %>
+                 <input type="text" id="profile-pincode" name="pincode" class="form-control" value="<%= user.address?.pincode || '' %>" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
              </div>
              <div class="form-group">
-                 <label for="cityVillage" class="form-label small">City / Village:</label>
-                 <input type="text" id="cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
+                 <label for="profile-cityVillage" class="form-label small">City / Village:</label> <%# Changed ID %>
+                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
              </div>
              <div class="form-group">
-                 <label for="landmarkNearby" class="form-label small">Landmark / Nearby (Optional):</label>
-                 <input type="text" id="landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>">
+                 <label for="profile-landmarkNearby" class="form-label small">Landmark / Nearby (Optional):</label> <%# Changed ID %>
+                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>">
              </div>
              <button type="submit" class="btn btn-primary me-2">Save Address</button>
              <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel Edit</button>
@@ -104,92 +105,6 @@
 
 </div>
 
-<%# --- Consolidated Script for Profile Page --- %>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // --- Address Edit Logic (Existing) ---
-    const editAddressBtn = document.getElementById('edit-address-btn');
-    const addAddressBtn = document.getElementById('add-address-btn');
-    const cancelAddressBtn = document.getElementById('cancel-edit-btn');
-    const addressForm = document.getElementById('address-form');
-    const savedAddressDiv = document.getElementById('saved-address-display');
-
-    const showAddressForm = () => {
-        if (!addressForm || !savedAddressDiv) return;
-        addressForm.classList.remove('hidden');
-        addressForm.querySelector('h3').textContent = savedAddressDiv.querySelector('strong') ? 'Edit Address' : 'Add Address';
-        savedAddressDiv.classList.add('hidden');
-        if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden');
-    };
-
-    const hideAddressForm = () => {
-        if (!addressForm || !savedAddressDiv) return;
-        addressForm.classList.add('hidden');
-        if (savedAddressDiv.querySelector('strong')) { // Check if address actually exists
-            savedAddressDiv.classList.remove('hidden');
-        } else {
-            savedAddressDiv.classList.remove('hidden'); // Still show "No address" message
-            if (cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
-        }
-    };
-
-    if (editAddressBtn) {
-        editAddressBtn.addEventListener('click', showAddressForm);
-    }
-    if (addAddressBtn) {
-         addAddressBtn.addEventListener('click', () => {
-            if(addressForm) addressForm.reset();
-            showAddressForm();
-            if(cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
-         });
-    }
-    if (cancelAddressBtn) {
-        cancelAddressBtn.addEventListener('click', hideAddressForm);
-    }
-
-    // Initial Address State
-    if (savedAddressDiv && addressForm && addAddressBtn) {
-        if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden')) {
-           addAddressBtn.classList.remove('hidden');
-        } else {
-             addAddressBtn.classList.add('hidden');
-        }
-    }
-
-
-    // --- Name Edit Logic (New) ---
-    const editNameBtn = document.getElementById('edit-name-btn');
-    const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
-    const nameForm = document.getElementById('name-form');
-    const savedNameDisplaySpan = document.getElementById('saved-name-display'); // The span containing the welcome text
-    const nameInput = document.getElementById('name-input'); // The input field
-    const displayUserNameStrong = document.getElementById('display-user-name'); // The strong tag holding the name
-
-    const showNameForm = () => {
-        if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
-        nameForm.classList.remove('hidden');        // Show the form
-        savedNameDisplaySpan.classList.add('hidden'); // Hide the "Welcome, Name" span
-        editNameBtn.classList.add('hidden');        // Hide the edit icon button
-        nameInput.focus();                          // Focus the input field
-    };
-
-    const hideNameForm = () => {
-        if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
-        nameForm.classList.add('hidden');            // Hide the form
-        savedNameDisplaySpan.classList.remove('hidden'); // Show the "Welcome, Name" span
-        editNameBtn.classList.remove('hidden');      // Show the edit icon button again
-        // Reset input value to the currently displayed name when cancelling
-        nameInput.value = displayUserNameStrong.textContent;
-    };
-
-    if (editNameBtn) {
-        editNameBtn.addEventListener('click', showNameForm);
-    }
-
-    if (cancelNameBtn) {
-        cancelNameBtn.addEventListener('click', hideNameForm);
-    }
-});
-</script>
+<%# --- JavaScript is now external in main.js --- %>
 
 <%- include('../partials/footer') %>

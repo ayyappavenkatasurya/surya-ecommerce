@@ -86,88 +86,89 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Profile Address Toggle Logic ---
+    // --- Profile Page Specific Logic ---
     const profilePage = document.querySelector('.profile-container'); // Check if we are on profile page
     if (profilePage) {
-        const profileEditBtn = profilePage.querySelector('#edit-address-btn');
-        const profileAddBtn = profilePage.querySelector('#add-address-btn');
-        const profileCancelBtn = profilePage.querySelector('#cancel-edit-btn');
-        const profileAddressForm = profilePage.querySelector('#address-form');
-        const profileSavedAddressDiv = profilePage.querySelector('#saved-address-display');
+        // --- Address Edit/Add Logic ---
+        const editAddressBtn = document.getElementById('edit-address-btn');
+        const addAddressBtn = document.getElementById('add-address-btn'); // Get the Add button
+        const cancelAddressBtn = document.getElementById('cancel-edit-btn');
+        const addressForm = document.getElementById('address-form');
+        const savedAddressDiv = document.getElementById('saved-address-display');
 
-        const showProfileForm = () => {
-            if (!profileAddressForm || !profileSavedAddressDiv) return; // Safety check
-            profileAddressForm.classList.remove('hidden');
-            // Check if saved address has actual content besides the button
-            const hasSavedContent = profileSavedAddressDiv.querySelector('p strong');
-            profileAddressForm.querySelector('h3').textContent = hasSavedContent ? 'Edit Address' : 'Add Address';
-            profileSavedAddressDiv.classList.add('hidden');
-            if (profileCancelBtn && hasSavedContent) {
-                profileCancelBtn.classList.remove('hidden'); // Show cancel only when editing existing
-            } else if (profileCancelBtn) {
-                profileCancelBtn.classList.add('hidden'); // Hide cancel when adding new
-            }
-            if (profileAddBtn) profileAddBtn.classList.add('hidden'); // Hide Add button when form is shown
+        const showAddressForm = () => {
+            if (!addressForm || !savedAddressDiv) return;
+            addressForm.classList.remove('hidden');
+            // Check if editing existing or adding new
+            const isEditing = savedAddressDiv.querySelector('strong') !== null;
+            addressForm.querySelector('h3').textContent = isEditing ? 'Edit Address' : 'Add Address';
+            savedAddressDiv.classList.add('hidden');
+            if (addAddressBtn) addAddressBtn.classList.add('hidden'); // Hide Add button when form is visible
+            if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden'); // Always show Cancel when form is open
         };
 
-        const hideProfileForm = () => {
-            if (!profileAddressForm || !profileSavedAddressDiv) return; // Safety check
-            profileAddressForm.classList.add('hidden');
-            profileSavedAddressDiv.classList.remove('hidden'); // Always show the container (it shows "No address" or the address)
-            if (profileCancelBtn) profileCancelBtn.classList.add('hidden');
-            // Show Add button only if no address content exists
-            if (!profileSavedAddressDiv.querySelector('p strong') && profileAddBtn) {
-                 profileAddBtn.classList.remove('hidden');
-            } else if(profileAddBtn) {
-                 profileAddBtn.classList.add('hidden'); // Ensure add button is hidden if address exists
+        const hideAddressForm = () => {
+            if (!addressForm || !savedAddressDiv) return;
+            addressForm.classList.add('hidden');
+            savedAddressDiv.classList.remove('hidden'); // Show the container (has address or "No address" text)
+            if (cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
+            // Show Add button only if there's no saved address content
+            if (!savedAddressDiv.querySelector('strong') && addAddressBtn) {
+                 addAddressBtn.classList.remove('hidden');
             }
         };
 
-        if (profileEditBtn) {
-            profileEditBtn.addEventListener('click', showProfileForm);
+        if (editAddressBtn) {
+            editAddressBtn.addEventListener('click', showAddressForm);
         }
-        if (profileAddBtn) {
-             profileAddBtn.addEventListener('click', () => {
-                 if(profileAddressForm) profileAddressForm.reset(); // Clear form fields when adding new
-                showProfileForm();
+        if (addAddressBtn) {
+             addAddressBtn.addEventListener('click', () => {
+                 if(addressForm) addressForm.reset(); // Clear form fields when adding new
+                 showAddressForm();
              });
         }
-        if (profileCancelBtn) {
-            profileCancelBtn.addEventListener('click', hideProfileForm);
+        if (cancelAddressBtn) {
+            cancelAddressBtn.addEventListener('click', hideAddressForm);
         }
 
-        // Initial state check
-        if (profileAddressForm && profileSavedAddressDiv && profileAddBtn) {
-            if (!profileSavedAddressDiv.querySelector('p strong') && profileAddressForm.classList.contains('hidden')) {
-                profileAddBtn.classList.remove('hidden'); // Show add button if no address
+        // Initial state check: Show Add button only if no address exists and form is hidden
+        if (savedAddressDiv && addressForm && addAddressBtn) {
+            if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden')) {
+                addAddressBtn.classList.remove('hidden');
             } else {
-                profileAddBtn.classList.add('hidden'); // Hide add button if address exists or form is shown
+                 // Ensure Add button is hidden if address exists or form is already shown
+                 addAddressBtn.classList.add('hidden');
             }
         }
 
-        // Name Edit Logic (Profile Page Only)
+
+        // --- Name Edit Logic (Checked and Correct) ---
         const editNameBtn = document.getElementById('edit-name-btn');
         const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
         const nameForm = document.getElementById('name-form');
-        const savedNameDisplaySpan = document.getElementById('saved-name-display'); // The span containing the welcome text
-        const nameInput = document.getElementById('name-input'); // The input field
-        const displayUserNameStrong = document.getElementById('display-user-name'); // The strong tag holding the name
+        const savedNameDisplaySpan = document.getElementById('saved-name-display');
+        const nameInput = document.getElementById('name-input');
+        // *** IMPORTANT: Target the strong tag inside the span ***
+        const displayUserNameStrong = document.getElementById('display-user-name');
 
         const showNameForm = () => {
             if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
-            nameForm.classList.remove('hidden');        // Show the form
-            savedNameDisplaySpan.classList.add('hidden'); // Hide the "Welcome, Name" span
-            editNameBtn.classList.add('hidden');        // Hide the edit icon button
-            nameInput.focus();                          // Focus the input field
+            nameForm.classList.remove('hidden');
+            savedNameDisplaySpan.classList.add('hidden');
+            editNameBtn.classList.add('hidden');
+            // Set input value to current name *before* focusing
+            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
+            nameInput.focus();
         };
 
         const hideNameForm = () => {
             if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
-            nameForm.classList.add('hidden');            // Hide the form
-            savedNameDisplaySpan.classList.remove('hidden'); // Show the "Welcome, Name" span
-            editNameBtn.classList.remove('hidden');      // Show the edit icon button again
+            nameForm.classList.add('hidden');
+            savedNameDisplaySpan.classList.remove('hidden');
+            editNameBtn.classList.remove('hidden');
             // Reset input value to the currently displayed name when cancelling
-            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
+            // This line correctly resets the input field
+            nameInput.value = displayUserNameStrong.textContent;
         };
 
         if (editNameBtn) {
@@ -175,9 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (cancelNameBtn) {
+            // This event listener correctly calls hideNameForm, which resets the input
             cancelNameBtn.addEventListener('click', hideNameForm);
         }
-    }
+    } // End if (profilePage)
 
     // --- Checkout Address Toggle Logic ---
     const checkoutPage = document.querySelector('.checkout-container'); // Check if on checkout page
@@ -490,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // Homepage Banner Slider Logic            <--- NEW SECTION
+    // Homepage Banner Slider Logic
     // ========================================
     const sliderContainer = document.querySelector('[data-slider-container]');
     if (sliderContainer) {
@@ -594,7 +596,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) { // Pass input el
-     const originalButtonText = 'Add';
+     const originalButtonText = 'Add'; // Adjust if your button text is different
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -612,7 +614,28 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
         const data = await response.json(); // Always parse response
 
         if (!response.ok) {
-            throw new Error(data.message || `Update failed (Status: ${response.status})`);
+             // Specific handling for 'removal: true' from backend (unapproved product)
+             if (data.removal === true) {
+                 showToast(data.message || 'Item unavailable and removed.', 'warning');
+                 if (cartItemDiv) { // Animate removal
+                    cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
+                    cartItemDiv.style.opacity = '0';
+                    cartItemDiv.style.height = '0';
+                    cartItemDiv.style.paddingTop = '0';
+                    cartItemDiv.style.paddingBottom = '0';
+                    cartItemDiv.style.marginBottom = '0';
+                    cartItemDiv.style.borderWidth = '0';
+                     setTimeout(() => {
+                         if (cartItemDiv.parentNode) cartItemDiv.remove();
+                         updateCartTotalAndBadge(data.cartTotal); // Update total even on removal
+                         handleEmptyCartDisplay();
+                     }, 300);
+                     return; // Exit early after removal
+                 }
+             } else {
+                 // Throw error for other non-ok responses
+                 throw new Error(data.message || `Update failed (Status: ${response.status})`);
+             }
         }
 
          // --- Show toast AFTER response is received ---
@@ -649,7 +672,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                  updateCartTotalAndBadge(data.cartTotal);
                  // showToast('Cart quantity updated.', 'success'); // Optional success message
              }
-         } else {
+         } else { // This block might be less likely if using throw new Error above
               // Show failure toast using backend message
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
               // Restore original value on backend failure
@@ -672,7 +695,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
          // Ensure this runs only if the item wasn't removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = originalButtonText;
+             buttonElement.innerHTML = originalButtonText; // Use the stored original button text
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }
@@ -780,8 +803,8 @@ function calculateNewCartCount() {
             if (quantityInput) {
                 const value = parseInt(quantityInput.value, 10);
                 if (!isNaN(value) && value > 0) {
-                    // Update count based on the QUANTITY of each item
-                    count += value; // THIS IS THE KEY CHANGE - SUM QUANTITIES, NOT ITEMS
+                    // Sum the quantities of items remaining in the cart
+                    count += value;
                 }
             }
         }
