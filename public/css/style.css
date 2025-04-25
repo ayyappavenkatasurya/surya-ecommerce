@@ -538,14 +538,14 @@ select.form-control-sm {
   font-size: 1.2em; /* Relative to logo font size */
 }
 
-/* Center Section (Search - Desktop/Tablet) - Initially hidden on mobile */
+/* Center Section (Search Container) */
+/* Mobile: Container is static, holds toggle, form is absolute */
 .search-container-dynamic {
-  display: none; /* Hidden on mobile */
-  flex-grow: 1; /* Takes available space on desktop/tablet */
-  justify-content: center; /* Centers the form within */
-  margin: 0 calc(var(--spacing-unit) * 0.5);
-  max-width: 500px; /* Limit search bar width */
-  position: relative; /* For suggestions dropdown */
+  flex-grow: 0; /* Doesn't grow on mobile */
+  max-width: none;
+  order: 1; /* Place it after nav-left */
+  margin: 0;
+  position: static; /* Container itself stays in flow */
 }
 
 /* --- Search Bar Black & White Styling (Shared) --- */
@@ -557,8 +557,9 @@ select.form-control-sm {
   background-color: #ffffff; /* White background */
   border: 1px solid #ccc; /* Subtle grey border */
   border-radius: var(--border-radius);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Keep transitions */
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
+  color: var(--dark-color); /* Ensure text color contrasts with white bg */
 }
 #search-input-dynamic {
   flex-grow: 1;
@@ -594,9 +595,9 @@ select.form-control-sm {
 
 /* Suggestions Dropdown (Shared) */
 .suggestions-dropdown {
-    display: none;
+    display: none; /* Hidden initially */
     position: absolute;
-    top: 100%; /* Position below the search form */
+    /* Mobile positioning handled in media query */
     left: 0;
     right: 0;
     background-color: var(--card-bg);
@@ -608,7 +609,7 @@ select.form-control-sm {
     overflow-y: auto;
     z-index: 1010; /* Above other content */
 }
-.suggestions-dropdown.active { display: block; }
+.suggestions-dropdown.active { display: block; } /* Show when active */
 .suggestion-item {
     display: flex;
     align-items: center;
@@ -1550,6 +1551,59 @@ select.form-control-sm {
 /* Media Queries                */
 /* ============================ */
 
+/* --- Mobile Specific Search Bar --- */
+@media (max-width: 767px) {
+  /* Keep the container static for layout */
+  .search-container-dynamic {
+      position: static; /* Important: container stays in flow */
+      order: 1; /* Appears after logo */
+  }
+
+  /* Style the search form itself for mobile - positioned absolutely */
+  .search-form-dynamic {
+      /* Base hidden state */
+      position: absolute;
+      top: calc(100% + 8px); /* Position below the header (adjust gap as needed) */
+      left: var(--spacing-unit);
+      right: var(--spacing-unit);
+      width: calc(100% - (2 * var(--spacing-unit))); /* Full width minus padding */
+      background-color: var(--card-bg); /* White background */
+      border: 1px solid var(--border-color); /* Standard border */
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px) scaleY(0.95);
+      transform-origin: top center;
+      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s; /* Delay visibility hide */
+      z-index: 1005; /* Ensure it's above normal content */
+      border-radius: var(--border-radius);
+      height: 42px; /* Consistent height */
+  }
+
+  /* When the container has 'active' class (toggled by JS), show the form */
+  .search-container-dynamic.active .search-form-dynamic {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scaleY(1);
+      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0s; /* Make visibility immediate */
+  }
+
+  /* Position suggestions dropdown below the activated search form */
+  .suggestions-dropdown {
+      top: calc(100% + 8px + 42px + 4px); /* Header height + gap + form height + small gap */
+      left: var(--spacing-unit);
+      right: var(--spacing-unit);
+      width: calc(100% - (2 * var(--spacing-unit)));
+      z-index: 1010; /* Above form */
+      border-top: 1px solid var(--border-color); /* Add top border */
+  }
+
+  /* Show suggestions only when container and dropdown are active */
+   .search-container-dynamic.active .suggestions-dropdown.active {
+      display: block;
+   }
+}
+
 /* Small devices (landscape phones, 576px and up) */
 @media (min-width: 576px) {
     .category-grid {
@@ -1623,36 +1677,36 @@ select.form-control-sm {
   .delivery-otp-display small { display: none; } /* Hide verbose text on desktop */
   /* --- End Table Restore --- */
 
-  /* Header/Navbar for Tablet+ */
+  /* --- Header/Navbar for Tablet+ --- */
   .app-header { padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit); }
   .navbar { gap: var(--spacing-unit); }
   .app-logo .app-name { display: inline; } /* Show name */
   .app-logo { font-size: 1.2rem; }
   .search-toggle-btn { display: none; } /* Hide toggle */
-  .search-container-dynamic { display: flex; order: 0; margin-right: auto; /* Push nav-right */ } /* Show search bar, reset order */
-  .nav-left { margin-right: 0; } /* Reset margin */
 
-  /* Reset mobile search bar positioning */
+  /* Make search container flex and take space */
+  .search-container-dynamic {
+      display: flex; /* Make it visible */
+      flex-grow: 1; /* Allow it to take space */
+      justify-content: center; /* Center form inside */
+      order: 0; /* Reset order */
+      margin: 0 calc(var(--spacing-unit) * 0.5); /* Add horizontal margin */
+      max-width: 500px; /* Limit width */
+      position: relative; /* Needed for suggestions dropdown */
+  }
+  .nav-left { margin-right: 0; } /* Reset mobile margin */
+
+  /* Reset mobile search form positioning */
   .search-form-dynamic {
-      position: relative;
-      top: auto; left: auto; right: auto; width: 100%;
-      box-shadow: none;
-      opacity: 1; visibility: visible; transform: none;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      position: relative; /* Back to relative positioning */
+      top: auto; left: auto; right: auto; width: 100%; /* Reset positioning */
+      box-shadow: none; /* Remove mobile shadow */
+      opacity: 1; visibility: visible; transform: none; /* Ensure visible */
+      transition: border-color 0.2s ease, box-shadow 0.2s ease; /* Keep transitions */
       height: 38px;
   }
-  .search-form-dynamic:focus-within {
-     /* border-color: var(--primary-color); */ /* Optional focus */
-     /* box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25); */
-  }
+  /* --- End Header/Navbar Tablet+ --- */
 
-  .nav-link { flex-direction: row; font-size: 0.9rem; align-items: center; padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.8); }
-  .nav-link span { display: inline; margin-left: calc(var(--spacing-unit) * 0.3); } /* Show text */
-  .nav-link i { font-size: 1rem; margin-bottom: 0; margin-right: 0; }
-  .nav-right { gap: calc(var(--spacing-unit) * 0.75); }
-  .profile-avatar-link { width: 38px; height: 38px; }
-  .btn-login-register { font-size: 0.9rem; }
-  .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; width: 100%; }
 
   /* Category Grid Tablet */
   .category-grid { grid-template-columns: repeat(6, 1fr); gap: calc(var(--spacing-unit) * 0.8); }
@@ -1675,6 +1729,16 @@ select.form-control-sm {
   .rating-bars { max-width: none; flex-grow: 1; margin: 0; } /* Reset mobile centering */
 
   .profile-container { padding: calc(var(--spacing-unit) * 2); }
+
+  /* Nav links Tablet+ */
+  .nav-link { flex-direction: row; font-size: 0.9rem; align-items: center; padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.8); }
+  .nav-link span { display: inline; margin-left: calc(var(--spacing-unit) * 0.3); } /* Show text */
+  .nav-link i { font-size: 1rem; margin-bottom: 0; margin-right: 0; }
+  .nav-right { gap: calc(var(--spacing-unit) * 0.75); }
+  .profile-avatar-link { width: 38px; height: 38px; }
+  .btn-login-register { font-size: 0.9rem; }
+  .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; width: 100%; } /* Position relative to search container */
+
 
 } /* End @media (min-width: 768px) */
 
