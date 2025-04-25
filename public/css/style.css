@@ -1047,7 +1047,7 @@ select.form-control-sm {
 .cart-item-quantity .btn-update-qty { font-size: 0.8rem; padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.6); }
 .cart-item-subtotal { font-size: 0.9rem; white-space: nowrap; }
 .cart-item-subtotal .item-subtotal-value { font-weight: 500; }
-.cart-item-remove .btn { padding: 0.1rem 0.4rem; font-size: 0.8rem; line-height: 1; }
+.cart-item-remove .btn { padding: 0.2rem 0.4rem; font-size: 0.8rem; ; }
 
 .cart-summary {
   margin-top: calc(var(--spacing-unit) * 1.5);

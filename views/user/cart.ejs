@@ -28,10 +28,10 @@
                                data-product-id="<%= item.productId %>"
                                data-item-price="<%= item.price %>"
                                aria-label="Quantity for <%= item.name %>">
-                        <button class="btn btn-secondary btn-sm btn-update-qty" data-product-id="<%= item.productId %>">Update</button> <%# Spinner handled by AJAX logic %>
+                        <button class="btn btn-secondary btn-sm btn-update-qty" data-product-id="<%= item.productId %>">Add</button> <%# Spinner handled by AJAX logic %>
                      </div>
                      <div class="cart-item-subtotal">
-                         Subtotal: ₹<span class="item-subtotal-value"><%= (typeof item.subtotal === 'number' ? item.subtotal : 0).toFixed(2) %></span>
+                         Total: ₹<span class="item-subtotal-value"><%= (typeof item.subtotal === 'number' ? item.subtotal : 0).toFixed(2) %></span>
                     </div>
                     <div class="cart-item-remove">
                         <form action="/user/cart/remove/<%= item.productId %>" method="POST" class="form-submit-spinner">
