@@ -8227,7 +8227,7 @@ views/user/profile.ejs:
         <h1 class="mb-0 me-3">My Profile</h1> <%# Removed bottom margin from h1 %>
         <div class="d-flex align-items-center">
              <%# Display current name - initially visible %>
-             <span id="saved-name-display" class="fs-5 me-2">Welcome, <strong id="display-user-name"><%= user.name %></strong></span>
+             <span id="saved-name-display" class="fs-5 me-2">Hi, <%= user.name %></span>
              <%# Edit button (icon) - initially visible %>
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
 
@@ -8240,7 +8240,7 @@ views/user/profile.ejs:
              </form>
          </div>
     </div>
-    <p class="text-muted text-center small mb-3">Email: <%= user.email %></p> <%# Moved email below %>
+    <p class="text-muted text-center small mb-3">Email: <strong><%= user.email %></strong></p> <%# Moved email below %>
 
     <%# --- NEW: My Orders Section --- %>
     <div class="profile-section orders-section mb-4">
