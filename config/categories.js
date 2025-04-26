@@ -3,7 +3,7 @@
 // ** IMPORTANT: Replace these placeholder URLs with your actual external image URLs **
 const categories = [
     { name: "Electronics", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/electronics-industry-4494765-3725864.png?f=webp&w=512" },
-    { name: "Fashion", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/fashion-8232047-6530232.png?f=webp&w=512" },
+    { name: "Food", iconUrl: "https://cdn-icons-png.flaticon.com/128/737/737967.png" },
     { name: "Home & Kitchen", iconUrl: "https://cdn.iconscout.com/icon/free/png-512/free-kitchen-icon-download-in-svg-png-gif-file-formats--appliances-stove-digital-electric-cooking-online-store-pack-miscellaneous-icons-288069.png?f=webp&w=512" },
     { name: "Books", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/books-3166435-2641511.png?f=webp&w=512" },
     { name: "Sports & Outdoors", iconUrl: "https://cdn.iconscout.com/icon/premium/png-512-thumb/sports-3552379-2971891.png?f=webp&w=512" },
