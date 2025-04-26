@@ -1,6 +1,5 @@
 // models/Product.js
 const mongoose = require('mongoose');
-// *** Import category names for validation ***
 const { categoryNames } = require('../config/categories');
 
 const RatingSchema = new mongoose.Schema({
@@ -27,7 +26,6 @@ const ProductSchema = new mongoose.Schema({
         required: [true, 'Please select a product category'],
         trim: true,
         index: true,
-        // *** Use enum validation ***
         enum: {
             values: categoryNames,
             message: '{VALUE} is not a supported category.'
@@ -44,11 +42,17 @@ const ProductSchema = new mongoose.Schema({
         min: 0,
         default: 0,
     },
-    imageUrl: {
+    imageUrl: { // First (required) image
         type: String,
         required: [true, 'Please provide a product image URL'],
         trim: true,
     },
+    // --- UPDATED: Added imageUrl2 ---
+    imageUrl2: { // Second (optional) image
+        type: String,
+        trim: true,
+    },
+    // --- END UPDATED ---
     specifications: {
         type: String,
         trim: true,
@@ -92,7 +96,7 @@ const ProductSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Calculate average rating and numReviews before saving
+// Pre-save hook remains the same
 ProductSchema.pre('save', function(next) {
     if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
@@ -107,7 +111,6 @@ ProductSchema.pre('save', function(next) {
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
-
     next();
 });
 

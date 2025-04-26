@@ -1813,3 +1813,144 @@ select.form-control-sm {
 tr.hidden {
     display: none !important;
 }
+
+/* ============================ */
+/* **** Product Image Slider Styles **** */
+/* ============================ */
+
+/* Container for the image section (either single or slider) */
+.product-detail-image-section {
+  position: relative;
+  width: 100%; /* Full width on mobile */
+  max-width: 450px; /* Limit width on larger screens if needed */
+  margin: 0 auto var(--spacing-unit) auto; /* Center and add bottom margin on mobile */
+  aspect-ratio: 1 / 1; /* Maintain square aspect ratio */
+  overflow: hidden;
+  border-radius: calc(var(--border-radius) + 2px);
+  background-color: #f8f9fa; /* Placeholder background */
+  border: 1px solid var(--border-color); /* Add a subtle border */
+}
+/* Desktop Layout Alignment (aligns with existing product detail layout) */
+@media (min-width: 768px) {
+  .product-detail-image-section {
+      flex: 1 1 40%; /* Take 40% of the flex space */
+      width: auto; /* Override mobile width */
+      max-width: none; /* Remove max-width limit */
+      margin: 0; /* Remove mobile margin */
+  }
+}
+
+/* Slider specific container */
+.product-image-slider-container {
+  position: relative; /* Needed for absolute positioning of children */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Hide slides outside the container */
+}
+
+.product-image-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Individual slide styling */
+.product-image-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0; /* Hidden by default */
+  visibility: hidden;
+  transition: opacity 0.5s ease-in-out; /* Smooth fade transition */
+  background-color: #eee; /* Fallback background if image is slow */
+}
+
+/* Active slide is visible */
+.product-image-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1; /* Ensure active slide is on top */
+}
+
+/* The actual image element (shared by slider and single image) */
+.product-detail-image {
+  display: block; /* Remove extra space below image */
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Cover the area, might crop */
+  /* object-fit: contain; */ /* Uncomment if you prefer to see the whole image */
+  object-position: center center; /* Center the image */
+  border-radius: inherit; /* Inherit border-radius from container */
+}
+
+/* Slider Navigation Arrows */
+.product-image-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px; /* Adjust size as needed */
+  height: 30px;
+  font-size: 1rem; /* Adjust icon size */
+  font-weight: bold;
+  line-height: 1; /* Center icon vertically */
+  cursor: pointer;
+  z-index: 2; /* Above the slides */
+  display: flex; /* Use flexbox to center icon */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  opacity: 0.8; /* Slightly transparent */
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-nav:hover,
+.product-image-nav:focus {
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  outline: none; /* Remove default focus outline */
+}
+.product-image-prev { left: 8px; }
+.product-image-next { right: 8px; }
+
+/* Slider Navigation Dots */
+.product-image-dots {
+  position: absolute;
+  bottom: 8px; /* Position dots at the bottom */
+  left: 50%;
+  transform: translateX(-50%); /* Center the dots horizontally */
+  display: flex;
+  gap: 6px; /* Space between dots */
+  z-index: 2; /* Above the slides */
+}
+.product-image-dot {
+  width: 7px; /* Size of the dots */
+  height: 7px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.6); /* Semi-transparent white */
+  border: 1px solid rgba(0, 0, 0, 0.3); /* Subtle border */
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.3s ease;
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-dot.active {
+  background-color: white; /* Active dot is solid white */
+}
+.product-image-dot:focus {
+   outline: 1px dotted white; /* Simple focus style for accessibility */
+   outline-offset: 1px;
+}
+
+
+/* Optional: Container for the single image case (if you added it in the EJS) */
+.product-detail-image-single {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- End Product Image Slider Styles --- */

@@ -140,13 +140,15 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
     // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
-        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
         // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
@@ -160,6 +162,7 @@ exports.uploadProduct = async (req, res, next) => {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
+    // Optional: Add validation for imageUrl2 if needed (e.g., check URL format if provided)
 
     try {
         const newProduct = new Product({
@@ -169,6 +172,9 @@ exports.uploadProduct = async (req, res, next) => {
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
+            // --- UPDATED: Assign imageUrl2 ---
+            imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
+            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: adminUserId,
             sellerEmail: adminUserEmail,
@@ -211,7 +217,7 @@ exports.uploadProduct = async (req, res, next) => {
     }
 };
 
-// --- Manage Products (Admin sees ALL - keep existing) ---
+// --- Manage Products (Admin sees ALL) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({})
@@ -256,7 +262,9 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    // --- END UPDATED ---
     const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
 
     // Validation
@@ -282,6 +290,7 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
         return res.render('admin/edit-product', renderOptions);
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const product = await Product.findById(productId); // Fetch non-lean for saving
@@ -296,6 +305,9 @@ exports.updateProduct = async (req, res, next) => {
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
+        // --- UPDATED: Update imageUrl2 ---
+        product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
+        // --- END UPDATED ---
         product.specifications = specifications ? specifications.trim() : '';
 
         if (reviewStatus && allowedStatus.includes(reviewStatus)) {
@@ -311,7 +323,6 @@ exports.updateProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-            // Fetch original product data again for rendering the edit page correctly on validation error
              try {
                  const originalProduct = await Product.findById(productId).lean();
                  renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data
@@ -2406,12 +2417,15 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Product Management Actions ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
+     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
-        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
         // *** Pass categories back on error ***
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
@@ -2425,6 +2439,7 @@ exports.uploadProduct = async (req, res, next) => {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const newProduct = new Product({
@@ -2434,6 +2449,9 @@ exports.uploadProduct = async (req, res, next) => {
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
+            // --- UPDATED: Assign imageUrl2 ---
+            imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
+            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: sellerId,
             sellerEmail: sellerEmail,
@@ -2524,10 +2542,13 @@ exports.getEditProductPage = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const renderOptions = { title: `Edit Product Error`, product: { _id: productId, ...req.body }, categories: categories }; // For re-rendering on error
 
 
+     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
@@ -2544,6 +2565,7 @@ exports.updateProduct = async (req, res, next) => {
          try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
         return res.render('seller/edit-product', renderOptions);
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const product = await Product.findOne({ _id: productId, sellerId: sellerId }); // Fetch non-lean
@@ -2559,6 +2581,9 @@ exports.updateProduct = async (req, res, next) => {
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
+         // --- UPDATED: Update imageUrl2 ---
+         product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
+         // --- END UPDATED ---
          product.specifications = specifications ? specifications.trim() : '';
          product.reviewStatus = 'pending'; // Reset status on update
          product.rejectionReason = undefined;
@@ -2643,7 +2668,7 @@ exports.getManageOrdersPage = async (req, res, next) => {
 
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price sellerId')
+                                   .populate('products.productId', 'name imageUrl _id price sellerId') // Ensure imageUrl is populated
                                    .populate('userId', 'name email')
                                    .lean();
 
@@ -3184,7 +3209,6 @@ module.exports = Order;
 models/Product.js:
 // models/Product.js
 const mongoose = require('mongoose');
-// *** Import category names for validation ***
 const { categoryNames } = require('../config/categories');
 
 const RatingSchema = new mongoose.Schema({
@@ -3211,7 +3235,6 @@ const ProductSchema = new mongoose.Schema({
         required: [true, 'Please select a product category'],
         trim: true,
         index: true,
-        // *** Use enum validation ***
         enum: {
             values: categoryNames,
             message: '{VALUE} is not a supported category.'
@@ -3228,11 +3251,17 @@ const ProductSchema = new mongoose.Schema({
         min: 0,
         default: 0,
     },
-    imageUrl: {
+    imageUrl: { // First (required) image
         type: String,
         required: [true, 'Please provide a product image URL'],
         trim: true,
     },
+    // --- UPDATED: Added imageUrl2 ---
+    imageUrl2: { // Second (optional) image
+        type: String,
+        trim: true,
+    },
+    // --- END UPDATED ---
     specifications: {
         type: String,
         trim: true,
@@ -3276,7 +3305,7 @@ const ProductSchema = new mongoose.Schema({
     timestamps: true
 });
 
-// Calculate average rating and numReviews before saving
+// Pre-save hook remains the same
 ProductSchema.pre('save', function(next) {
     if (this.isModified('ratings')) {
         if (this.ratings && this.ratings.length > 0) {
@@ -3291,7 +3320,6 @@ ProductSchema.pre('save', function(next) {
     if (this.isModified('reviewStatus') && this.reviewStatus !== 'rejected') {
         this.rejectionReason = undefined;
     }
-
     next();
 });
 
@@ -5220,6 +5248,147 @@ tr.hidden {
     display: none !important;
 }
 
+/* ============================ */
+/* **** Product Image Slider Styles **** */
+/* ============================ */
+
+/* Container for the image section (either single or slider) */
+.product-detail-image-section {
+  position: relative;
+  width: 100%; /* Full width on mobile */
+  max-width: 450px; /* Limit width on larger screens if needed */
+  margin: 0 auto var(--spacing-unit) auto; /* Center and add bottom margin on mobile */
+  aspect-ratio: 1 / 1; /* Maintain square aspect ratio */
+  overflow: hidden;
+  border-radius: calc(var(--border-radius) + 2px);
+  background-color: #f8f9fa; /* Placeholder background */
+  border: 1px solid var(--border-color); /* Add a subtle border */
+}
+/* Desktop Layout Alignment (aligns with existing product detail layout) */
+@media (min-width: 768px) {
+  .product-detail-image-section {
+      flex: 1 1 40%; /* Take 40% of the flex space */
+      width: auto; /* Override mobile width */
+      max-width: none; /* Remove max-width limit */
+      margin: 0; /* Remove mobile margin */
+  }
+}
+
+/* Slider specific container */
+.product-image-slider-container {
+  position: relative; /* Needed for absolute positioning of children */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Hide slides outside the container */
+}
+
+.product-image-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Individual slide styling */
+.product-image-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0; /* Hidden by default */
+  visibility: hidden;
+  transition: opacity 0.5s ease-in-out; /* Smooth fade transition */
+  background-color: #eee; /* Fallback background if image is slow */
+}
+
+/* Active slide is visible */
+.product-image-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1; /* Ensure active slide is on top */
+}
+
+/* The actual image element (shared by slider and single image) */
+.product-detail-image {
+  display: block; /* Remove extra space below image */
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* Cover the area, might crop */
+  /* object-fit: contain; */ /* Uncomment if you prefer to see the whole image */
+  object-position: center center; /* Center the image */
+  border-radius: inherit; /* Inherit border-radius from container */
+}
+
+/* Slider Navigation Arrows */
+.product-image-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px; /* Adjust size as needed */
+  height: 30px;
+  font-size: 1rem; /* Adjust icon size */
+  font-weight: bold;
+  line-height: 1; /* Center icon vertically */
+  cursor: pointer;
+  z-index: 2; /* Above the slides */
+  display: flex; /* Use flexbox to center icon */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  opacity: 0.8; /* Slightly transparent */
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-nav:hover,
+.product-image-nav:focus {
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  outline: none; /* Remove default focus outline */
+}
+.product-image-prev { left: 8px; }
+.product-image-next { right: 8px; }
+
+/* Slider Navigation Dots */
+.product-image-dots {
+  position: absolute;
+  bottom: 8px; /* Position dots at the bottom */
+  left: 50%;
+  transform: translateX(-50%); /* Center the dots horizontally */
+  display: flex;
+  gap: 6px; /* Space between dots */
+  z-index: 2; /* Above the slides */
+}
+.product-image-dot {
+  width: 7px; /* Size of the dots */
+  height: 7px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.6); /* Semi-transparent white */
+  border: 1px solid rgba(0, 0, 0, 0.3); /* Subtle border */
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.3s ease;
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-dot.active {
+  background-color: white; /* Active dot is solid white */
+}
+.product-image-dot:focus {
+   outline: 1px dotted white; /* Simple focus style for accessibility */
+   outline-offset: 1px;
+}
+
+
+/* Optional: Container for the single image case (if you added it in the EJS) */
+.product-detail-image-single {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- End Product Image Slider Styles --- */
+
 public/js/main.js:
 // public/js/main.js
 console.log("Main JS loaded.");
@@ -5452,6 +5621,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Initialize form state on page load
         if (!hasInitialAddress && checkoutAddressForm) {
             checkoutAddressForm.classList.remove('hidden');
             if (placeOrderBtn) placeOrderBtn.disabled = true;
@@ -5462,7 +5632,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (placeOrderBtn) placeOrderBtn.disabled = false;
             if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         }
-    }
+    } // End if(checkoutPage)
 
 
     // --- Cart Update AJAX Logic ---
@@ -5569,10 +5739,11 @@ document.addEventListener('DOMContentLoaded', () => {
                  const item = document.createElement('a');
                  item.classList.add('suggestion-item');
                  item.href = `/products/${product._id}`;
+                 // Basic sanitization for display
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
-                    <img src="${safeImageUrl}" alt="${safeName}" loading="lazy">
+                    <img src="${safeImageUrl}" alt="" loading="lazy"> <%# Alt left blank for brevity %>
                     <span>${safeName}</span>
                  `;
                  suggestionsDropdown.appendChild(item);
@@ -5584,6 +5755,7 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
+     // Global click listener to close search/suggestions
      document.addEventListener('click', (e) => {
          if (searchContainer && suggestionsDropdown && searchToggleBtn && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
              searchContainer.classList.remove('active');
@@ -5591,14 +5763,17 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      });
 
+     // Handle clicks within the suggestions dropdown
      if(suggestionsDropdown) {
          suggestionsDropdown.addEventListener('click', (e) => {
-             const link = e.target.closest('a');
+             const link = e.target.closest('a.suggestion-item');
              if (!link) {
+                 // Prevent closing if clicking inside the dropdown but not on a link
                  e.stopPropagation();
              } else {
+                 // Allow link navigation and close dropdown/search
                  suggestionsDropdown.classList.remove('active');
-                 if (searchContainer && window.innerWidth < 768) {
+                 if (searchContainer && window.innerWidth < 768) { // Only hide container on mobile
                     searchContainer.classList.remove('active');
                  }
              }
@@ -5627,24 +5802,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 toastElement.classList.remove('show');
                 toastElement.classList.add('hide');
                 toastElement.addEventListener('transitionend', (event) => {
+                    // Ensure removal only happens once and the element still exists
                     if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
-                        toastElement.remove();
+                         try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
                     }
                 }, { once: true });
             };
 
+            // Show toast initially
             setTimeout(() => {
-                if (toastElement.parentNode) {
+                if (toastElement.parentNode) { // Check if still in DOM before showing
                    toastElement.classList.add('show');
                 }
-            }, 0);
+            }, 10); // Small delay to allow transition
 
+             // Auto hide
              hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
 
+            // Manual close
             if (closeButton) {
                 closeButton.addEventListener('click', dismissToast);
             }
 
+             // Pause on hover
              toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
              toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 
@@ -5658,8 +5838,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
+            // Use requestAnimationFrame for smoother rendering
             requestAnimationFrame(() => {
-                 if(el.parentNode) {
+                 if(el.parentNode) { // Check if element is still in the DOM
                     el.style.width = width + '%';
                  }
             });
@@ -5667,7 +5848,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ========================================
-    // Loading State for Non-Form Actions
+    // Loading State for Non-Form Actions (e.g., Proceed to Checkout)
     // ========================================
     const proceedCheckoutBtn = document.getElementById('btn-proceed-checkout');
     if (proceedCheckoutBtn) {
@@ -5675,19 +5856,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingCheckoutText = proceedCheckoutBtn.dataset.loadingText || '<i class="fas fa-spinner fa-spin"></i> Loading...';
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
+            // Check if already loading to prevent multiple clicks
             if (proceedCheckoutBtn.classList.contains('loading')) {
-                event.preventDefault(); // Prevent navigation if already loading
+                event.preventDefault();
                 return;
             }
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
-            proceedCheckoutBtn.style.pointerEvents = 'none';
+            proceedCheckoutBtn.style.pointerEvents = 'none'; // Disable further clicks via pointer
             proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
-            // Navigation will happen normally if not prevented earlier
+            // Allow the default link navigation to proceed
         });
 
+        // Handle browser back button scenario
         window.addEventListener('pageshow', function(pageEvent) {
             if (pageEvent.persisted && proceedCheckoutBtn.classList.contains('loading')) {
+                // Reset button if the page was loaded from cache and button was loading
                 proceedCheckoutBtn.classList.remove('loading');
                 proceedCheckoutBtn.innerHTML = originalCheckoutText;
                 proceedCheckoutBtn.style.pointerEvents = 'auto';
@@ -5712,37 +5896,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let currentSlideIndex = 0;
         let autoSlideInterval = null;
-        const slideIntervalTime = 5000;
+        const slideIntervalTime = 5000; // 5 seconds
 
         function showSlide(index) {
             if (!slides || slides.length === 0) return;
-            const newIndex = (index + slides.length) % slides.length;
-            slides.forEach((slide, i) => { slide.classList.remove('active'); });
-            dots.forEach(dot => { dot.classList.remove('active'); });
-            slides[newIndex].classList.add('active');
-            if (dots[newIndex]) { dots[newIndex].classList.add('active'); }
+            // Correctly calculate index, handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
+            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
             currentSlideIndex = newIndex;
         }
+
         function nextSlide() { showSlide(currentSlideIndex + 1); }
         function prevSlide() { showSlide(currentSlideIndex - 1); }
+
         function startAutoSlide() {
-            clearInterval(autoSlideInterval);
-            if (slides.length > 1) { autoSlideInterval = setInterval(nextSlide, slideIntervalTime); }
+            clearInterval(autoSlideInterval); // Clear existing interval
+            if (slides.length > 1) { // Only auto-slide if there's more than one slide
+                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
+            }
         }
-        if (slides.length > 0) { showSlide(0); startAutoSlide(); }
-        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
-        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
+
+        // Initialize first slide and start auto-slide
+        if (slides.length > 0) {
+            showSlide(0);
+            startAutoSlide();
+        }
+
+        // Event Listeners for Nav Buttons
+        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
+        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
+
+        // Event Listener for Dots
         if (dotsContainer) {
             dotsContainer.addEventListener('click', (e) => {
                 const targetDot = e.target.closest('[data-slide-to]');
                 if (targetDot) {
                     const index = parseInt(targetDot.dataset.slideTo, 10);
-                    if (!isNaN(index)) { showSlide(index); startAutoSlide(); }
+                    if (!isNaN(index)) {
+                        showSlide(index);
+                        startAutoSlide(); // Restart timer on dot click
+                    }
                 }
             });
         }
+
+        // Pause on hover
         sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
-        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
+        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); }); // Resume on mouse leave
     }
     // ========================================
     // End Homepage Banner Slider Logic
@@ -5759,54 +5961,73 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(pincodeTimeout);
             const pincode = input.value.trim();
             const targetPrefix = input.dataset.targetPrefix;
-            const statusElement = input.nextElementSibling;
+            const statusElement = input.nextElementSibling; // Assumes status is the next sibling
 
+            // Basic validation and clearing
             if (pincode.length < 6) {
-                 clearAutoFilledFields(targetPrefix);
-                 if (statusElement) statusElement.textContent = '';
-                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
-                     if (statusElement) statusElement.textContent = 'Digits only';
-                     statusElement?.classList.add('text-danger');
-                     statusElement?.classList.remove('text-muted');
-                 } else if (statusElement) {
-                     statusElement?.classList.remove('text-danger');
-                     statusElement?.classList.add('text-muted');
+                 clearAutoFilledFields(targetPrefix); // Clear derived fields
+                 if (statusElement) {
+                    statusElement.textContent = ''; // Clear status message
+                    statusElement.classList.remove('text-danger', 'text-success');
+                    statusElement.classList.add('text-muted');
                  }
+                 // Show digit-only error immediately if non-digits are entered
+                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
+                     if (statusElement) {
+                        statusElement.textContent = 'Digits only';
+                        statusElement.classList.add('text-danger');
+                        statusElement.classList.remove('text-muted');
+                    }
+                 }
+                 return; // Stop processing if less than 6 digits
             }
 
+            // If 6 digits and valid format, start fetch timeout
             if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                if (statusElement) statusElement.textContent = 'Looking up...';
-                statusElement?.classList.remove('text-danger');
-                statusElement?.classList.add('text-muted');
+                if (statusElement) {
+                    statusElement.textContent = 'Looking up...';
+                    statusElement.classList.remove('text-danger', 'text-success');
+                    statusElement.classList.add('text-muted');
+                }
                 pincodeTimeout = setTimeout(() => {
                     fetchPincodeData(pincode, targetPrefix);
-                }, 500);
+                }, 500); // Wait 500ms after user stops typing
+            } else if (pincode.length === 6) {
+                 // If 6 chars but not all digits
+                 clearAutoFilledFields(targetPrefix);
+                 if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode (digits only)';
+                    statusElement.classList.add('text-danger');
+                    statusElement.classList.remove('text-muted', 'text-success');
+                 }
             }
         });
 
+         // Optional: Fetch on blur if not already fetched/fetching
          input.addEventListener('blur', () => {
-             clearTimeout(pincodeTimeout);
+             clearTimeout(pincodeTimeout); // Clear any pending timeout
              const pincode = input.value.trim();
              const targetPrefix = input.dataset.targetPrefix;
              const statusElement = input.nextElementSibling;
 
              if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                 if (statusElement && statusElement.textContent !== 'Fetching...' && !statusElement.textContent.startsWith('✓')) {
+                 // Fetch only if status isn't already success or currently fetching
+                 if (statusElement && !statusElement.classList.contains('text-success') && statusElement.textContent !== 'Fetching...') {
                       statusElement.textContent = 'Looking up...';
                       statusElement.classList.remove('text-danger');
                       statusElement.classList.add('text-muted');
                       fetchPincodeData(pincode, targetPrefix);
-                 } else if (statusElement && statusElement.textContent === 'Fetching...') {
-                     // Do nothing, let fetch complete
-                 } else {
-                    // Already fetched or fetching, no need to re-fetch on blur
                  }
              } else if (pincode.length > 0) {
+                 // If left field with invalid pincode
                  clearAutoFilledFields(targetPrefix);
-                 if (statusElement) statusElement.textContent = 'Invalid Pincode';
-                 statusElement.classList.add('text-danger');
-                 statusElement.classList.remove('text-muted', 'text-success');
+                 if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode';
+                    statusElement.classList.add('text-danger');
+                    statusElement.classList.remove('text-muted', 'text-success');
+                 }
              } else {
+                  // If left field empty
                   clearAutoFilledFields(targetPrefix);
                   if (statusElement) statusElement.textContent = '';
              }
@@ -5816,12 +6037,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const initialPincode = input.value.trim();
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
             const targetPrefix = input.dataset.targetPrefix;
+            // Optionally add 'Looking up...' status immediately on load
+            const initialStatusElement = input.nextElementSibling;
+            if (initialStatusElement) {
+                initialStatusElement.textContent = 'Verifying...';
+                initialStatusElement.classList.add('text-muted');
+            }
             fetchPincodeData(initialPincode, targetPrefix);
         }
 
     }); // end pincodeInputs.forEach
 
     async function fetchPincodeData(pincode, prefix) {
+        // Get references to all related elements using the prefix
         const stateInput = document.getElementById(`${prefix}-state`);
         const districtInput = document.getElementById(`${prefix}-district`);
         const mandalInput = document.getElementById(`${prefix}-mandal`);
@@ -5829,14 +6057,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
         const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
         const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-        const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+        const pincodeInput = document.getElementById(`${prefix}-pincode`);
+        const pincodeStatusElement = pincodeInput?.nextElementSibling; // Status element is next sibling
 
+        // Ensure all required elements are found
         if (!stateInput || !districtInput || !mandalInput || !containerDiv || !pincodeStatusElement || !stateHiddenInput || !districtHiddenInput || !mandalHiddenInput) {
             console.error("Pincode target/hidden elements not found for prefix:", prefix);
+            if (pincodeStatusElement) pincodeStatusElement.textContent = 'Setup Error';
             return;
         }
 
-        // Only update status if it's not already showing success
+        // Set status to fetching if not already success
         if (!pincodeStatusElement.classList.contains('text-success')) {
             pincodeStatusElement.textContent = 'Fetching...';
             pincodeStatusElement.classList.remove('text-danger', 'text-success');
@@ -5848,26 +6079,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (!response.ok || !data.success) {
+                 // Throw error with message from server or default HTTP status text
                  throw new Error(data.message || `Pincode ${response.statusText}`);
              }
 
             const location = data.location;
+            // Update visible readonly fields
             stateInput.value = location.stateName || '';
             districtInput.value = location.districtName || '';
             mandalInput.value = location.mandalName || '';
-
+            // Update hidden fields for form submission
             stateHiddenInput.value = location.stateName || '';
             districtHiddenInput.value = location.districtName || '';
             mandalHiddenInput.value = location.mandalName || '';
 
-            containerDiv.style.display = 'block';
+            containerDiv.style.display = 'block'; // Show the container with derived fields
             pincodeStatusElement.textContent = `✓ Location found (${location.postOfficeName || 'Area'})`;
             pincodeStatusElement.classList.remove('text-danger', 'text-muted');
             pincodeStatusElement.classList.add('text-success');
 
         } catch (error) {
              console.error('Pincode lookup error:', error);
-             clearAutoFilledFields(prefix);
+             clearAutoFilledFields(prefix); // Clear fields on error
              pincodeStatusElement.textContent = `Error: ${error.message}`;
              pincodeStatusElement.classList.remove('text-success', 'text-muted');
              pincodeStatusElement.classList.add('text-danger');
@@ -5882,7 +6115,7 @@ document.addEventListener('DOMContentLoaded', () => {
          const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
          const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
          const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-         const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+        // Don't clear the pincode status here, let the input/blur handler manage it
 
          if (stateInput) stateInput.value = '';
          if (districtInput) districtInput.value = '';
@@ -5890,12 +6123,7 @@ document.addEventListener('DOMContentLoaded', () => {
          if (stateHiddenInput) stateHiddenInput.value = '';
          if (districtHiddenInput) districtHiddenInput.value = '';
          if (mandalHiddenInput) mandalHiddenInput.value = '';
-         if (containerDiv) containerDiv.style.display = 'none';
-         if (pincodeStatusElement) {
-             pincodeStatusElement.textContent = '';
-             pincodeStatusElement.classList.remove('text-danger', 'text-success');
-             pincodeStatusElement.classList.add('text-muted');
-         }
+         if (containerDiv) containerDiv.style.display = 'none'; // Hide the container
      }
     // ========================================
     // End Pincode Lookup Logic
@@ -5903,7 +6131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Live Order Filtering Logic (Admin & Seller) - NEWLY ADDED
+    // Live Order Filtering Logic (Admin & Seller)
     // ========================================
     const orderFilterInput = document.getElementById('order-filter-input');
     // Determine which table and "no results" row to target based on page context
@@ -5952,6 +6180,61 @@ document.addEventListener('DOMContentLoaded', () => {
     // End Live Order Filtering Logic
     // ========================================
 
+    // ========================================
+    // **** Product Image Slider Logic ****
+    // ========================================
+    const imageSlider = document.querySelector('[data-product-image-slider]');
+    if (imageSlider) {
+        const slides = imageSlider.querySelectorAll('[data-product-slide]');
+        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
+        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
+        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
+        let currentImageIndex = 0;
+
+        function showProductImage(index) {
+            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
+
+            // Calculate the new index correctly handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            // Update active classes for slides and dots
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === newIndex);
+            });
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === newIndex);
+            });
+
+            currentImageIndex = newIndex;
+        }
+
+        // Add event listeners if buttons/dots exist
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const index = parseInt(dot.dataset.productImageDot, 10);
+                if (!isNaN(index)) {
+                    showProductImage(index);
+                }
+            });
+        });
+
+        // Initialize the slider to the first image
+        if (slides.length > 0) {
+             showProductImage(0);
+        }
+    }
+    // ========================================
+    // **** End Product Image Slider Logic ****
+    // ========================================
+
+
 }); // End DOMContentLoaded
 
 
@@ -5959,7 +6242,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Update'; // Or use buttonElement.dataset.originalText if set
+     const originalButtonText = 'Update';
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -6069,6 +6352,7 @@ function showToast(message, type = 'info') {
     toastElement.setAttribute('aria-live', 'assertive');
     toastElement.setAttribute('aria-atomic', 'true');
 
+    // Basic sanitization
     const sanitizedMessage = typeof message === 'string'
         ? message.replace(/</g, "<").replace(/>/g, ">")
         : 'An unexpected error occurred.';
@@ -6093,7 +6377,7 @@ function showToast(message, type = 'info') {
         toastElement.classList.add('hide');
         toastElement.addEventListener('transitionend', (event) => {
             if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
-                toastElement.remove();
+                try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
             }
         }, { once: true });
     };
@@ -6162,13 +6446,24 @@ function handleEmptyCartDisplay() {
          if (visibleItems.length === 0) {
              // Only update if the empty message isn't already there
              if (!cartContainer.querySelector('.alert-info')) {
-                 cartContainer.innerHTML = `
+                 // Clear existing items and summary before adding the message
+                 cartItemsContainer.innerHTML = '';
+                 if(cartSummary) cartSummary.remove();
+
+                 const emptyCartHTML = `
                     <h1>Your Shopping Cart</h1>
                     <p class="alert alert-info mt-3">
                         Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
                     </p>`;
+                  // Insert the message after the h1
+                  const h1 = cartContainer.querySelector('h1');
+                  if (h1) {
+                      h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
+                  } else {
+                      // Fallback if h1 not found (shouldn't happen usually)
+                      cartContainer.innerHTML = emptyCartHTML;
+                  }
              }
-             if(cartSummary) cartSummary.remove(); // Remove summary if it exists
          }
      }
 }
@@ -6426,7 +6721,9 @@ if (!API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null;
+// --- UPDATED: Use a vision-capable model like gemini-1.5-flash ---
+const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
+// --- END UPDATED ---
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -6455,17 +6752,24 @@ async function urlToGenerativePart(url) {
         }
 
         const contentType = response.headers['content-type'];
-        if (!contentType || !['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
-            console.warn(`Invalid or unsupported image Content-Type: ${contentType} from URL: ${url}`);
-            throw new Error(`Unsupported image type: ${contentType}`);
+        // Relaxed content type check to allow more flexibility, but keep warning
+        if (!contentType || !contentType.toLowerCase().startsWith('image/')) {
+             console.warn(`Potentially unsupported image Content-Type: ${contentType} from URL: ${url}. Proceeding but Gemini might reject.`);
+             // Allow common image types even if not strictly in the list
+             if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
+                 console.warn(`Content-Type ${contentType} is less common for Gemini Vision.`);
+             }
+        } else if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
+             console.warn(`Content-Type ${contentType} is less common for Gemini Vision.`);
         }
+
 
         const base64Data = Buffer.from(response.data).toString('base64');
 
         return {
             inlineData: {
                 data: base64Data,
-                mimeType: contentType,
+                mimeType: contentType || 'application/octet-stream', // Provide a default if missing
             },
         };
     } catch (error) {
@@ -6479,10 +6783,11 @@ async function urlToGenerativePart(url) {
                  throw new Error(`Failed to fetch image: Request setup error (${error.message})`);
              }
          } else {
-             throw error;
+             throw error; // Re-throw other errors
          }
     }
 }
+
 
 const reviewProductWithGemini = async (product) => {
     if (!visionModel) {
@@ -6490,31 +6795,50 @@ const reviewProductWithGemini = async (product) => {
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
 
-    // *** ADD shortDescription to destructuring ***
-    const { name, category, price, specifications, imageUrl, shortDescription } = product;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, specifications, imageUrl, imageUrl2, shortDescription } = product;
+    // --- END UPDATED ---
 
     let imagePart;
+    let imagePart2 = null; // Initialize second image part as null
+
     try {
+        // Process first image (required)
         imagePart = await urlToGenerativePart(imageUrl);
-        if (!imagePart) {
-            throw new Error("Image processing failed unexpectedly.");
+        if (!imagePart) throw new Error("Primary image processing failed.");
+        console.log(`Successfully prepared primary image part for ${name} from ${imageUrl}`);
+
+        // --- UPDATED: Process second image (optional) ---
+        if (imageUrl2) {
+            try {
+                imagePart2 = await urlToGenerativePart(imageUrl2);
+                if (!imagePart2) throw new Error("Second image processing failed unexpectedly.");
+                 console.log(`Successfully prepared second image part for ${name} from ${imageUrl2}`);
+            } catch (image2Error) {
+                console.warn(`Could not process second image for "${name}" (${imageUrl2}): ${image2Error.message}. Proceeding with primary image only.`);
+                // Note: We are choosing *not* to reject if only the second image fails.
+                // If the second image MUST be valid, you could reject here:
+                // return { status: 'rejected', reason: `Second Image Error: ${image2Error.message}` };
+            }
         }
-         console.log(`Successfully prepared image part for ${name} from ${imageUrl}`);
+        // --- END UPDATED ---
+
     } catch (imageError) {
-        console.error(`Cannot review product "${name}" due to image processing error: ${imageError.message}`);
+        console.error(`Cannot review product "${name}" due to critical image processing error: ${imageError.message}`);
+        // Reject if the primary image fails
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
 
 
-    // --- 2. Construct Text Prompt Part ---
+    // --- UPDATED: Construct Text Prompt Part (Mention potential second image) ---
     const textPrompt = `
-        Analyze the following product details AND the provided image for an e-commerce store. Act as a strict content moderator.
+        Analyze the following product details AND the provided image(s) for an e-commerce store. Act as a strict content moderator.
 
         **Instructions:**
-        1. Examine the IMAGE CONTENT closely.
+        1. Examine the IMAGE CONTENT closely (check BOTH images if a second one is provided).
         2. Examine the TEXT DETAILS (Name, Category, Short Description, Price, Specifications).
-        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category, short description). Is it clearly the item described?
-        4. Check BOTH image and text for:
+        3. Verify if the image(s) VISUALLY MATCH the product described by the text (name, category, short description). Are they clearly the item described?
+        4. Check BOTH image(s) and text for:
             - Explicit content (nudity, graphic violence).
             - Depictions of weapons (unless clearly a toy and stated category is 'Toys').
             - Illegal items or substances.
@@ -6530,38 +6854,49 @@ const reviewProductWithGemini = async (product) => {
         **Product Details (Text):**
         - Name: ${name}
         - Category: ${category}
-        - Short Description: ${shortDescription || 'Not provided'}  <%# *** ADDED LINE *** %>
+        - Short Description: ${shortDescription || 'Not provided'}
         - Price: ₹${price?.toFixed(2) || 'N/A'}
         - Specifications: ${specifications || 'Not provided'}
-        - Provided Image URL: ${imageUrl}
+        - Primary Image URL: ${imageUrl}
+        - Second Image URL: ${imageUrl2 || 'Not provided'} <%# Mention second URL %>
 
-        **Analysis Task:** Based on BOTH the text analysis AND image content analysis:
-        - Respond with "APPROVE" if the product (image and text) seems legitimate, safe, accurately described, and the image clearly matches the text description.
+        **Analysis Task:** Based on BOTH the text analysis AND image content analysis (considering both images if provided):
+        - Respond with "APPROVE" if the product (image(s) and text) seems legitimate, safe, accurately described, and the image(s) clearly match the text description.
         - Respond with "REJECT: [BRIEF REASON]" if ANY issues are found (safety violation in image/text, image mismatch, misleading text, nonsensical entry, absurd price, etc.). Example Reasons: "Image contains prohibited items", "Text contains inappropriate language", "Image does not match product description", "Price is nonsensical".
 
         Your response:`;
+    // --- END UPDATED ---
 
     const textPart = { text: textPrompt };
 
-    // --- 3. Call Gemini API ---
+    // --- UPDATED: Prepare content parts array (include imagePart2 if it exists) ---
+    const contentParts = [textPart, imagePart];
+    if (imagePart2) {
+        contentParts.push(imagePart2);
+    }
+    // --- END UPDATED ---
+
+    // --- Call Gemini API ---
     try {
-        console.log(`Sending product "${name}" (with image) for Gemini Vision review...`);
+        console.log(`Sending product "${name}" (${imagePart2 ? '2 images' : '1 image'}) for Gemini Vision review...`);
         const result = await visionModel.generateContent(
-            [textPart, imagePart], // Send both text and image parts
+            contentParts, // Use the dynamic array
             { safetySettings } // Apply safety settings
         );
         const response = result?.response;
 
+        // Check for safety blocks first
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            const safetyRatings = response?.promptFeedback?.safetyRatings || [];
            console.warn(`Gemini review for "${name}" blocked. Reason: ${blockReason}. Ratings: ${JSON.stringify(safetyRatings)}`);
            return { status: 'rejected', reason: `Content blocked by AI safety filters (${blockReason}).` };
-       }
+        }
 
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Review Raw Response for "${name}": ${reviewText}`);
 
+        // Process the response text
         if (reviewText.startsWith('APPROVE')) {
             console.log(`Gemini Vision approved product: ${name}`);
             return { status: 'approved', reason: null };
@@ -6570,18 +6905,24 @@ const reviewProductWithGemini = async (product) => {
             console.log(`Gemini Vision rejected product: ${name}. Reason: ${reason}`);
             return { status: 'rejected', reason: reason };
         } else {
+            // Handle cases where the model might not return exactly APPROVE or REJECT
             console.warn(`Unexpected Gemini Vision response format for "${name}": ${reviewText}. Defaulting to pending.`);
+            // You might want to log the full response here for debugging: console.log(JSON.stringify(response));
             return { status: 'pending', reason: 'AI review result unclear.' };
         }
 
     } catch (error) {
+        // Handle API call errors
         console.error(`Error during Gemini Vision API call for product "${name}":`, error);
         let reason = 'AI review failed due to an API error.';
-        if (error.message && error.message.includes('SAFETY')) {
-            reason = 'Content blocked by AI safety filters during API call.';
+        // Check if the error message indicates a safety issue (this might vary depending on the SDK version)
+        if (error.message && (error.message.includes('SAFETY') || error.message.includes('blocked'))) {
+            reason = 'Content potentially blocked by safety filters during API call.';
         } else if (error.message) {
-            reason = `AI API Error: ${error.message.substring(0, 100)}...`;
+            // Provide a snippet of the error message for context
+            reason = `AI API Error: ${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''}`;
         }
+        // It's often safer to reject if the AI review fails catastrophically
         return { status: 'rejected', reason: reason };
     }
 };
@@ -6688,7 +7029,6 @@ views/admin/edit-product.ejs:
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -6700,7 +7040,6 @@ views/admin/edit-product.ejs:
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
@@ -6710,12 +7049,27 @@ views/admin/edit-product.ejs:
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
         <div class="form-group">
-            <label for="imageUrl">Image URL:</label>
+            <label for="imageUrl">Image URL (Primary):</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
         </div>
+        <!-- --- UPDATED: Add Second Image URL Input --- -->
+        <div class="form-group">
+            <label for="imageUrl2">Second Image URL (Optional):</label>
+            <input type="url"
+                   id="imageUrl2"
+                   name="imageUrl2"
+                   class="form-control"
+                   placeholder="https://example.com/image_alt.jpg"
+                   value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+             <%# Preview for edit forms %>
+             <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
+                <img src="<%= product.imageUrl2 %>" alt="Current Second Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
+             <% } %>
+        </div>
+        <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications:</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
@@ -6752,7 +7106,9 @@ views/admin/edit-product.ejs:
         }
     }
     document.addEventListener('DOMContentLoaded', () => {
-        toggleRejectionReason(document.getElementById('reviewStatus').value);
+        // Ensure the rejection reason field visibility is set correctly on page load
+        const initialStatus = document.getElementById('reviewStatus').value;
+        toggleRejectionReason(initialStatus);
     });
 </script>
 
@@ -7085,7 +7441,6 @@ views/admin/upload-product.ejs:
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -7097,7 +7452,6 @@ views/admin/upload-product.ejs:
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -7107,9 +7461,20 @@ views/admin/upload-product.ejs:
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
-            <label for="imageUrl">Image URL:</label>
+            <label for="imageUrl">Image URL (Primary):</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
+        <!-- --- UPDATED: Add Second Image URL Input --- -->
+        <div class="form-group">
+            <label for="imageUrl2">Second Image URL (Optional):</label>
+            <input type="url"
+                   id="imageUrl2"
+                   name="imageUrl2"
+                   class="form-control"
+                   placeholder="https://example.com/image_alt.jpg"
+                   value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+        </div>
+        <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
@@ -7417,23 +7782,18 @@ views/partials/messages.ejs:
 
 views/products/detail.ejs:
 <%# views/products/detail.ejs %>
-
-<%# --- Meta Description Preparation (Same as before) --- %>
-<% let metaDesc = product.shortDescription || `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`; %> <%# Use short desc if available %>
-<% if (metaDesc.length > 160) { metaDesc = metaDesc.substring(0, 157) + '...'; } %>
-
 <%- include('../partials/header', {
     title: product.name,
     metaTitle: product.name + ' - ' + defaultSiteName,
-    metaDescription: metaDesc,
-    metaImageUrl: product.imageUrl,
+    metaDescription: (product.shortDescription || `Check out ${product.name} on miniapp. Available now for ₹${product.price.toFixed(2)}.`).substring(0, 157) + '...',
+    metaImageUrl: product.imageUrl, // Use primary image for meta tags
     metaUrl: fullUrl,
     metaType: 'product'
 }) %>
 
 <div class="product-detail-container">
 
-   <%# --- Status Banner --- %>
+   <%# --- Status Banner (No changes needed) --- %>
    <% if (!isApproved && (isAdminView || isOwnerView)) { %>
      <div class="alert alert-<%= product.reviewStatus === 'rejected' ? 'danger' : 'warning' %> mb-3" role="alert">
        <strong>Status:</strong> <span class="text-capitalize fw-bold"><%= product.reviewStatus %></span>
@@ -7450,24 +7810,48 @@ views/products/detail.ejs:
      </div>
    <% } else if (!isApproved && !isAdminView && !isOwnerView) { %>
       <div class="alert alert-danger">This product is currently unavailable.</div>
-      </div>
+      </div> <%# Close container early if unavailable %>
       <%- include('../partials/footer') %>
       <% return; %>
    <% } %>
 
    <div class="product-detail-main">
-        <div class="product-detail-image">
-           <img src="<%= product.imageUrl %>" alt="<%= product.name %>">
+        <%# --- UPDATED: Image Display Logic --- %>
+        <div class="product-detail-image-section"> <%# Wrapper section %>
+            <% if (product.imageUrl2) { %>
+                <%# Slider structure if two images exist %>
+                <div class="product-image-slider-container" data-product-image-slider>
+                    <div class="product-image-slides">
+                        <div class="product-image-slide active" data-product-slide>
+                            <img src="<%= product.imageUrl %>" alt="<%= product.name %> - Image 1" class="product-detail-image">
+                        </div>
+                        <div class="product-image-slide" data-product-slide>
+                             <img src="<%= product.imageUrl2 %>" alt="<%= product.name %> - Image 2" class="product-detail-image">
+                        </div>
+                    </div>
+                    <%# Navigation Arrows only if there are slides to navigate %>
+                    <button class="product-image-nav product-image-prev" data-product-image-nav="prev" aria-label="Previous Image">‹</button>
+                    <button class="product-image-nav product-image-next" data-product-image-nav="next" aria-label="Next Image">›</button>
+                    <%# Navigation Dots only if there are slides to navigate %>
+                     <div class="product-image-dots">
+                         <button class="product-image-dot active" data-product-image-dot="0" aria-label="Go to image 1"></button>
+                         <button class="product-image-dot" data-product-image-dot="1" aria-label="Go to image 2"></button>
+                     </div>
+                </div>
+            <% } else { %>
+                <%# Original single image display if only one image %>
+                <div class="product-detail-image-single"> <%# Optional wrapper %>
+                    <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-detail-image">
+                </div>
+            <% } %>
         </div>
+        <%# --- END UPDATED --- %>
+
        <div class="product-detail-info">
             <h1><%= product.name %></h1>
-
-            <!-- *** ADDED SHORT DESCRIPTION DISPLAY *** -->
             <% if (product.shortDescription) { %>
               <p class="product-short-description text-muted mb-2"><%= product.shortDescription %></p>
             <% } %>
-            <!-- *** END *** -->
-
             <p class="detail-price">₹<%= product.price.toFixed(2) %></p>
             <p class="detail-stock">
                 <% if (product.stock > 0) { %>
@@ -7477,8 +7861,8 @@ views/products/detail.ejs:
                 <% } %>
             </p>
 
-            <%# === MOVED SHARE BUTTON HERE === %>
-            <div class="share-section mt-2"> <%# Adjusted margin %>
+            <%# Share Button %>
+            <div class="share-section mt-2">
                  <button id="share-product-btn" class="btn btn-outline-secondary btn-sm"
                          data-title="<%= product.name %>"
                          data-text="Check out this product: <%= product.name %>"
@@ -7494,8 +7878,8 @@ views/products/detail.ejs:
                  </div>
              </div>
 
-            <%# --- RATING DISPLAY BLOCK (Moved below Purchase Actions) --- %>
-            <div class="mb-3 mt-2"> <%# Adjusted margin %>
+            <%# Rating Display %>
+            <div class="mb-3 mt-2">
                  <% if (product.numReviews > 0) { %>
                      <p class="detail-rating">
                          Rating:
@@ -7507,14 +7891,14 @@ views/products/detail.ejs:
                  <% } %>
              </div>
 
-           <%# --- Conditional Purchase Actions --- %>
+           <%# Conditional Purchase Actions %>
            <% if (isApproved) { %>
                <div class="product-actions">
                    <form action="/user/cart/add" method="POST" style="display: inline-block; margin-right: 10px;" class="form-submit-spinner">
                       <input type="hidden" name="productId" value="<%= product._id %>">
                        <div class="quantity-selector mb-2 d-inline-flex align-items-center">
-                           <label for="quantity" class="me-1 mb-0 text-muted">Quantity </label>
-                           <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 70px;">
+                           <label for="quantity" class="me-1 mb-0 text-muted small">Qty:</label> <%# Made smaller %>
+                           <input type="number" id="quantity" name="quantity" value="1" min="1" max="<%= product.stock %>" required aria-label="Quantity" class="form-control form-control-sm" style="width: 65px;"> <%# Adjusted width %>
                        </div>
                        <button type="submit" class="btn btn-primary btn-sm" <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
@@ -7523,7 +7907,7 @@ views/products/detail.ejs:
                     <% if (product.stock > 0) { %>
                     <form action="/user/cart/add?redirectTo=checkout" method="POST" style="display: inline-block;" class="form-submit-spinner">
                           <input type="hidden" name="productId" value="<%= product._id %>">
-                          <input type="hidden" name="quantity" value="1">
+                          <input type="hidden" name="quantity" value="1"> <%# Default Buy Now to 1 %>
                          <button type="submit" class="btn btn-success btn-sm">Buy Now</button>
                        </form>
                     <% } else {%>
@@ -7544,14 +7928,12 @@ views/products/detail.ejs:
                  <pre class="border p-2 bg-light small"><%= product.specifications || 'No specifications provided.' %></pre>
             </div>
 
-            <%# === MOVED SELLER INFO HERE === %>
+            <%# Seller Info %>
             <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
-            <%# === END MOVED SELLER INFO === %>
-
        </div> <%# End product-detail-info %>
     </div> <%# End product-detail-main %>
 
-   <%# --- Conditional Rating Section --- %>
+   <%# Conditional Rating Section %>
    <div class="product-rating-section mt-4 border-top pt-3">
         <h3>Rate This Product</h3>
         <% if (isApproved) { %>
@@ -7570,7 +7952,7 @@ views/products/detail.ejs:
          <% } %>
    </div>
 
-    <%# --- Rating Stats Display --- %>
+    <%# Rating Stats Display %>
     <div class="rating-stats-container mt-4 border-top pt-3">
         <h3>Ratings & Reviews Summary</h3>
          <% if (totalRatings > 0) { %>
@@ -7601,19 +7983,71 @@ views/products/detail.ejs:
          <% } %>
     </div>
 
-</div>
+</div> <%# End product-detail-container %>
+
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
-        var width = el.getAttribute('data-width');
-        if (width) {
-            setTimeout(() => {
-                 el.style.width = width + '%';
-            }, 100);
+    // --- UPDATED: Product Image Slider JS ---
+    const imageSlider = document.querySelector('[data-product-image-slider]');
+    if (imageSlider) {
+        const slides = imageSlider.querySelectorAll('[data-product-slide]');
+        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
+        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
+        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
+        let currentImageIndex = 0;
+
+        function showProductImage(index) {
+            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
+
+            // Calculate the new index correctly handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            // Update active classes for slides and dots
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === newIndex);
+            });
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === newIndex);
+            });
+
+            currentImageIndex = newIndex;
         }
+
+        // Add event listeners if buttons/dots exist
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const index = parseInt(dot.dataset.productImageDot, 10);
+                if (!isNaN(index)) {
+                    showProductImage(index);
+                }
+            });
+        });
+
+        // Initialize the slider to the first image
+        if (slides.length > 0) {
+             showProductImage(0);
+        }
+    }
+    // --- END UPDATED ---
+
+    // Keep existing rating bar animation script
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
+            var width = el.getAttribute('data-width');
+            if (width) {
+                setTimeout(() => {
+                     el.style.width = width + '%';
+                }, 100); // Slight delay for effect
+            }
+        });
     });
-});
 </script>
 
 <%- include('../partials/footer') %>
@@ -7815,7 +8249,6 @@ views/seller/edit-product.ejs:
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -7827,7 +8260,6 @@ views/seller/edit-product.ejs:
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
          <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
@@ -7837,12 +8269,27 @@ views/seller/edit-product.ejs:
              <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
          <div class="form-group">
-             <label for="imageUrl">Image URL:</label>
+             <label for="imageUrl">Image URL (Primary):</label>
              <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
              <% if(product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border: 1px solid #ddd; padding: 2px;">
              <% } %>
          </div>
+         <!-- --- UPDATED: Add Second Image URL Input --- -->
+         <div class="form-group">
+             <label for="imageUrl2">Second Image URL (Optional):</label>
+             <input type="url"
+                    id="imageUrl2"
+                    name="imageUrl2"
+                    class="form-control"
+                    placeholder="https://example.com/image_alt.jpg"
+                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+              <%# Preview for edit forms %>
+              <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
+                 <img src="<%= product.imageUrl2 %>" alt="Current Second Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
+              <% } %>
+         </div>
+         <!-- --- END UPDATED --- -->
          <div class="form-group">
              <label for="specifications">Specifications (Optional):</label>
              <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
@@ -8078,7 +8525,6 @@ views/seller/upload-product.ejs:
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -8090,7 +8536,6 @@ views/seller/upload-product.ejs:
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -8100,9 +8545,20 @@ views/seller/upload-product.ejs:
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
-            <label for="imageUrl">Image URL:</label>
+            <label for="imageUrl">Image URL (Primary):</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
+        <!-- --- UPDATED: Add Second Image URL Input --- -->
+        <div class="form-group">
+            <label for="imageUrl2">Second Image URL (Optional):</label>
+            <input type="url"
+                   id="imageUrl2"
+                   name="imageUrl2"
+                   class="form-control"
+                   placeholder="https://example.com/image_alt.jpg"
+                   value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+        </div>
+        <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>

@@ -37,12 +37,15 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Product Management Actions ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
+     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
-        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
         // *** Pass categories back on error ***
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
@@ -56,6 +59,7 @@ exports.uploadProduct = async (req, res, next) => {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const newProduct = new Product({
@@ -65,6 +69,9 @@ exports.uploadProduct = async (req, res, next) => {
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
+            // --- UPDATED: Assign imageUrl2 ---
+            imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
+            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: sellerId,
             sellerEmail: sellerEmail,
@@ -155,10 +162,13 @@ exports.getEditProductPage = async (req, res, next) => {
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const renderOptions = { title: `Edit Product Error`, product: { _id: productId, ...req.body }, categories: categories }; // For re-rendering on error
 
 
+     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
@@ -175,6 +185,7 @@ exports.updateProduct = async (req, res, next) => {
          try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
         return res.render('seller/edit-product', renderOptions);
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const product = await Product.findOne({ _id: productId, sellerId: sellerId }); // Fetch non-lean
@@ -190,6 +201,9 @@ exports.updateProduct = async (req, res, next) => {
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
+         // --- UPDATED: Update imageUrl2 ---
+         product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
+         // --- END UPDATED ---
          product.specifications = specifications ? specifications.trim() : '';
          product.reviewStatus = 'pending'; // Reset status on update
          product.rejectionReason = undefined;
@@ -274,7 +288,7 @@ exports.getManageOrdersPage = async (req, res, next) => {
 
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price sellerId')
+                                   .populate('products.productId', 'name imageUrl _id price sellerId') // Ensure imageUrl is populated
                                    .populate('userId', 'name email')
                                    .lean();
 

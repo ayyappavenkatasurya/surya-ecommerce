@@ -13,7 +13,6 @@
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -25,7 +24,6 @@
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
@@ -35,9 +33,20 @@
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
         </div>
         <div class="form-group">
-            <label for="imageUrl">Image URL:</label>
+            <label for="imageUrl">Image URL (Primary):</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
+        <!-- --- UPDATED: Add Second Image URL Input --- -->
+        <div class="form-group">
+            <label for="imageUrl2">Second Image URL (Optional):</label>
+            <input type="url"
+                   id="imageUrl2"
+                   name="imageUrl2"
+                   class="form-control"
+                   placeholder="https://example.com/image_alt.jpg"
+                   value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+        </div>
+        <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>

@@ -39,13 +39,15 @@ exports.getUploadProductPage = (req, res) => {
 
 // --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    const { name, category, price, stock, imageUrl, specifications, shortDescription } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
+    // --- END UPDATED ---
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
     // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
-        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Image URL).');
+        req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
         // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
@@ -59,6 +61,7 @@ exports.uploadProduct = async (req, res, next) => {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
+    // Optional: Add validation for imageUrl2 if needed (e.g., check URL format if provided)
 
     try {
         const newProduct = new Product({
@@ -68,6 +71,9 @@ exports.uploadProduct = async (req, res, next) => {
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
+            // --- UPDATED: Assign imageUrl2 ---
+            imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
+            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: adminUserId,
             sellerEmail: adminUserEmail,
@@ -110,7 +116,7 @@ exports.uploadProduct = async (req, res, next) => {
     }
 };
 
-// --- Manage Products (Admin sees ALL - keep existing) ---
+// --- Manage Products (Admin sees ALL) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({})
@@ -155,7 +161,9 @@ exports.getEditProductPage = async (req, res, next) => {
 // --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    const { name, category, price, stock, imageUrl, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
+    // --- END UPDATED ---
     const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
 
     // Validation
@@ -181,6 +189,7 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
         return res.render('admin/edit-product', renderOptions);
     }
+    // Optional: Validate imageUrl2 format if present
 
     try {
         const product = await Product.findById(productId); // Fetch non-lean for saving
@@ -195,6 +204,9 @@ exports.updateProduct = async (req, res, next) => {
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
+        // --- UPDATED: Update imageUrl2 ---
+        product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
+        // --- END UPDATED ---
         product.specifications = specifications ? specifications.trim() : '';
 
         if (reviewStatus && allowedStatus.includes(reviewStatus)) {
@@ -210,7 +222,6 @@ exports.updateProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
             let errors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-            // Fetch original product data again for rendering the edit page correctly on validation error
              try {
                  const originalProduct = await Product.findById(productId).lean();
                  renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data

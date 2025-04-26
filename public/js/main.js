@@ -229,6 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        // Initialize form state on page load
         if (!hasInitialAddress && checkoutAddressForm) {
             checkoutAddressForm.classList.remove('hidden');
             if (placeOrderBtn) placeOrderBtn.disabled = true;
@@ -239,7 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (placeOrderBtn) placeOrderBtn.disabled = false;
             if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         }
-    }
+    } // End if(checkoutPage)
 
 
     // --- Cart Update AJAX Logic ---
@@ -346,10 +347,11 @@ document.addEventListener('DOMContentLoaded', () => {
                  const item = document.createElement('a');
                  item.classList.add('suggestion-item');
                  item.href = `/products/${product._id}`;
+                 // Basic sanitization for display
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
-                    <img src="${safeImageUrl}" alt="${safeName}" loading="lazy">
+                    <img src="${safeImageUrl}" alt="" loading="lazy"> <%# Alt left blank for brevity %>
                     <span>${safeName}</span>
                  `;
                  suggestionsDropdown.appendChild(item);
@@ -361,6 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
+     // Global click listener to close search/suggestions
      document.addEventListener('click', (e) => {
          if (searchContainer && suggestionsDropdown && searchToggleBtn && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
              searchContainer.classList.remove('active');
@@ -368,14 +371,17 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      });
 
+     // Handle clicks within the suggestions dropdown
      if(suggestionsDropdown) {
          suggestionsDropdown.addEventListener('click', (e) => {
-             const link = e.target.closest('a');
+             const link = e.target.closest('a.suggestion-item');
              if (!link) {
+                 // Prevent closing if clicking inside the dropdown but not on a link
                  e.stopPropagation();
              } else {
+                 // Allow link navigation and close dropdown/search
                  suggestionsDropdown.classList.remove('active');
-                 if (searchContainer && window.innerWidth < 768) {
+                 if (searchContainer && window.innerWidth < 768) { // Only hide container on mobile
                     searchContainer.classList.remove('active');
                  }
              }
@@ -404,24 +410,29 @@ document.addEventListener('DOMContentLoaded', () => {
                 toastElement.classList.remove('show');
                 toastElement.classList.add('hide');
                 toastElement.addEventListener('transitionend', (event) => {
+                    // Ensure removal only happens once and the element still exists
                     if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
-                        toastElement.remove();
+                         try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
                     }
                 }, { once: true });
             };
 
+            // Show toast initially
             setTimeout(() => {
-                if (toastElement.parentNode) {
+                if (toastElement.parentNode) { // Check if still in DOM before showing
                    toastElement.classList.add('show');
                 }
-            }, 0);
+            }, 10); // Small delay to allow transition
 
+             // Auto hide
              hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
 
+            // Manual close
             if (closeButton) {
                 closeButton.addEventListener('click', dismissToast);
             }
 
+             // Pause on hover
              toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
              toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 
@@ -435,8 +446,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
+            // Use requestAnimationFrame for smoother rendering
             requestAnimationFrame(() => {
-                 if(el.parentNode) {
+                 if(el.parentNode) { // Check if element is still in the DOM
                     el.style.width = width + '%';
                  }
             });
@@ -444,7 +456,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ========================================
-    // Loading State for Non-Form Actions
+    // Loading State for Non-Form Actions (e.g., Proceed to Checkout)
     // ========================================
     const proceedCheckoutBtn = document.getElementById('btn-proceed-checkout');
     if (proceedCheckoutBtn) {
@@ -452,19 +464,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingCheckoutText = proceedCheckoutBtn.dataset.loadingText || '<i class="fas fa-spinner fa-spin"></i> Loading...';
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
+            // Check if already loading to prevent multiple clicks
             if (proceedCheckoutBtn.classList.contains('loading')) {
-                event.preventDefault(); // Prevent navigation if already loading
+                event.preventDefault();
                 return;
             }
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
-            proceedCheckoutBtn.style.pointerEvents = 'none';
+            proceedCheckoutBtn.style.pointerEvents = 'none'; // Disable further clicks via pointer
             proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
-            // Navigation will happen normally if not prevented earlier
+            // Allow the default link navigation to proceed
         });
 
+        // Handle browser back button scenario
         window.addEventListener('pageshow', function(pageEvent) {
             if (pageEvent.persisted && proceedCheckoutBtn.classList.contains('loading')) {
+                // Reset button if the page was loaded from cache and button was loading
                 proceedCheckoutBtn.classList.remove('loading');
                 proceedCheckoutBtn.innerHTML = originalCheckoutText;
                 proceedCheckoutBtn.style.pointerEvents = 'auto';
@@ -489,37 +504,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let currentSlideIndex = 0;
         let autoSlideInterval = null;
-        const slideIntervalTime = 5000;
+        const slideIntervalTime = 5000; // 5 seconds
 
         function showSlide(index) {
             if (!slides || slides.length === 0) return;
-            const newIndex = (index + slides.length) % slides.length;
-            slides.forEach((slide, i) => { slide.classList.remove('active'); });
-            dots.forEach(dot => { dot.classList.remove('active'); });
-            slides[newIndex].classList.add('active');
-            if (dots[newIndex]) { dots[newIndex].classList.add('active'); }
+            // Correctly calculate index, handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
+            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
             currentSlideIndex = newIndex;
         }
+
         function nextSlide() { showSlide(currentSlideIndex + 1); }
         function prevSlide() { showSlide(currentSlideIndex - 1); }
+
         function startAutoSlide() {
-            clearInterval(autoSlideInterval);
-            if (slides.length > 1) { autoSlideInterval = setInterval(nextSlide, slideIntervalTime); }
+            clearInterval(autoSlideInterval); // Clear existing interval
+            if (slides.length > 1) { // Only auto-slide if there's more than one slide
+                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
+            }
         }
-        if (slides.length > 0) { showSlide(0); startAutoSlide(); }
-        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
-        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
+
+        // Initialize first slide and start auto-slide
+        if (slides.length > 0) {
+            showSlide(0);
+            startAutoSlide();
+        }
+
+        // Event Listeners for Nav Buttons
+        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
+        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
+
+        // Event Listener for Dots
         if (dotsContainer) {
             dotsContainer.addEventListener('click', (e) => {
                 const targetDot = e.target.closest('[data-slide-to]');
                 if (targetDot) {
                     const index = parseInt(targetDot.dataset.slideTo, 10);
-                    if (!isNaN(index)) { showSlide(index); startAutoSlide(); }
+                    if (!isNaN(index)) {
+                        showSlide(index);
+                        startAutoSlide(); // Restart timer on dot click
+                    }
                 }
             });
         }
+
+        // Pause on hover
         sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
-        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
+        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); }); // Resume on mouse leave
     }
     // ========================================
     // End Homepage Banner Slider Logic
@@ -536,54 +569,73 @@ document.addEventListener('DOMContentLoaded', () => {
             clearTimeout(pincodeTimeout);
             const pincode = input.value.trim();
             const targetPrefix = input.dataset.targetPrefix;
-            const statusElement = input.nextElementSibling;
+            const statusElement = input.nextElementSibling; // Assumes status is the next sibling
 
+            // Basic validation and clearing
             if (pincode.length < 6) {
-                 clearAutoFilledFields(targetPrefix);
-                 if (statusElement) statusElement.textContent = '';
-                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
-                     if (statusElement) statusElement.textContent = 'Digits only';
-                     statusElement?.classList.add('text-danger');
-                     statusElement?.classList.remove('text-muted');
-                 } else if (statusElement) {
-                     statusElement?.classList.remove('text-danger');
-                     statusElement?.classList.add('text-muted');
+                 clearAutoFilledFields(targetPrefix); // Clear derived fields
+                 if (statusElement) {
+                    statusElement.textContent = ''; // Clear status message
+                    statusElement.classList.remove('text-danger', 'text-success');
+                    statusElement.classList.add('text-muted');
                  }
+                 // Show digit-only error immediately if non-digits are entered
+                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
+                     if (statusElement) {
+                        statusElement.textContent = 'Digits only';
+                        statusElement.classList.add('text-danger');
+                        statusElement.classList.remove('text-muted');
+                    }
+                 }
+                 return; // Stop processing if less than 6 digits
             }
 
+            // If 6 digits and valid format, start fetch timeout
             if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                if (statusElement) statusElement.textContent = 'Looking up...';
-                statusElement?.classList.remove('text-danger');
-                statusElement?.classList.add('text-muted');
+                if (statusElement) {
+                    statusElement.textContent = 'Looking up...';
+                    statusElement.classList.remove('text-danger', 'text-success');
+                    statusElement.classList.add('text-muted');
+                }
                 pincodeTimeout = setTimeout(() => {
                     fetchPincodeData(pincode, targetPrefix);
-                }, 500);
+                }, 500); // Wait 500ms after user stops typing
+            } else if (pincode.length === 6) {
+                 // If 6 chars but not all digits
+                 clearAutoFilledFields(targetPrefix);
+                 if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode (digits only)';
+                    statusElement.classList.add('text-danger');
+                    statusElement.classList.remove('text-muted', 'text-success');
+                 }
             }
         });
 
+         // Optional: Fetch on blur if not already fetched/fetching
          input.addEventListener('blur', () => {
-             clearTimeout(pincodeTimeout);
+             clearTimeout(pincodeTimeout); // Clear any pending timeout
              const pincode = input.value.trim();
              const targetPrefix = input.dataset.targetPrefix;
              const statusElement = input.nextElementSibling;
 
              if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                 if (statusElement && statusElement.textContent !== 'Fetching...' && !statusElement.textContent.startsWith('✓')) {
+                 // Fetch only if status isn't already success or currently fetching
+                 if (statusElement && !statusElement.classList.contains('text-success') && statusElement.textContent !== 'Fetching...') {
                       statusElement.textContent = 'Looking up...';
                       statusElement.classList.remove('text-danger');
                       statusElement.classList.add('text-muted');
                       fetchPincodeData(pincode, targetPrefix);
-                 } else if (statusElement && statusElement.textContent === 'Fetching...') {
-                     // Do nothing, let fetch complete
-                 } else {
-                    // Already fetched or fetching, no need to re-fetch on blur
                  }
              } else if (pincode.length > 0) {
+                 // If left field with invalid pincode
                  clearAutoFilledFields(targetPrefix);
-                 if (statusElement) statusElement.textContent = 'Invalid Pincode';
-                 statusElement.classList.add('text-danger');
-                 statusElement.classList.remove('text-muted', 'text-success');
+                 if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode';
+                    statusElement.classList.add('text-danger');
+                    statusElement.classList.remove('text-muted', 'text-success');
+                 }
              } else {
+                  // If left field empty
                   clearAutoFilledFields(targetPrefix);
                   if (statusElement) statusElement.textContent = '';
              }
@@ -593,12 +645,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const initialPincode = input.value.trim();
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
             const targetPrefix = input.dataset.targetPrefix;
+            // Optionally add 'Looking up...' status immediately on load
+            const initialStatusElement = input.nextElementSibling;
+            if (initialStatusElement) {
+                initialStatusElement.textContent = 'Verifying...';
+                initialStatusElement.classList.add('text-muted');
+            }
             fetchPincodeData(initialPincode, targetPrefix);
         }
 
     }); // end pincodeInputs.forEach
 
     async function fetchPincodeData(pincode, prefix) {
+        // Get references to all related elements using the prefix
         const stateInput = document.getElementById(`${prefix}-state`);
         const districtInput = document.getElementById(`${prefix}-district`);
         const mandalInput = document.getElementById(`${prefix}-mandal`);
@@ -606,14 +665,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
         const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
         const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-        const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+        const pincodeInput = document.getElementById(`${prefix}-pincode`);
+        const pincodeStatusElement = pincodeInput?.nextElementSibling; // Status element is next sibling
 
+        // Ensure all required elements are found
         if (!stateInput || !districtInput || !mandalInput || !containerDiv || !pincodeStatusElement || !stateHiddenInput || !districtHiddenInput || !mandalHiddenInput) {
             console.error("Pincode target/hidden elements not found for prefix:", prefix);
+            if (pincodeStatusElement) pincodeStatusElement.textContent = 'Setup Error';
             return;
         }
 
-        // Only update status if it's not already showing success
+        // Set status to fetching if not already success
         if (!pincodeStatusElement.classList.contains('text-success')) {
             pincodeStatusElement.textContent = 'Fetching...';
             pincodeStatusElement.classList.remove('text-danger', 'text-success');
@@ -625,26 +687,28 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
 
             if (!response.ok || !data.success) {
+                 // Throw error with message from server or default HTTP status text
                  throw new Error(data.message || `Pincode ${response.statusText}`);
              }
 
             const location = data.location;
+            // Update visible readonly fields
             stateInput.value = location.stateName || '';
             districtInput.value = location.districtName || '';
             mandalInput.value = location.mandalName || '';
-
+            // Update hidden fields for form submission
             stateHiddenInput.value = location.stateName || '';
             districtHiddenInput.value = location.districtName || '';
             mandalHiddenInput.value = location.mandalName || '';
 
-            containerDiv.style.display = 'block';
+            containerDiv.style.display = 'block'; // Show the container with derived fields
             pincodeStatusElement.textContent = `✓ Location found (${location.postOfficeName || 'Area'})`;
             pincodeStatusElement.classList.remove('text-danger', 'text-muted');
             pincodeStatusElement.classList.add('text-success');
 
         } catch (error) {
              console.error('Pincode lookup error:', error);
-             clearAutoFilledFields(prefix);
+             clearAutoFilledFields(prefix); // Clear fields on error
              pincodeStatusElement.textContent = `Error: ${error.message}`;
              pincodeStatusElement.classList.remove('text-success', 'text-muted');
              pincodeStatusElement.classList.add('text-danger');
@@ -659,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
          const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
          const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
          const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-         const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+        // Don't clear the pincode status here, let the input/blur handler manage it
 
          if (stateInput) stateInput.value = '';
          if (districtInput) districtInput.value = '';
@@ -667,12 +731,7 @@ document.addEventListener('DOMContentLoaded', () => {
          if (stateHiddenInput) stateHiddenInput.value = '';
          if (districtHiddenInput) districtHiddenInput.value = '';
          if (mandalHiddenInput) mandalHiddenInput.value = '';
-         if (containerDiv) containerDiv.style.display = 'none';
-         if (pincodeStatusElement) {
-             pincodeStatusElement.textContent = '';
-             pincodeStatusElement.classList.remove('text-danger', 'text-success');
-             pincodeStatusElement.classList.add('text-muted');
-         }
+         if (containerDiv) containerDiv.style.display = 'none'; // Hide the container
      }
     // ========================================
     // End Pincode Lookup Logic
@@ -680,7 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Live Order Filtering Logic (Admin & Seller) - NEWLY ADDED
+    // Live Order Filtering Logic (Admin & Seller)
     // ========================================
     const orderFilterInput = document.getElementById('order-filter-input');
     // Determine which table and "no results" row to target based on page context
@@ -729,6 +788,61 @@ document.addEventListener('DOMContentLoaded', () => {
     // End Live Order Filtering Logic
     // ========================================
 
+    // ========================================
+    // **** Product Image Slider Logic ****
+    // ========================================
+    const imageSlider = document.querySelector('[data-product-image-slider]');
+    if (imageSlider) {
+        const slides = imageSlider.querySelectorAll('[data-product-slide]');
+        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
+        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
+        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
+        let currentImageIndex = 0;
+
+        function showProductImage(index) {
+            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
+
+            // Calculate the new index correctly handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            // Update active classes for slides and dots
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === newIndex);
+            });
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === newIndex);
+            });
+
+            currentImageIndex = newIndex;
+        }
+
+        // Add event listeners if buttons/dots exist
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const index = parseInt(dot.dataset.productImageDot, 10);
+                if (!isNaN(index)) {
+                    showProductImage(index);
+                }
+            });
+        });
+
+        // Initialize the slider to the first image
+        if (slides.length > 0) {
+             showProductImage(0);
+        }
+    }
+    // ========================================
+    // **** End Product Image Slider Logic ****
+    // ========================================
+
+
 }); // End DOMContentLoaded
 
 
@@ -736,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Update'; // Or use buttonElement.dataset.originalText if set
+     const originalButtonText = 'Update';
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -846,6 +960,7 @@ function showToast(message, type = 'info') {
     toastElement.setAttribute('aria-live', 'assertive');
     toastElement.setAttribute('aria-atomic', 'true');
 
+    // Basic sanitization
     const sanitizedMessage = typeof message === 'string'
         ? message.replace(/</g, "<").replace(/>/g, ">")
         : 'An unexpected error occurred.';
@@ -870,7 +985,7 @@ function showToast(message, type = 'info') {
         toastElement.classList.add('hide');
         toastElement.addEventListener('transitionend', (event) => {
             if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
-                toastElement.remove();
+                try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
             }
         }, { once: true });
     };
@@ -939,13 +1054,24 @@ function handleEmptyCartDisplay() {
          if (visibleItems.length === 0) {
              // Only update if the empty message isn't already there
              if (!cartContainer.querySelector('.alert-info')) {
-                 cartContainer.innerHTML = `
+                 // Clear existing items and summary before adding the message
+                 cartItemsContainer.innerHTML = '';
+                 if(cartSummary) cartSummary.remove();
+
+                 const emptyCartHTML = `
                     <h1>Your Shopping Cart</h1>
                     <p class="alert alert-info mt-3">
                         Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
                     </p>`;
+                  // Insert the message after the h1
+                  const h1 = cartContainer.querySelector('h1');
+                  if (h1) {
+                      h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
+                  } else {
+                      // Fallback if h1 not found (shouldn't happen usually)
+                      cartContainer.innerHTML = emptyCartHTML;
+                  }
              }
-             if(cartSummary) cartSummary.remove(); // Remove summary if it exists
          }
      }
 }

@@ -13,7 +13,6 @@
             <label for="shortDescription">Short Description (Optional):</label>
             <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
         </div>
-        <!-- *** Category Dropdown *** -->
         <div class="form-group">
             <label for="category">Category:</label>
             <select id="category" name="category" class="form-control" required>
@@ -25,7 +24,6 @@
                 <% } %>
             </select>
         </div>
-        <!-- *** End Category Dropdown *** -->
         <div class="form-group">
             <label for="price">Price (₹):</label>
             <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
@@ -35,12 +33,27 @@
             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
         </div>
         <div class="form-group">
-            <label for="imageUrl">Image URL:</label>
+            <label for="imageUrl">Image URL (Primary):</label>
             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
         </div>
+        <!-- --- UPDATED: Add Second Image URL Input --- -->
+        <div class="form-group">
+            <label for="imageUrl2">Second Image URL (Optional):</label>
+            <input type="url"
+                   id="imageUrl2"
+                   name="imageUrl2"
+                   class="form-control"
+                   placeholder="https://example.com/image_alt.jpg"
+                   value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
+             <%# Preview for edit forms %>
+             <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
+                <img src="<%= product.imageUrl2 %>" alt="Current Second Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
+             <% } %>
+        </div>
+        <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications:</label>
             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
@@ -77,7 +90,9 @@
         }
     }
     document.addEventListener('DOMContentLoaded', () => {
-        toggleRejectionReason(document.getElementById('reviewStatus').value);
+        // Ensure the rejection reason field visibility is set correctly on page load
+        const initialStatus = document.getElementById('reviewStatus').value;
+        toggleRejectionReason(initialStatus);
     });
 </script>
 

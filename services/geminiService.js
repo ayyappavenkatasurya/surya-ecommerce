@@ -7,7 +7,9 @@ if (!API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
 const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
-const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null;
+// --- UPDATED: Use a vision-capable model like gemini-1.5-flash ---
+const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
+// --- END UPDATED ---
 
 const safetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -36,17 +38,24 @@ async function urlToGenerativePart(url) {
         }
 
         const contentType = response.headers['content-type'];
-        if (!contentType || !['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
-            console.warn(`Invalid or unsupported image Content-Type: ${contentType} from URL: ${url}`);
-            throw new Error(`Unsupported image type: ${contentType}`);
+        // Relaxed content type check to allow more flexibility, but keep warning
+        if (!contentType || !contentType.toLowerCase().startsWith('image/')) {
+             console.warn(`Potentially unsupported image Content-Type: ${contentType} from URL: ${url}. Proceeding but Gemini might reject.`);
+             // Allow common image types even if not strictly in the list
+             if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
+                 console.warn(`Content-Type ${contentType} is less common for Gemini Vision.`);
+             }
+        } else if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'].includes(contentType.toLowerCase())) {
+             console.warn(`Content-Type ${contentType} is less common for Gemini Vision.`);
         }
+
 
         const base64Data = Buffer.from(response.data).toString('base64');
 
         return {
             inlineData: {
                 data: base64Data,
-                mimeType: contentType,
+                mimeType: contentType || 'application/octet-stream', // Provide a default if missing
             },
         };
     } catch (error) {
@@ -60,10 +69,11 @@ async function urlToGenerativePart(url) {
                  throw new Error(`Failed to fetch image: Request setup error (${error.message})`);
              }
          } else {
-             throw error;
+             throw error; // Re-throw other errors
          }
     }
 }
+
 
 const reviewProductWithGemini = async (product) => {
     if (!visionModel) {
@@ -71,31 +81,50 @@ const reviewProductWithGemini = async (product) => {
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
 
-    // *** ADD shortDescription to destructuring ***
-    const { name, category, price, specifications, imageUrl, shortDescription } = product;
+    // --- UPDATED: Destructure imageUrl2 ---
+    const { name, category, price, specifications, imageUrl, imageUrl2, shortDescription } = product;
+    // --- END UPDATED ---
 
     let imagePart;
+    let imagePart2 = null; // Initialize second image part as null
+
     try {
+        // Process first image (required)
         imagePart = await urlToGenerativePart(imageUrl);
-        if (!imagePart) {
-            throw new Error("Image processing failed unexpectedly.");
+        if (!imagePart) throw new Error("Primary image processing failed.");
+        console.log(`Successfully prepared primary image part for ${name} from ${imageUrl}`);
+
+        // --- UPDATED: Process second image (optional) ---
+        if (imageUrl2) {
+            try {
+                imagePart2 = await urlToGenerativePart(imageUrl2);
+                if (!imagePart2) throw new Error("Second image processing failed unexpectedly.");
+                 console.log(`Successfully prepared second image part for ${name} from ${imageUrl2}`);
+            } catch (image2Error) {
+                console.warn(`Could not process second image for "${name}" (${imageUrl2}): ${image2Error.message}. Proceeding with primary image only.`);
+                // Note: We are choosing *not* to reject if only the second image fails.
+                // If the second image MUST be valid, you could reject here:
+                // return { status: 'rejected', reason: `Second Image Error: ${image2Error.message}` };
+            }
         }
-         console.log(`Successfully prepared image part for ${name} from ${imageUrl}`);
+        // --- END UPDATED ---
+
     } catch (imageError) {
-        console.error(`Cannot review product "${name}" due to image processing error: ${imageError.message}`);
+        console.error(`Cannot review product "${name}" due to critical image processing error: ${imageError.message}`);
+        // Reject if the primary image fails
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
 
 
-    // --- 2. Construct Text Prompt Part ---
+    // --- UPDATED: Construct Text Prompt Part (Mention potential second image) ---
     const textPrompt = `
-        Analyze the following product details AND the provided image for an e-commerce store. Act as a strict content moderator.
+        Analyze the following product details AND the provided image(s) for an e-commerce store. Act as a strict content moderator.
 
         **Instructions:**
-        1. Examine the IMAGE CONTENT closely.
+        1. Examine the IMAGE CONTENT closely (check BOTH images if a second one is provided).
         2. Examine the TEXT DETAILS (Name, Category, Short Description, Price, Specifications).
-        3. Verify if the image VISUALLY MATCHES the product described by the text (name, category, short description). Is it clearly the item described?
-        4. Check BOTH image and text for:
+        3. Verify if the image(s) VISUALLY MATCH the product described by the text (name, category, short description). Are they clearly the item described?
+        4. Check BOTH image(s) and text for:
             - Explicit content (nudity, graphic violence).
             - Depictions of weapons (unless clearly a toy and stated category is 'Toys').
             - Illegal items or substances.
@@ -111,38 +140,49 @@ const reviewProductWithGemini = async (product) => {
         **Product Details (Text):**
         - Name: ${name}
         - Category: ${category}
-        - Short Description: ${shortDescription || 'Not provided'}  <%# *** ADDED LINE *** %>
+        - Short Description: ${shortDescription || 'Not provided'}
         - Price: ₹${price?.toFixed(2) || 'N/A'}
         - Specifications: ${specifications || 'Not provided'}
-        - Provided Image URL: ${imageUrl}
+        - Primary Image URL: ${imageUrl}
+        - Second Image URL: ${imageUrl2 || 'Not provided'} <%# Mention second URL %>
 
-        **Analysis Task:** Based on BOTH the text analysis AND image content analysis:
-        - Respond with "APPROVE" if the product (image and text) seems legitimate, safe, accurately described, and the image clearly matches the text description.
+        **Analysis Task:** Based on BOTH the text analysis AND image content analysis (considering both images if provided):
+        - Respond with "APPROVE" if the product (image(s) and text) seems legitimate, safe, accurately described, and the image(s) clearly match the text description.
         - Respond with "REJECT: [BRIEF REASON]" if ANY issues are found (safety violation in image/text, image mismatch, misleading text, nonsensical entry, absurd price, etc.). Example Reasons: "Image contains prohibited items", "Text contains inappropriate language", "Image does not match product description", "Price is nonsensical".
 
         Your response:`;
+    // --- END UPDATED ---
 
     const textPart = { text: textPrompt };
 
-    // --- 3. Call Gemini API ---
+    // --- UPDATED: Prepare content parts array (include imagePart2 if it exists) ---
+    const contentParts = [textPart, imagePart];
+    if (imagePart2) {
+        contentParts.push(imagePart2);
+    }
+    // --- END UPDATED ---
+
+    // --- Call Gemini API ---
     try {
-        console.log(`Sending product "${name}" (with image) for Gemini Vision review...`);
+        console.log(`Sending product "${name}" (${imagePart2 ? '2 images' : '1 image'}) for Gemini Vision review...`);
         const result = await visionModel.generateContent(
-            [textPart, imagePart], // Send both text and image parts
+            contentParts, // Use the dynamic array
             { safetySettings } // Apply safety settings
         );
         const response = result?.response;
 
+        // Check for safety blocks first
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            const safetyRatings = response?.promptFeedback?.safetyRatings || [];
            console.warn(`Gemini review for "${name}" blocked. Reason: ${blockReason}. Ratings: ${JSON.stringify(safetyRatings)}`);
            return { status: 'rejected', reason: `Content blocked by AI safety filters (${blockReason}).` };
-       }
+        }
 
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Review Raw Response for "${name}": ${reviewText}`);
 
+        // Process the response text
         if (reviewText.startsWith('APPROVE')) {
             console.log(`Gemini Vision approved product: ${name}`);
             return { status: 'approved', reason: null };
@@ -151,18 +191,24 @@ const reviewProductWithGemini = async (product) => {
             console.log(`Gemini Vision rejected product: ${name}. Reason: ${reason}`);
             return { status: 'rejected', reason: reason };
         } else {
+            // Handle cases where the model might not return exactly APPROVE or REJECT
             console.warn(`Unexpected Gemini Vision response format for "${name}": ${reviewText}. Defaulting to pending.`);
+            // You might want to log the full response here for debugging: console.log(JSON.stringify(response));
             return { status: 'pending', reason: 'AI review result unclear.' };
         }
 
     } catch (error) {
+        // Handle API call errors
         console.error(`Error during Gemini Vision API call for product "${name}":`, error);
         let reason = 'AI review failed due to an API error.';
-        if (error.message && error.message.includes('SAFETY')) {
-            reason = 'Content blocked by AI safety filters during API call.';
+        // Check if the error message indicates a safety issue (this might vary depending on the SDK version)
+        if (error.message && (error.message.includes('SAFETY') || error.message.includes('blocked'))) {
+            reason = 'Content potentially blocked by safety filters during API call.';
         } else if (error.message) {
-            reason = `AI API Error: ${error.message.substring(0, 100)}...`;
+            // Provide a snippet of the error message for context
+            reason = `AI API Error: ${error.message.substring(0, 100)}${error.message.length > 100 ? '...' : ''}`;
         }
+        // It's often safer to reject if the AI review fails catastrophically
         return { status: 'rejected', reason: reason };
     }
 };
