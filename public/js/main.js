@@ -492,7 +492,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // Homepage Banner Slider Logic
+    // Homepage Banner Slider Logic (with Touch Events)
     // ========================================
     const sliderContainer = document.querySelector('[data-slider-container]');
     if (sliderContainer) {
@@ -506,9 +506,15 @@ document.addEventListener('DOMContentLoaded', () => {
         let autoSlideInterval = null;
         const slideIntervalTime = 5000; // 5 seconds
 
+        // --- Touch Swipe Variables ---
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let diffX = 0;
+        const swipeThreshold = 50; // Minimum pixels to swipe to change slide
+
         function showSlide(index) {
             if (!slides || slides.length === 0) return;
-            // Correctly calculate index, handling negative numbers
             const newIndex = (index % slides.length + slides.length) % slides.length;
 
             slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
@@ -520,10 +526,46 @@ document.addEventListener('DOMContentLoaded', () => {
         function prevSlide() { showSlide(currentSlideIndex - 1); }
 
         function startAutoSlide() {
-            clearInterval(autoSlideInterval); // Clear existing interval
-            if (slides.length > 1) { // Only auto-slide if there's more than one slide
+            clearInterval(autoSlideInterval);
+            if (slides.length > 1) {
                 autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
             }
+        }
+
+        // --- Touch Event Handlers ---
+        function handleTouchStart(event) {
+            if (slides.length <= 1) return; // No swiping needed for single slide
+            isDragging = true;
+            startX = event.touches[0].pageX;
+            currentX = startX; // Initialize currentX
+            diffX = 0;
+            clearInterval(autoSlideInterval); // Pause auto-slide on touch
+        }
+
+        function handleTouchMove(event) {
+            if (!isDragging || slides.length <= 1) return;
+            currentX = event.touches[0].pageX;
+            diffX = startX - currentX;
+            // Optional: prevent default if swipe is mainly horizontal
+            if (Math.abs(diffX) > 10) {
+               // consider event.preventDefault() here if needed, but touch-action: pan-y might suffice
+            }
+        }
+
+        function handleTouchEnd() {
+            if (!isDragging || slides.length <= 1) return;
+            isDragging = false;
+            if (Math.abs(diffX) > swipeThreshold) {
+                if (diffX > 0) { // Swiped Left
+                    nextSlide();
+                } else { // Swiped Right
+                    prevSlide();
+                }
+            }
+            startX = 0;
+            currentX = 0;
+            diffX = 0;
+            startAutoSlide(); // Resume auto-slide after interaction
         }
 
         // Initialize first slide and start auto-slide
@@ -533,8 +575,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Event Listeners for Nav Buttons
-        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
-        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); /* Restart timer on manual nav */ }); }
+        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
+        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
 
         // Event Listener for Dots
         if (dotsContainer) {
@@ -544,19 +586,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     const index = parseInt(targetDot.dataset.slideTo, 10);
                     if (!isNaN(index)) {
                         showSlide(index);
-                        startAutoSlide(); // Restart timer on dot click
+                        startAutoSlide();
                     }
                 }
             });
         }
 
-        // Pause on hover
+        // Event Listeners for Touch Swiping
+        sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+        sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: false }); // Need false if preventDefault might be used
+        sliderContainer.addEventListener('touchend', handleTouchEnd);
+        sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle interruption
+
+        // Pause on hover (for desktop)
         sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
-        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); }); // Resume on mouse leave
+        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
     }
     // ========================================
     // End Homepage Banner Slider Logic
     // ========================================
+
 
     // ========================================
     // Pincode Lookup Logic
@@ -789,7 +838,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // **** Product Image Slider Logic ****
+    // **** Product Image Slider Logic (UPDATED with Touch) ****
     // ========================================
     const imageSlider = document.querySelector('[data-product-image-slider]');
     if (imageSlider) {
@@ -799,13 +848,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
         let currentImageIndex = 0;
 
-        function showProductImage(index) {
-            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
+        // --- Touch Swipe Variables (Scoped to this slider) ---
+        let isProductDragging = false;
+        let productStartX = 0;
+        let productCurrentX = 0;
+        let productDiffX = 0;
+        const productSwipeThreshold = 50; // Minimum pixels to swipe
 
-            // Calculate the new index correctly handling negative numbers
+        function showProductImage(index) {
+            if (!slides || slides.length < 2) return; // Only run if multiple slides
+
             const newIndex = (index % slides.length + slides.length) % slides.length;
 
-            // Update active classes for slides and dots
             slides.forEach((slide, i) => {
                 slide.classList.toggle('active', i === newIndex);
             });
@@ -816,24 +870,74 @@ document.addEventListener('DOMContentLoaded', () => {
             currentImageIndex = newIndex;
         }
 
-        // Add event listeners if buttons/dots exist
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        // --- Touch Event Handlers (Scoped to this slider) ---
+        function handleProductTouchStart(event) {
+            if (slides.length <= 1) return;
+            isProductDragging = true;
+            productStartX = event.touches[0].pageX;
+            productCurrentX = productStartX;
+            productDiffX = 0;
         }
 
-        dots.forEach(dot => {
-            dot.addEventListener('click', () => {
-                const index = parseInt(dot.dataset.productImageDot, 10);
-                if (!isNaN(index)) {
-                    showProductImage(index);
+        function handleProductTouchMove(event) {
+            if (!isProductDragging || slides.length <= 1) return;
+            productCurrentX = event.touches[0].pageX;
+            productDiffX = productStartX - productCurrentX;
+            // Optional: prevent default if swipe is mainly horizontal
+            if (Math.abs(productDiffX) > 10) {
+                // consider event.preventDefault() if needed
+            }
+        }
+
+        function handleProductTouchEnd() {
+            if (!isProductDragging || slides.length <= 1) return;
+            isProductDragging = false;
+
+            if (Math.abs(productDiffX) > productSwipeThreshold) {
+                if (productDiffX > 0) { // Swiped Left
+                    showProductImage(currentImageIndex + 1);
+                } else { // Swiped Right
+                    showProductImage(currentImageIndex - 1);
                 }
-            });
-        });
+            }
+            productStartX = 0;
+            productCurrentX = 0;
+            productDiffX = 0;
+            // No auto-slide to resume for product slider
+        }
 
-        // Initialize the slider to the first image
+        // Add event listeners if buttons/dots exist and more than one slide
+        if (slides.length > 1) {
+            if (nextBtn) {
+                nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+            }
+            if (prevBtn) {
+                prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+            }
+
+            dots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    const index = parseInt(dot.dataset.productImageDot, 10);
+                    if (!isNaN(index)) {
+                        showProductImage(index);
+                    }
+                });
+            });
+
+            // Add Touch Listeners only if multiple slides
+            imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true });
+            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: false }); // Need false if preventDefault might be used
+            imageSlider.addEventListener('touchend', handleProductTouchEnd);
+            imageSlider.addEventListener('touchcancel', handleProductTouchEnd);
+        } else {
+            // Hide nav/dots if only one slide
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (prevBtn) prevBtn.style.display = 'none';
+            const dotsContainer = imageSlider.querySelector('.product-image-dots');
+            if (dotsContainer) dotsContainer.style.display = 'none';
+        }
+
+        // Initialize the slider to the first image (always happens, even for one slide)
         if (slides.length > 0) {
              showProductImage(0);
         }
@@ -850,7 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Update';
+     const originalButtonText = 'Add'; // Changed default text back to 'Add'
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -939,7 +1043,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
          // Ensure button and input are re-enabled unless the item is being removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = 'Add'; // Restore button text
+             buttonElement.innerHTML = originalButtonText; // Restore button text
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }

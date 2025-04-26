@@ -863,23 +863,14 @@ select.form-control-sm {
     flex-direction: column;
     gap: var(--spacing-unit);
 }
-.product-detail-image {
-    width: 100%;
-    max-width: 450px;
-    margin: 0 auto var(--spacing-unit) auto;
-    aspect-ratio: 1 / 1;
-    overflow: hidden;
-    border-radius: calc(var(--border-radius) + 2px);
-    background-color: #f8f9fa;
-    position: relative;
-}
-.product-detail-image img {
-    display: block;
+.product-detail-image { /* This styles the actual img tag */
+    display: block; /* Remove extra space below image */
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center center;
-    border-radius: inherit;
+    object-fit: cover; /* Cover the area, might crop */
+    /* object-fit: contain; */ /* Uncomment if you prefer to see the whole image */
+    object-position: center center; /* Center the image */
+    border-radius: inherit; /* Inherit border-radius from container */
 }
 .product-detail-info h1 {
     font-size: 1.6rem;
@@ -1363,6 +1354,8 @@ select.form-control-sm {
   overflow: hidden;
   border-radius: var(--border-radius);
   background-color: #e0e0e0;
+  touch-action: pan-y; /* Enable vertical scroll, handle horizontal swipe in JS */
+  -webkit-tap-highlight-color: transparent; /* Optional: Remove tap highlight on mobile */
 }
 
 .banner-slides {
@@ -1650,7 +1643,8 @@ select.form-control-sm {
   .product-name { height: auto; white-space: normal; display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
   .product-detail-main { flex-direction: row; align-items: flex-start; }
   .product-detail-info { flex: 1 1 60%; }
-  .product-detail-image { flex: 1 1 40%; width: auto; max-width: none; margin: 0; }
+  /* .product-detail-image { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } */ /* Moved to image section */
+  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } /* Apply flex to the section */
   .product-actions { flex-direction: row; align-items: center; }
   .product-actions .btn { width: auto; }
   .quantity-selector { max-width: 120px; margin-bottom: 0; }
@@ -1737,7 +1731,10 @@ select.form-control-sm {
   .category-icons-section h2 { font-size: 1.4rem; }
 
   /* Banner Slider Tablet */
-  .banner-slider-container { aspect-ratio: 24 / 7; }
+  .banner-slider-container {
+      aspect-ratio: 24 / 7;
+      /* touch-action is inherited */
+  }
   .banner-nav { width: 40px; height: 40px; font-size: 1rem; }
   .banner-dots { bottom: 15px; }
   .banner-dot { width: 10px; height: 10px; }
@@ -1846,6 +1843,8 @@ tr.hidden {
   width: 100%;
   height: 100%;
   overflow: hidden; /* Hide slides outside the container */
+  touch-action: pan-y; /* <<<--- ADD FOR PRODUCT SLIDER */
+  -webkit-tap-highlight-color: transparent; /* <<<--- ADD FOR PRODUCT SLIDER */
 }
 
 .product-image-slides {
@@ -1875,15 +1874,7 @@ tr.hidden {
 }
 
 /* The actual image element (shared by slider and single image) */
-.product-detail-image {
-  display: block; /* Remove extra space below image */
-  width: 100%;
-  height: 100%;
-  object-fit: cover; /* Cover the area, might crop */
-  /* object-fit: contain; */ /* Uncomment if you prefer to see the whole image */
-  object-position: center center; /* Center the image */
-  border-radius: inherit; /* Inherit border-radius from container */
-}
+/* .product-detail-image styles are already defined above */
 
 /* Slider Navigation Arrows */
 .product-image-nav {
