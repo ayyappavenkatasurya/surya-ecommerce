@@ -1,24 +1,30 @@
 <%# views/seller/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<%# **** Use the exact same container classes as admin page **** %>
 <div class="admin-manage-container order-manage-page">
     <h1>Manage Your Orders</h1>
     <p class="text-muted small mb-3">Showing orders that contain one or more of your products.</p>
+
+    <%# --- ADD FILTER INPUT --- %>
+    <div class="form-group mb-3">
+        <label for="order-filter-input" class="visually-hidden">Filter Orders:</label>
+        <input type="text" id="order-filter-input" class="form-control" placeholder="Type to filter orders (ID, Name, Email, Product, Status...)" aria-label="Filter Orders">
+    </div>
+    <%# --- END FILTER INPUT --- %>
+
 
     <% if (message) { %>
         <p class="alert alert-info"><%= message %></p>
     <% } %>
 
     <% if (orders.length > 0) { %>
-        <%# **** Use the exact same table container and table classes **** %>
         <div class="table-container">
-            <table class="data-table order-table">
+            <table class="data-table order-table" id="seller-order-table"> <%# Added ID %>
                 <thead>
                     <tr>
-                        <th>Details</th> <%# Changed header to match admin %>
-                        <th>Customer & Shipping Address</th> <%# Changed header to match admin %>
-                        <th>Items (Your items highlighted)</th> <%# Kept seller-specific text %>
+                        <th>Order ID / Date</th>
+                        <th>Customer / Address</th>
+                        <th>Items (Your items highlighted)</th>
                         <th>Total</th>
                         <th>Status</th>
                         <th class="actions-cell">Actions</th>
@@ -26,43 +32,20 @@
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
-                        <%# Use the same status class structure %>
-                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
-                            <%# Use the same data-label and structure for Details %>
-                            <td data-label="Details">
-                                <strong>ID:</strong> <%= order._id %><br>
+                         <%# Added class="order-row" %>
+                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %> order-row" data-order-id="<%= order._id %>">
+                            <td data-label="Order ID / Date">
+                                <%= order._id %><br>
                                 <small class="text-muted"><%= formatDateIST(order.orderDate) %></small>
                             </td>
-                            <%# Use the exact same structure for Customer & Address display %>
-                            <td data-label="Customer & Shipping Address">
-                                <div>
-                                    <strong>Customer:</strong> <%= order.userId?.name || order.shippingAddress.name || '[Name Missing]' %><br>
-                                    <small class="text-muted"><%= order.userEmail || order.userId?.email || '[Email Missing]' %></small>
-                                </div>
-                                <div class="mt-2 pt-2 border-top">
-                                    <strong>Shipping To:</strong><br>
-                                    <strong><%= order.shippingAddress.name %></strong><br>
-                                    Ph: <%= order.shippingAddress.phone %><br>
-                                    <% if (order.shippingAddress.landmarkNearby) { %>
-                                        <%= order.shippingAddress.landmarkNearby %>,<br>
-                                    <% } %>
-                                    <%= order.shippingAddress.cityVillage %>,<br>
-                                    <% if (order.shippingAddress.mandal) { %>
-                                        <%= order.shippingAddress.mandal %>,<br>
-                                    <% } %>
-                                     <% if (order.shippingAddress.district) { %>
-                                        <%= order.shippingAddress.district %>,<br>
-                                    <% } %>
-                                    <% if (order.shippingAddress.state) { %>
-                                        <%= order.shippingAddress.state %> -
-                                    <% } %>
-                                    <%= order.shippingAddress.pincode %>
-                                </div>
+                            <td data-label="Customer / Address">
+                                <strong><%= order.shippingAddress.name %></strong><br>
+                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br>
+                                <small class="text-muted"><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
+                                <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
-                            <%# Use the same structure for Items display (summary + images) %>
                             <td data-label="Items">
                                 <div class="order-items-summary">
-                                    <%# Highlight seller items (using existing logic) %>
                                     <%- order.itemsSummary %>
                                 </div>
                                 <% if (order.products && order.products.length > 0) { %>
@@ -83,33 +66,25 @@
                                     </div>
                                 <% } %>
                             </td>
-                            <%# Use the same structure for Total %>
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
-                            <%# Use the same structure for Status cell %>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %>
                                     <br><small class="text-danger mt-1 d-block">Reason:<br><%= order.cancellationReason %></small>
                                 <% } %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
-                                <%# Use same OTP display logic %>
                                 <% if (order.showDeliveryOtp && order.status === 'Pending') { %>
                                   <div class="delivery-otp-display mt-1">
                                     <p>Customer OTP Sent</p>
                                     <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
-                                     <% if (order.orderOTPExpires) { %>
-                                         <small class="text-muted d-block">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
-                                     <% } %>
                                   </div>
                                 <% } %>
                             </td>
-                             <%# Use the same structure for Actions cell, applying seller-specific logic within %>
                             <td data-label="Actions" class="actions-cell">
                                 <%# Seller Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredBySeller) { %>
-                                    <%# Use action-group and inline-form classes like admin page %>
                                     <div class="action-group mb-2">
-                                        <p class="action-group-title">Confirm Delivery:</p> <%# Keep descriptive title %>
+                                        <p class="action-group-title">Confirm Delivery:</p>
                                         <% if (!order.showDeliveryOtp) { %>
                                             <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
                                                 <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery">
@@ -128,9 +103,7 @@
 
                                 <%# Seller Order Cancellation Form %>
                                 <% if (order.canBeCancelledBySeller) { %>
-                                     <%# Use action-group class like admin page %>
                                     <div class="action-group">
-                                        <%# Use form structure similar to admin cancel %>
                                         <form action="/seller/orders/<%= order._id %>/cancel" method="POST" class="cancel-delivery-form form-submit-spinner" onsubmit="return confirm('SELLER ACTION: Are you sure you want to cancel your items in order <%= order._id %>? This action cannot be undone.');">
                                             <label for="reason-<%= order._id %>" class="action-group-title">Cancel Your Items:</label>
                                             <select name="reason" id="reason-<%= order._id %>" required class="form-control form-control-sm d-block mb-1">
@@ -148,7 +121,7 @@
                                     </div>
                                 <% } %>
 
-                                <%# Use the same fallback structure %>
+                                <%# Fallback for no actions %>
                                 <% if (!order.canBeDirectlyDeliveredBySeller && !order.canBeCancelledBySeller) { %>
                                      <small class="text-muted no-actions-text">
                                          <% if (order.status === 'Delivered') { %>Completed<% } else if (order.status === 'Cancelled') { %>Cancelled<% } else { %>No actions available<% } %>
@@ -157,6 +130,11 @@
                             </td>
                         </tr>
                     <% }) %>
+                    <%# --- ADD NO RESULTS ROW --- %>
+                    <tr id="no-seller-orders-found" class="hidden">
+                        <td colspan="6" class="text-center text-muted p-3">No orders match your filter.</td>
+                    </tr>
+                    <%# --- END NO RESULTS ROW --- %>
                 </tbody>
             </table>
         </div>

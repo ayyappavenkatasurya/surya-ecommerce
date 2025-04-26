@@ -4,9 +4,16 @@
 <div class="admin-manage-container order-manage-page">
     <h1><%= title %></h1>
 
+    <%# --- ADD FILTER INPUT --- %>
+    <div class="form-group mb-3">
+        <label for="order-filter-input" class="visually-hidden">Filter Orders:</label>
+        <input type="text" id="order-filter-input" class="form-control" placeholder="Type to filter orders (ID, Name, Email, Product, Status...)" aria-label="Filter Orders">
+    </div>
+    <%# --- END FILTER INPUT --- %>
+
     <% if (orders.length > 0) { %>
         <div class="table-container">
-            <table class="data-table order-table">
+            <table class="data-table order-table" id="admin-order-table"> <%# Added ID %>
                 <thead>
                     <tr>
                         <th>Details</th>
@@ -19,7 +26,8 @@
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
-                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
+                        <%# Added class="order-row" %>
+                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %> order-row" data-order-id="<%= order._id %>">
                             <td data-label="Details">
                                 <strong>ID:</strong> <%= order._id %><br>
                                 <small class="text-muted"><%= formatDateIST(order.orderDate) %></small><br>
@@ -42,7 +50,6 @@
                                         <%= order.shippingAddress.landmarkNearby %>,<br>
                                     <% } %>
                                     <%= order.shippingAddress.cityVillage %>,<br>
-                                    <%# Display Mandal, District, State if available %>
                                     <% if (order.shippingAddress.mandal) { %>
                                         <%= order.shippingAddress.mandal %>,<br>
                                     <% } %>
@@ -142,6 +149,11 @@
                             </td>
                         </tr>
                     <% }) %>
+                    <%# --- ADD NO RESULTS ROW --- %>
+                    <tr id="no-admin-orders-found" class="hidden">
+                         <td colspan="6" class="text-center text-muted p-3">No orders match your filter.</td>
+                    </tr>
+                    <%# --- END NO RESULTS ROW --- %>
                 </tbody>
             </table>
         </div>

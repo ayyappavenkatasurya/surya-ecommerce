@@ -1794,3 +1794,22 @@ select.form-control-sm {
     /* .category-grid { grid-template-columns: repeat(10, 1fr); } */
     .category-icon-wrapper { width: 75px; height: 75px; border-radius: 25px; }
 } /* End @media (min-width: 1200px) */
+
+/* Add this rule or adjust existing margins */
+.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
+  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
+}
+
+/* Style for the "no results" row */
+#no-admin-orders-found td,
+#no-seller-orders-found td {
+    text-align: center;
+    padding: var(--spacing-unit);
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* Ensure hidden rows are truly hidden */
+tr.hidden {
+    display: none !important;
+}

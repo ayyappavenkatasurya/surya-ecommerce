@@ -5201,6 +5201,25 @@ select.form-control-sm {
     .category-icon-wrapper { width: 75px; height: 75px; border-radius: 25px; }
 } /* End @media (min-width: 1200px) */
 
+/* Add this rule or adjust existing margins */
+.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
+  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
+}
+
+/* Style for the "no results" row */
+#no-admin-orders-found td,
+#no-seller-orders-found td {
+    text-align: center;
+    padding: var(--spacing-unit);
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* Ensure hidden rows are truly hidden */
+tr.hidden {
+    display: none !important;
+}
+
 public/js/main.js:
 // public/js/main.js
 console.log("Main JS loaded.");
@@ -5657,12 +5676,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
             if (proceedCheckoutBtn.classList.contains('loading')) {
+                event.preventDefault(); // Prevent navigation if already loading
                 return;
             }
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
             proceedCheckoutBtn.style.pointerEvents = 'none';
             proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
+            // Navigation will happen normally if not prevented earlier
         });
 
         window.addEventListener('pageshow', function(pageEvent) {
@@ -5770,28 +5791,35 @@ document.addEventListener('DOMContentLoaded', () => {
              const statusElement = input.nextElementSibling;
 
              if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                 if (statusElement) statusElement.textContent = 'Looking up...';
-                 statusElement?.classList.remove('text-danger');
-                 statusElement?.classList.add('text-muted');
-                 fetchPincodeData(pincode, targetPrefix);
+                 if (statusElement && statusElement.textContent !== 'Fetching...' && !statusElement.textContent.startsWith('✓')) {
+                      statusElement.textContent = 'Looking up...';
+                      statusElement.classList.remove('text-danger');
+                      statusElement.classList.add('text-muted');
+                      fetchPincodeData(pincode, targetPrefix);
+                 } else if (statusElement && statusElement.textContent === 'Fetching...') {
+                     // Do nothing, let fetch complete
+                 } else {
+                    // Already fetched or fetching, no need to re-fetch on blur
+                 }
              } else if (pincode.length > 0) {
                  clearAutoFilledFields(targetPrefix);
                  if (statusElement) statusElement.textContent = 'Invalid Pincode';
-                 statusElement?.classList.add('text-danger');
-                 statusElement?.classList.remove('text-muted');
+                 statusElement.classList.add('text-danger');
+                 statusElement.classList.remove('text-muted', 'text-success');
              } else {
                   clearAutoFilledFields(targetPrefix);
                   if (statusElement) statusElement.textContent = '';
              }
          });
 
+        // Initial check on page load for pre-filled pincodes
         const initialPincode = input.value.trim();
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
             const targetPrefix = input.dataset.targetPrefix;
             fetchPincodeData(initialPincode, targetPrefix);
         }
 
-    });
+    }); // end pincodeInputs.forEach
 
     async function fetchPincodeData(pincode, prefix) {
         const stateInput = document.getElementById(`${prefix}-state`);
@@ -5808,9 +5836,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        pincodeStatusElement.textContent = 'Fetching...';
-        pincodeStatusElement.classList.remove('text-danger', 'text-success');
-        pincodeStatusElement.classList.add('text-muted');
+        // Only update status if it's not already showing success
+        if (!pincodeStatusElement.classList.contains('text-success')) {
+            pincodeStatusElement.textContent = 'Fetching...';
+            pincodeStatusElement.classList.remove('text-danger', 'text-success');
+            pincodeStatusElement.classList.add('text-muted');
+        }
 
         try {
             const response = await fetch(`/user/pincode-lookup/${pincode}`);
@@ -5871,8 +5902,60 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
 
+    // ========================================
+    // Live Order Filtering Logic (Admin & Seller) - NEWLY ADDED
+    // ========================================
+    const orderFilterInput = document.getElementById('order-filter-input');
+    // Determine which table and "no results" row to target based on page context
+    const adminOrderTable = document.getElementById('admin-order-table');
+    const sellerOrderTable = document.getElementById('seller-order-table');
+
+    let targetTableBody = null;
+    let noResultsRow = null;
+
+    if (adminOrderTable) {
+        targetTableBody = adminOrderTable.querySelector('tbody');
+        noResultsRow = document.getElementById('no-admin-orders-found');
+    } else if (sellerOrderTable) {
+        targetTableBody = sellerOrderTable.querySelector('tbody');
+        noResultsRow = document.getElementById('no-seller-orders-found');
+    }
+
+    if (orderFilterInput && targetTableBody && noResultsRow) {
+        orderFilterInput.addEventListener('input', () => {
+            const filterValue = orderFilterInput.value.trim().toLowerCase();
+            const rows = targetTableBody.querySelectorAll('tr.order-row'); // Target only order rows
+            let matchFound = false;
+
+            rows.forEach(row => {
+                const rowText = row.textContent.toLowerCase();
+                // Check if the filter value is empty or the row text includes the filter value
+                if (filterValue === '' || rowText.includes(filterValue)) {
+                    row.style.display = ''; // Show row (revert to default display)
+                    matchFound = true;
+                } else {
+                    row.style.display = 'none'; // Hide row
+                }
+            });
+
+            // Show/hide the "no results" message row
+            if (!matchFound && rows.length > 0) { // Only show if there were rows initially
+                noResultsRow.classList.remove('hidden');
+                noResultsRow.style.display = ''; // Ensure it's displayed correctly in table context
+            } else {
+                noResultsRow.classList.add('hidden');
+                noResultsRow.style.display = 'none';
+            }
+        });
+    }
+    // ========================================
+    // End Live Order Filtering Logic
+    // ========================================
+
 }); // End DOMContentLoaded
 
+
+// --- Helper Functions (Outside DOMContentLoaded) ---
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
@@ -5909,7 +5992,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                          updateCartTotalAndBadge(data.cartTotal);
                          handleEmptyCartDisplay();
                      }, 300);
-                     return;
+                     return; // Important: exit after starting removal animation
                  }
              } else {
                  throw new Error(data.message || `Update failed (Status: ${response.status})`);
@@ -5917,7 +6000,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
         }
 
          if (data.success) {
-             if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity;
+             if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity; // Update original value on success
 
              if (quantity === 0) {
                 if (cartItemDiv) {
@@ -5936,29 +6019,33 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                         handleEmptyCartDisplay();
                         showToast('Item removed from cart.', 'success');
                     }, 300);
-                     return;
+                     return; // Important: exit after starting removal animation
                 }
              } else {
+                 // Update UI for non-zero quantity
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
-                if(quantityInputElement) quantityInputElement.value = data.newQuantity;
+                 if(quantityInputElement) quantityInputElement.value = data.newQuantity;
                  updateCartTotalAndBadge(data.cartTotal);
              }
          } else {
+              // Handle failure case from server (e.g., validation error on server side)
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
               if(quantityInputElement && quantityInputElement.dataset.originalValue) {
-                  quantityInputElement.value = quantityInputElement.dataset.originalValue;
+                  quantityInputElement.value = quantityInputElement.dataset.originalValue; // Revert to original value
               }
          }
 
     } catch (error) {
+         // Handle network errors or unexpected issues
          console.error('Error updating cart quantity:', error);
           showToast(`Error: ${error.message}`, 'danger');
           if(quantityInputElement && quantityInputElement.dataset.originalValue) {
-            quantityInputElement.value = quantityInputElement.dataset.originalValue;
+            quantityInputElement.value = quantityInputElement.dataset.originalValue; // Revert on error
           }
 
     } finally {
+         // Ensure button and input are re-enabled unless the item is being removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
              buttonElement.innerHTML = 'Update'; // Restore button text
@@ -6011,14 +6098,18 @@ function showToast(message, type = 'info') {
         }, { once: true });
     };
 
+    // Trigger the show animation
     setTimeout(() => {
         if (toastElement.parentNode) {
            toastElement.classList.add('show');
         }
-    }, 0);
+    }, 10); // Small delay ensures transition happens
 
+    // Auto hide
     hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
+    // Manual close
     if (closeButton) { closeButton.addEventListener('click', dismissToast); }
+    // Pause on hover
     toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
     toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 }
@@ -6042,12 +6133,14 @@ function updateCartTotalAndBadge(newCartTotal) {
      }
 }
 
+// Calculates based on visible items in the DOM
 function calculateNewCartCount() {
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
+        // Check if item is potentially visible (not explicitly display:none or fully transparent)
         const style = window.getComputedStyle(item);
-        if (style.display !== 'none' && parseFloat(style.opacity) > 0) {
+        if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
             count++; // Count items, not total quantity
         }
     });
@@ -6060,18 +6153,22 @@ function handleEmptyCartDisplay() {
      const cartSummary = document.querySelector('.cart-summary');
 
      if (cartItemsContainer && cartContainer) {
+         // Use the same visibility check as calculateNewCartCount
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
-             return style.display !== 'none' && parseFloat(style.opacity) > 0;
+             return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
          });
 
          if (visibleItems.length === 0) {
-             cartContainer.innerHTML = `
-                <h1>Your Shopping Cart</h1>
-                <p class="alert alert-info mt-3">
-                    Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
-                </p>`;
-             if(cartSummary) cartSummary.remove();
+             // Only update if the empty message isn't already there
+             if (!cartContainer.querySelector('.alert-info')) {
+                 cartContainer.innerHTML = `
+                    <h1>Your Shopping Cart</h1>
+                    <p class="alert alert-info mt-3">
+                        Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
+                    </p>`;
+             }
+             if(cartSummary) cartSummary.remove(); // Remove summary if it exists
          }
      }
 }
@@ -6669,9 +6766,16 @@ views/admin/manage-orders.ejs:
 <div class="admin-manage-container order-manage-page">
     <h1><%= title %></h1>
 
+    <%# --- ADD FILTER INPUT --- %>
+    <div class="form-group mb-3">
+        <label for="order-filter-input" class="visually-hidden">Filter Orders:</label>
+        <input type="text" id="order-filter-input" class="form-control" placeholder="Type to filter orders (ID, Name, Email, Product, Status...)" aria-label="Filter Orders">
+    </div>
+    <%# --- END FILTER INPUT --- %>
+
     <% if (orders.length > 0) { %>
         <div class="table-container">
-            <table class="data-table order-table">
+            <table class="data-table order-table" id="admin-order-table"> <%# Added ID %>
                 <thead>
                     <tr>
                         <th>Details</th>
@@ -6684,7 +6788,8 @@ views/admin/manage-orders.ejs:
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
-                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
+                        <%# Added class="order-row" %>
+                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %> order-row" data-order-id="<%= order._id %>">
                             <td data-label="Details">
                                 <strong>ID:</strong> <%= order._id %><br>
                                 <small class="text-muted"><%= formatDateIST(order.orderDate) %></small><br>
@@ -6707,7 +6812,6 @@ views/admin/manage-orders.ejs:
                                         <%= order.shippingAddress.landmarkNearby %>,<br>
                                     <% } %>
                                     <%= order.shippingAddress.cityVillage %>,<br>
-                                    <%# Display Mandal, District, State if available %>
                                     <% if (order.shippingAddress.mandal) { %>
                                         <%= order.shippingAddress.mandal %>,<br>
                                     <% } %>
@@ -6807,6 +6911,11 @@ views/admin/manage-orders.ejs:
                             </td>
                         </tr>
                     <% }) %>
+                    <%# --- ADD NO RESULTS ROW --- %>
+                    <tr id="no-admin-orders-found" class="hidden">
+                         <td colspan="6" class="text-center text-muted p-3">No orders match your filter.</td>
+                    </tr>
+                    <%# --- END NO RESULTS ROW --- %>
                 </tbody>
             </table>
         </div>
@@ -7749,17 +7858,25 @@ views/seller/manage-orders.ejs:
 <%# views/seller/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container order-manage-page"> <%# Added 'order-manage-page' class %>
+<div class="admin-manage-container order-manage-page">
     <h1>Manage Your Orders</h1>
     <p class="text-muted small mb-3">Showing orders that contain one or more of your products.</p>
+
+    <%# --- ADD FILTER INPUT --- %>
+    <div class="form-group mb-3">
+        <label for="order-filter-input" class="visually-hidden">Filter Orders:</label>
+        <input type="text" id="order-filter-input" class="form-control" placeholder="Type to filter orders (ID, Name, Email, Product, Status...)" aria-label="Filter Orders">
+    </div>
+    <%# --- END FILTER INPUT --- %>
+
 
     <% if (message) { %>
         <p class="alert alert-info"><%= message %></p>
     <% } %>
 
     <% if (orders.length > 0) { %>
-        <div class="table-container"> <%# Removed 'card' class %>
-            <table class="data-table order-table"> <%# Added 'order-table' class %>
+        <div class="table-container">
+            <table class="data-table order-table" id="seller-order-table"> <%# Added ID %>
                 <thead>
                     <tr>
                         <th>Order ID / Date</th>
@@ -7772,20 +7889,21 @@ views/seller/manage-orders.ejs:
                 </thead>
                 <tbody>
                     <% orders.forEach(order => { %>
-                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %>" data-order-id="<%= order._id %>">
+                         <%# Added class="order-row" %>
+                        <tr class="status-<%= order.status.toLowerCase().replace(/ /g, '-') %> order-row" data-order-id="<%= order._id %>">
                             <td data-label="Order ID / Date">
                                 <%= order._id %><br>
                                 <small class="text-muted"><%= formatDateIST(order.orderDate) %></small>
                             </td>
                             <td data-label="Customer / Address">
                                 <strong><%= order.shippingAddress.name %></strong><br>
-                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br> <%# Added null check for email %>
+                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br>
                                 <small class="text-muted"><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
                                 <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
                             </td>
                             <td data-label="Items">
                                 <div class="order-items-summary">
-                                    <%- order.itemsSummary %> <%# Raw HTML summary %>
+                                    <%- order.itemsSummary %>
                                 </div>
                                 <% if (order.products && order.products.length > 0) { %>
                                     <div class="order-items-images">
@@ -7794,7 +7912,7 @@ views/seller/manage-orders.ejs:
                                                 <a href="/products/<%= item.productId._id %>" target="_blank" title="View <%= item.productId.name || 'Product' %>">
                                                     <img src="<%= item.productId.imageUrl %>"
                                                          alt="<%= item.productId.name || 'Product Image' %>"
-                                                         class="order-item-thumbnail" loading="lazy"> <%# Added lazy loading %>
+                                                         class="order-item-thumbnail" loading="lazy">
                                                 </a>
                                             <% } else if (item.productId && item.productId._id) { %>
                                                 <a href="/products/<%= item.productId._id %>" target="_blank" class="order-item-thumbnail-placeholder" title="View <%= item.productId.name || 'Product' %>">[No Img]</a>
@@ -7808,13 +7926,12 @@ views/seller/manage-orders.ejs:
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <%# Display cancellation reason including seller prefix %>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %>
                                     <br><small class="text-danger mt-1 d-block">Reason:<br><%= order.cancellationReason %></small>
                                 <% } %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
                                 <% if (order.showDeliveryOtp && order.status === 'Pending') { %>
-                                  <div class="delivery-otp-display mt-1"> <%# Reusing user style %>
+                                  <div class="delivery-otp-display mt-1">
                                     <p>Customer OTP Sent</p>
                                     <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
                                   </div>
@@ -7823,11 +7940,11 @@ views/seller/manage-orders.ejs:
                             <td data-label="Actions" class="actions-cell">
                                 <%# Seller Direct Delivery Confirmation %>
                                 <% if (order.canBeDirectlyDeliveredBySeller) { %>
-                                    <div class="action-group mb-2"> <%# Added mb-2 for spacing %>
+                                    <div class="action-group mb-2">
                                         <p class="action-group-title">Confirm Delivery:</p>
                                         <% if (!order.showDeliveryOtp) { %>
                                             <form action="/seller/orders/<%= order._id %>/send-otp" method="POST" class="inline-form form-submit-spinner mb-1">
-                                                <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery"> <%# Control width %>
+                                                <button type="submit" class="btn btn-warning btn-sm w-100 w-md-auto" title="Send OTP to customer to confirm delivery">
                                                     <i class="fas fa-mobile-alt"></i> Send OTP
                                                 </button>
                                             </form>
@@ -7841,7 +7958,7 @@ views/seller/manage-orders.ejs:
                                     </div>
                                 <% } %>
 
-                                <%# --- NEW: Seller Order Cancellation Form --- %>
+                                <%# Seller Order Cancellation Form %>
                                 <% if (order.canBeCancelledBySeller) { %>
                                     <div class="action-group">
                                         <form action="/seller/orders/<%= order._id %>/cancel" method="POST" class="cancel-delivery-form form-submit-spinner" onsubmit="return confirm('SELLER ACTION: Are you sure you want to cancel your items in order <%= order._id %>? This action cannot be undone.');">
@@ -7860,7 +7977,6 @@ views/seller/manage-orders.ejs:
                                         </form>
                                     </div>
                                 <% } %>
-                                <%# --- End: Seller Order Cancellation Form --- %>
 
                                 <%# Fallback for no actions %>
                                 <% if (!order.canBeDirectlyDeliveredBySeller && !order.canBeCancelledBySeller) { %>
@@ -7871,6 +7987,11 @@ views/seller/manage-orders.ejs:
                             </td>
                         </tr>
                     <% }) %>
+                    <%# --- ADD NO RESULTS ROW --- %>
+                    <tr id="no-seller-orders-found" class="hidden">
+                        <td colspan="6" class="text-center text-muted p-3">No orders match your filter.</td>
+                    </tr>
+                    <%# --- END NO RESULTS ROW --- %>
                 </tbody>
             </table>
         </div>

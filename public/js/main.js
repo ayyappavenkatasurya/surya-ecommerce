@@ -453,12 +453,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
             if (proceedCheckoutBtn.classList.contains('loading')) {
+                event.preventDefault(); // Prevent navigation if already loading
                 return;
             }
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
             proceedCheckoutBtn.style.pointerEvents = 'none';
             proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
+            // Navigation will happen normally if not prevented earlier
         });
 
         window.addEventListener('pageshow', function(pageEvent) {
@@ -566,28 +568,35 @@ document.addEventListener('DOMContentLoaded', () => {
              const statusElement = input.nextElementSibling;
 
              if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                 if (statusElement) statusElement.textContent = 'Looking up...';
-                 statusElement?.classList.remove('text-danger');
-                 statusElement?.classList.add('text-muted');
-                 fetchPincodeData(pincode, targetPrefix);
+                 if (statusElement && statusElement.textContent !== 'Fetching...' && !statusElement.textContent.startsWith('✓')) {
+                      statusElement.textContent = 'Looking up...';
+                      statusElement.classList.remove('text-danger');
+                      statusElement.classList.add('text-muted');
+                      fetchPincodeData(pincode, targetPrefix);
+                 } else if (statusElement && statusElement.textContent === 'Fetching...') {
+                     // Do nothing, let fetch complete
+                 } else {
+                    // Already fetched or fetching, no need to re-fetch on blur
+                 }
              } else if (pincode.length > 0) {
                  clearAutoFilledFields(targetPrefix);
                  if (statusElement) statusElement.textContent = 'Invalid Pincode';
-                 statusElement?.classList.add('text-danger');
-                 statusElement?.classList.remove('text-muted');
+                 statusElement.classList.add('text-danger');
+                 statusElement.classList.remove('text-muted', 'text-success');
              } else {
                   clearAutoFilledFields(targetPrefix);
                   if (statusElement) statusElement.textContent = '';
              }
          });
 
+        // Initial check on page load for pre-filled pincodes
         const initialPincode = input.value.trim();
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
             const targetPrefix = input.dataset.targetPrefix;
             fetchPincodeData(initialPincode, targetPrefix);
         }
 
-    });
+    }); // end pincodeInputs.forEach
 
     async function fetchPincodeData(pincode, prefix) {
         const stateInput = document.getElementById(`${prefix}-state`);
@@ -604,9 +613,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        pincodeStatusElement.textContent = 'Fetching...';
-        pincodeStatusElement.classList.remove('text-danger', 'text-success');
-        pincodeStatusElement.classList.add('text-muted');
+        // Only update status if it's not already showing success
+        if (!pincodeStatusElement.classList.contains('text-success')) {
+            pincodeStatusElement.textContent = 'Fetching...';
+            pincodeStatusElement.classList.remove('text-danger', 'text-success');
+            pincodeStatusElement.classList.add('text-muted');
+        }
 
         try {
             const response = await fetch(`/user/pincode-lookup/${pincode}`);
@@ -667,8 +679,60 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
 
+    // ========================================
+    // Live Order Filtering Logic (Admin & Seller) - NEWLY ADDED
+    // ========================================
+    const orderFilterInput = document.getElementById('order-filter-input');
+    // Determine which table and "no results" row to target based on page context
+    const adminOrderTable = document.getElementById('admin-order-table');
+    const sellerOrderTable = document.getElementById('seller-order-table');
+
+    let targetTableBody = null;
+    let noResultsRow = null;
+
+    if (adminOrderTable) {
+        targetTableBody = adminOrderTable.querySelector('tbody');
+        noResultsRow = document.getElementById('no-admin-orders-found');
+    } else if (sellerOrderTable) {
+        targetTableBody = sellerOrderTable.querySelector('tbody');
+        noResultsRow = document.getElementById('no-seller-orders-found');
+    }
+
+    if (orderFilterInput && targetTableBody && noResultsRow) {
+        orderFilterInput.addEventListener('input', () => {
+            const filterValue = orderFilterInput.value.trim().toLowerCase();
+            const rows = targetTableBody.querySelectorAll('tr.order-row'); // Target only order rows
+            let matchFound = false;
+
+            rows.forEach(row => {
+                const rowText = row.textContent.toLowerCase();
+                // Check if the filter value is empty or the row text includes the filter value
+                if (filterValue === '' || rowText.includes(filterValue)) {
+                    row.style.display = ''; // Show row (revert to default display)
+                    matchFound = true;
+                } else {
+                    row.style.display = 'none'; // Hide row
+                }
+            });
+
+            // Show/hide the "no results" message row
+            if (!matchFound && rows.length > 0) { // Only show if there were rows initially
+                noResultsRow.classList.remove('hidden');
+                noResultsRow.style.display = ''; // Ensure it's displayed correctly in table context
+            } else {
+                noResultsRow.classList.add('hidden');
+                noResultsRow.style.display = 'none';
+            }
+        });
+    }
+    // ========================================
+    // End Live Order Filtering Logic
+    // ========================================
+
 }); // End DOMContentLoaded
 
+
+// --- Helper Functions (Outside DOMContentLoaded) ---
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
@@ -705,7 +769,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                          updateCartTotalAndBadge(data.cartTotal);
                          handleEmptyCartDisplay();
                      }, 300);
-                     return;
+                     return; // Important: exit after starting removal animation
                  }
              } else {
                  throw new Error(data.message || `Update failed (Status: ${response.status})`);
@@ -713,7 +777,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
         }
 
          if (data.success) {
-             if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity;
+             if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity; // Update original value on success
 
              if (quantity === 0) {
                 if (cartItemDiv) {
@@ -732,29 +796,33 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                         handleEmptyCartDisplay();
                         showToast('Item removed from cart.', 'success');
                     }, 300);
-                     return;
+                     return; // Important: exit after starting removal animation
                 }
              } else {
+                 // Update UI for non-zero quantity
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
-                if(quantityInputElement) quantityInputElement.value = data.newQuantity;
+                 if(quantityInputElement) quantityInputElement.value = data.newQuantity;
                  updateCartTotalAndBadge(data.cartTotal);
              }
          } else {
+              // Handle failure case from server (e.g., validation error on server side)
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
               if(quantityInputElement && quantityInputElement.dataset.originalValue) {
-                  quantityInputElement.value = quantityInputElement.dataset.originalValue;
+                  quantityInputElement.value = quantityInputElement.dataset.originalValue; // Revert to original value
               }
          }
 
     } catch (error) {
+         // Handle network errors or unexpected issues
          console.error('Error updating cart quantity:', error);
           showToast(`Error: ${error.message}`, 'danger');
           if(quantityInputElement && quantityInputElement.dataset.originalValue) {
-            quantityInputElement.value = quantityInputElement.dataset.originalValue;
+            quantityInputElement.value = quantityInputElement.dataset.originalValue; // Revert on error
           }
 
     } finally {
+         // Ensure button and input are re-enabled unless the item is being removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
              buttonElement.innerHTML = 'Update'; // Restore button text
@@ -807,14 +875,18 @@ function showToast(message, type = 'info') {
         }, { once: true });
     };
 
+    // Trigger the show animation
     setTimeout(() => {
         if (toastElement.parentNode) {
            toastElement.classList.add('show');
         }
-    }, 0);
+    }, 10); // Small delay ensures transition happens
 
+    // Auto hide
     hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
+    // Manual close
     if (closeButton) { closeButton.addEventListener('click', dismissToast); }
+    // Pause on hover
     toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
     toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 }
@@ -838,12 +910,14 @@ function updateCartTotalAndBadge(newCartTotal) {
      }
 }
 
+// Calculates based on visible items in the DOM
 function calculateNewCartCount() {
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
+        // Check if item is potentially visible (not explicitly display:none or fully transparent)
         const style = window.getComputedStyle(item);
-        if (style.display !== 'none' && parseFloat(style.opacity) > 0) {
+        if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
             count++; // Count items, not total quantity
         }
     });
@@ -856,18 +930,22 @@ function handleEmptyCartDisplay() {
      const cartSummary = document.querySelector('.cart-summary');
 
      if (cartItemsContainer && cartContainer) {
+         // Use the same visibility check as calculateNewCartCount
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
-             return style.display !== 'none' && parseFloat(style.opacity) > 0;
+             return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
          });
 
          if (visibleItems.length === 0) {
-             cartContainer.innerHTML = `
-                <h1>Your Shopping Cart</h1>
-                <p class="alert alert-info mt-3">
-                    Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
-                </p>`;
-             if(cartSummary) cartSummary.remove();
+             // Only update if the empty message isn't already there
+             if (!cartContainer.querySelector('.alert-info')) {
+                 cartContainer.innerHTML = `
+                    <h1>Your Shopping Cart</h1>
+                    <p class="alert alert-info mt-3">
+                        Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
+                    </p>`;
+             }
+             if(cartSummary) cartSummary.remove(); // Remove summary if it exists
          }
      }
 }
