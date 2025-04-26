@@ -939,7 +939,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
          // Ensure button and input are re-enabled unless the item is being removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = 'Update'; // Restore button text
+             buttonElement.innerHTML = 'Add'; // Restore button text
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }
