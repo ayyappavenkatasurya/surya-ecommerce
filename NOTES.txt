@@ -5756,7 +5756,7 @@ document.addEventListener('DOMContentLoaded', () => {
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
-                    <img src="${safeImageUrl}" alt="" loading="lazy"> <%# Alt left blank for brevity %>
+                    <img src="${safeImageUrl}" alt="" loading="lazy">
                     <span>${safeName}</span>
                  `;
                  suggestionsDropdown.appendChild(item);
