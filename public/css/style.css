@@ -1945,3 +1945,27 @@ tr.hidden {
 }
 
 /* --- End Product Image Slider Styles --- */
+
+/* Add this rule or adjust existing margins */
+.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
+  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
+}
+
+/* Style for the "no results" row */
+#no-admin-orders-found td,
+#no-seller-orders-found td,
+#no-admin-products-found td,  /* <<< ADDED for admin products */
+#no-seller-products-found td { /* <<< ADDED for seller products */
+    text-align: center;
+    padding: var(--spacing-unit);
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* Ensure hidden rows are truly hidden */
+tr.hidden {
+    display: none !important;
+}
+
+/* Existing styles below... */
+/* ... */

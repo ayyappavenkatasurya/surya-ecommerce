@@ -791,51 +791,103 @@ document.addEventListener('DOMContentLoaded', () => {
     // Live Order Filtering Logic (Admin & Seller)
     // ========================================
     const orderFilterInput = document.getElementById('order-filter-input');
-    // Determine which table and "no results" row to target based on page context
     const adminOrderTable = document.getElementById('admin-order-table');
     const sellerOrderTable = document.getElementById('seller-order-table');
 
-    let targetTableBody = null;
-    let noResultsRow = null;
+    let targetOrderTableBody = null; // Renamed variable
+    let noOrderResultsRow = null;    // Renamed variable
 
     if (adminOrderTable) {
-        targetTableBody = adminOrderTable.querySelector('tbody');
-        noResultsRow = document.getElementById('no-admin-orders-found');
+        targetOrderTableBody = adminOrderTable.querySelector('tbody');
+        noOrderResultsRow = document.getElementById('no-admin-orders-found');
     } else if (sellerOrderTable) {
-        targetTableBody = sellerOrderTable.querySelector('tbody');
-        noResultsRow = document.getElementById('no-seller-orders-found');
+        targetOrderTableBody = sellerOrderTable.querySelector('tbody');
+        noOrderResultsRow = document.getElementById('no-seller-orders-found');
     }
 
-    if (orderFilterInput && targetTableBody && noResultsRow) {
+    if (orderFilterInput && targetOrderTableBody && noOrderResultsRow) {
         orderFilterInput.addEventListener('input', () => {
             const filterValue = orderFilterInput.value.trim().toLowerCase();
-            const rows = targetTableBody.querySelectorAll('tr.order-row'); // Target only order rows
+            // Select only rows meant to contain order data
+            const rows = targetOrderTableBody.querySelectorAll('tr.order-row');
             let matchFound = false;
 
             rows.forEach(row => {
                 const rowText = row.textContent.toLowerCase();
-                // Check if the filter value is empty or the row text includes the filter value
                 if (filterValue === '' || rowText.includes(filterValue)) {
-                    row.style.display = ''; // Show row (revert to default display)
+                    row.style.display = ''; // Use default display (table-row)
                     matchFound = true;
                 } else {
-                    row.style.display = 'none'; // Hide row
+                    row.style.display = 'none';
                 }
             });
 
             // Show/hide the "no results" message row
-            if (!matchFound && rows.length > 0) { // Only show if there were rows initially
-                noResultsRow.classList.remove('hidden');
-                noResultsRow.style.display = ''; // Ensure it's displayed correctly in table context
+            if (!matchFound && rows.length > 0) {
+                noOrderResultsRow.classList.remove('hidden');
+                // Ensure correct display for table row
+                noOrderResultsRow.style.display = ''; // Let CSS handle it or use 'table-row'
             } else {
-                noResultsRow.classList.add('hidden');
-                noResultsRow.style.display = 'none';
+                noOrderResultsRow.classList.add('hidden');
+                noOrderResultsRow.style.display = 'none';
             }
         });
     }
     // ========================================
     // End Live Order Filtering Logic
     // ========================================
+
+
+    // ========================================
+    // **** NEW: Live Product Filtering Logic (Admin & Seller) ****
+    // ========================================
+    function setupProductFilter(inputId, tableId, noResultsId) {
+        const filterInput = document.getElementById(inputId);
+        const productTable = document.getElementById(tableId);
+        const noResultsRow = document.getElementById(noResultsId);
+
+        if (filterInput && productTable && noResultsRow) {
+            const tableBody = productTable.querySelector('tbody');
+            if (!tableBody) return; // Exit if table body not found
+
+            filterInput.addEventListener('input', () => {
+                const filterValue = filterInput.value.trim().toLowerCase();
+                // Target only rows with the 'product-row' class
+                const rows = tableBody.querySelectorAll('tr.product-row');
+                let matchFound = false;
+
+                rows.forEach(row => {
+                    const rowText = row.textContent.toLowerCase();
+                    // Check if filter is empty or row text includes the filter
+                    if (filterValue === '' || rowText.includes(filterValue)) {
+                        row.style.display = ''; // Show row
+                        matchFound = true;
+                    } else {
+                        row.style.display = 'none'; // Hide row
+                    }
+                });
+
+                // Toggle the "no results" row visibility
+                if (!matchFound && rows.length > 0) {
+                    noResultsRow.classList.remove('hidden');
+                    noResultsRow.style.display = ''; // Use default display (or 'table-row')
+                } else {
+                    noResultsRow.classList.add('hidden');
+                    noResultsRow.style.display = 'none';
+                }
+            });
+        }
+    }
+
+    // Setup filter for Admin Products page
+    setupProductFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found');
+
+    // Setup filter for Seller Products page
+    setupProductFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found');
+    // ========================================
+    // **** End Live Product Filtering Logic ****
+    // ========================================
+
 
     // ========================================
     // **** Product Image Slider Logic (UPDATED with Touch) ****
