@@ -5,12 +5,17 @@ const { isAuthenticated } = require('../middleware/authMiddleware'); // Protect 
 
 const router = express.Router();
 
-// Apply isAuthenticated middleware to all routes in this file
+// --- NEW: Pincode Lookup Route ---
+// Placing it before other user routes that might have similar patterns
+router.get('/pincode-lookup/:pincode', userController.lookupPincode);
+// --- End Pincode Lookup Route ---
+
+// Apply isAuthenticated middleware to the remaining routes in this file
 router.use(isAuthenticated);
 
 // User Profile
 router.get('/profile', userController.getUserProfilePage);
-router.post('/profile/update-name', userController.updateUserName); // *** ADDED THIS LINE ***
+router.post('/profile/update-name', userController.updateUserName);
 
 // User Cart Management
 router.get('/cart', userController.getCart);                // View cart (controller filters unapproved)

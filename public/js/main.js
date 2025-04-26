@@ -105,6 +105,12 @@ document.addEventListener('DOMContentLoaded', () => {
             savedAddressDiv.classList.add('hidden');
             if (addAddressBtn) addAddressBtn.classList.add('hidden'); // Hide Add button when form is visible
             if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden'); // Always show Cancel when form is open
+
+             // Trigger pincode check if pincode has value when form is shown for edit
+             const pincodeInput = addressForm.querySelector('#profile-pincode');
+             if (pincodeInput && pincodeInput.value.length === 6 && /^\d{6}$/.test(pincodeInput.value)) {
+                 fetchPincodeData(pincodeInput.value, 'profile');
+             }
         };
 
         const hideAddressForm = () => {
@@ -116,6 +122,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!savedAddressDiv.querySelector('strong') && addAddressBtn) {
                  addAddressBtn.classList.remove('hidden');
             }
+            // Clear status messages when hiding
+            const statusElement = addressForm.querySelector('.pincode-status');
+            if (statusElement) statusElement.textContent = '';
         };
 
         if (editAddressBtn) {
@@ -124,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (addAddressBtn) {
              addAddressBtn.addEventListener('click', () => {
                  if(addressForm) addressForm.reset(); // Clear form fields when adding new
+                 clearAutoFilledFields('profile'); // Clear auto-filled fields too
                  showAddressForm();
              });
         }
@@ -136,19 +146,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden')) {
                 addAddressBtn.classList.remove('hidden');
             } else {
-                 // Ensure Add button is hidden if address exists or form is already shown
                  addAddressBtn.classList.add('hidden');
             }
         }
 
 
-        // --- Name Edit Logic (Checked and Correct) ---
+        // --- Name Edit Logic ---
         const editNameBtn = document.getElementById('edit-name-btn');
         const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
         const nameForm = document.getElementById('name-form');
         const savedNameDisplaySpan = document.getElementById('saved-name-display');
         const nameInput = document.getElementById('name-input');
-        // *** IMPORTANT: Target the strong tag inside the span ***
         const displayUserNameStrong = document.getElementById('display-user-name');
 
         const showNameForm = () => {
@@ -156,7 +164,6 @@ document.addEventListener('DOMContentLoaded', () => {
             nameForm.classList.remove('hidden');
             savedNameDisplaySpan.classList.add('hidden');
             editNameBtn.classList.add('hidden');
-            // Set input value to current name *before* focusing
             if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
             nameInput.focus();
         };
@@ -166,8 +173,6 @@ document.addEventListener('DOMContentLoaded', () => {
             nameForm.classList.add('hidden');
             savedNameDisplaySpan.classList.remove('hidden');
             editNameBtn.classList.remove('hidden');
-            // Reset input value to the currently displayed name when cancelling
-            // This line correctly resets the input field
             nameInput.value = displayUserNameStrong.textContent;
         };
 
@@ -176,7 +181,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (cancelNameBtn) {
-            // This event listener correctly calls hideNameForm, which resets the input
             cancelNameBtn.addEventListener('click', hideNameForm);
         }
     } // End if (profilePage)
@@ -190,7 +194,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkoutSavedAddressDiv = checkoutPage.querySelector('.checkout-address .saved-address');
         const placeOrderBtn = checkoutPage.querySelector('.btn-place-order');
 
-        // Check if an address is initially displayed (not hidden)
         const hasInitialAddress = checkoutSavedAddressDiv && !checkoutSavedAddressDiv.classList.contains('hidden');
 
         if (checkoutEditBtn) {
@@ -198,9 +201,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!checkoutAddressForm || !checkoutSavedAddressDiv) return;
                 checkoutAddressForm.classList.remove('hidden');
                 checkoutSavedAddressDiv.classList.add('hidden');
-                if(placeOrderBtn) placeOrderBtn.disabled = true; // Disable place order when editing
+                if(placeOrderBtn) placeOrderBtn.disabled = true;
                 checkoutAddressForm.querySelector('h3').textContent = 'Edit Address';
-                if (checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden'); // Show cancel button
+                if (checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden');
+                // Trigger pincode check if pincode has value when form is shown for edit
+                const pincodeInput = checkoutAddressForm.querySelector('#checkout-pincode');
+                if (pincodeInput && pincodeInput.value.length === 6 && /^\d{6}$/.test(pincodeInput.value)) {
+                    fetchPincodeData(pincodeInput.value, 'checkout');
+                }
             });
         }
 
@@ -208,27 +216,28 @@ document.addEventListener('DOMContentLoaded', () => {
             checkoutCancelBtn.addEventListener('click', () => {
                 if (!checkoutAddressForm || !checkoutSavedAddressDiv) return;
                 checkoutAddressForm.classList.add('hidden');
-                if (hasInitialAddress) { // Only show saved div if it existed initially
+                if (hasInitialAddress) {
                     checkoutSavedAddressDiv.classList.remove('hidden');
-                    if(placeOrderBtn) placeOrderBtn.disabled = false; // Re-enable place order
+                    if(placeOrderBtn) placeOrderBtn.disabled = false;
                 } else {
-                    // If there was no initial address, cancelling means keep form hidden and button disabled
                     if(placeOrderBtn) placeOrderBtn.disabled = true;
                 }
-                checkoutCancelBtn.classList.add('hidden'); // Hide cancel button again
+                checkoutCancelBtn.classList.add('hidden');
+                // Clear status messages when hiding
+                const statusElement = checkoutAddressForm.querySelector('.pincode-status');
+                if (statusElement) statusElement.textContent = '';
             });
         }
 
-        // Initial state for checkout page
         if (!hasInitialAddress && checkoutAddressForm) {
-            checkoutAddressForm.classList.remove('hidden'); // Show form if no address saved
-            if (placeOrderBtn) placeOrderBtn.disabled = true; // Disable place order
-            checkoutAddressForm.querySelector('h3').textContent = 'Add Shipping Address'; // Clearer label
-            if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden'); // Hide cancel btn if adding new
+            checkoutAddressForm.classList.remove('hidden');
+            if (placeOrderBtn) placeOrderBtn.disabled = true;
+            checkoutAddressForm.querySelector('h3').textContent = 'Add Shipping Address';
+            if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         } else if (hasInitialAddress && checkoutAddressForm) {
-            checkoutAddressForm.classList.add('hidden'); // Ensure form is hidden initially
-            if (placeOrderBtn) placeOrderBtn.disabled = false; // Enable if address exists
-            if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden'); // Ensure cancel is hidden initially
+            checkoutAddressForm.classList.add('hidden');
+            if (placeOrderBtn) placeOrderBtn.disabled = false;
+            if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         }
     }
 
@@ -243,24 +252,22 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!quantityInput) return;
             const newQuantity = parseInt(quantityInput.value, 10);
 
-            // Store original value in case of error
             if (!quantityInput.dataset.originalValue) {
                 quantityInput.dataset.originalValue = quantityInput.value;
             }
 
-
             if (isNaN(newQuantity) || newQuantity < 0) {
                  showToast('Invalid quantity entered.', 'danger');
-                 quantityInput.value = quantityInput.dataset.originalValue; // Restore original
+                 quantityInput.value = quantityInput.dataset.originalValue;
                 return;
              }
             const maxStock = parseInt(quantityInput.max, 10);
             if (!isNaN(maxStock) && newQuantity > maxStock) {
                 showToast(`Only ${maxStock} items available in stock.`, 'warning');
-                quantityInput.value = maxStock; // Correct to max stock, don't restore original
-                 return; // Don't proceed with AJAX call yet, let user confirm or re-update
+                quantityInput.value = maxStock;
+                 return;
              }
-            updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput); // Pass input element
+            updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
         });
     });
 
@@ -275,7 +282,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const suggestionsDropdown = document.getElementById('suggestions-dropdown');
     let suggestionFetchTimeout;
 
-    // --- Toggle Search Bar (Mobile) ---
     if (searchToggleBtn && searchContainer) {
         searchToggleBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -288,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Handle Search Input ---
     if (searchInput && suggestionsDropdown) {
         searchInput.addEventListener('input', () => {
             const query = searchInput.value.trim();
@@ -299,14 +304,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 suggestionsDropdown.classList.add('active');
                 suggestionFetchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 300); // Debounce
+                }, 300);
             } else {
                 suggestionsDropdown.innerHTML = '';
                 suggestionsDropdown.classList.remove('active');
             }
         });
 
-        // Keep suggestions open on focus if suggestions exist
         searchInput.addEventListener('focus', () => {
              const query = searchInput.value.trim();
               const hasActualSuggestions = suggestionsDropdown.querySelector('a.suggestion-item');
@@ -316,7 +320,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-     // --- Fetch Suggestions ---
      async function fetchSuggestions(query) {
          if (!suggestionsDropdown) return;
          try {
@@ -335,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
-     // --- Display Suggestions ---
      function displaySuggestions(suggestions) {
           if (!suggestionsDropdown) return;
          suggestionsDropdown.innerHTML = '';
@@ -344,7 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  const item = document.createElement('a');
                  item.classList.add('suggestion-item');
                  item.href = `/products/${product._id}`;
-                 // Basic sanitization for display
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
@@ -360,25 +361,21 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
-     // --- Close Search/Suggestions on Outside Click ---
      document.addEventListener('click', (e) => {
-         // Ensure all elements exist before checking contains
          if (searchContainer && suggestionsDropdown && searchToggleBtn && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
              searchContainer.classList.remove('active');
              suggestionsDropdown.classList.remove('active');
          }
      });
 
-     // --- Handle Clicks Inside Suggestions ---
      if(suggestionsDropdown) {
          suggestionsDropdown.addEventListener('click', (e) => {
              const link = e.target.closest('a');
              if (!link) {
-                 e.stopPropagation(); // Don't close if click is not on a link itself
+                 e.stopPropagation();
              } else {
-                 // Hide dropdown after clicking a link
                  suggestionsDropdown.classList.remove('active');
-                 if (searchContainer && window.innerWidth < 768) { // Also hide mobile search bar
+                 if (searchContainer && window.innerWidth < 768) {
                     searchContainer.classList.remove('active');
                  }
              }
@@ -390,49 +387,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Toast Notification Logic (FASTER APPEARANCE)
+    // Toast Notification Logic
     // ========================================
     const toastContainer = document.querySelector('.toast-container');
     if (toastContainer) {
         const toastElements = toastContainer.querySelectorAll('.toast');
 
-        toastElements.forEach((toastElement) => { // No index needed now
+        toastElements.forEach((toastElement) => {
             const closeButton = toastElement.querySelector('.toast-close-btn');
-            const autoHideDelay = 5000; // 5 seconds
+            const autoHideDelay = 5000;
             let hideTimeoutId;
 
             const dismissToast = () => {
                 clearTimeout(hideTimeoutId);
-                if (toastElement.classList.contains('hide') || !toastElement.parentNode) return; // Already hiding or removed
+                if (toastElement.classList.contains('hide') || !toastElement.parentNode) return;
                 toastElement.classList.remove('show');
                 toastElement.classList.add('hide');
                 toastElement.addEventListener('transitionend', (event) => {
-                    // Check propertyName to ensure it's the opacity/transform transition
                     if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
                         toastElement.remove();
                     }
                 }, { once: true });
             };
 
-            // --- Show Animation (IMMEDIATE TRIGGER using setTimeout 0) ---
             setTimeout(() => {
-                // Check if element is still in DOM before showing
                 if (toastElement.parentNode) {
                    toastElement.classList.add('show');
                 }
-            }, 0); // Minimal delay to allow rendering initial state
+            }, 0);
 
-            // --- Auto Hide Timer ---
              hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
 
-            // --- Manual Close Button ---
             if (closeButton) {
                 closeButton.addEventListener('click', dismissToast);
             }
 
-             // --- Prevent auto-hide on hover ---
              toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
-             toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2)); // Restart timer on mouse out
+             toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 
         });
     }
@@ -444,9 +435,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            // Allow the browser a moment to render before starting animation
             requestAnimationFrame(() => {
-                 if(el.parentNode) { // Check if element still exists
+                 if(el.parentNode) {
                     el.style.width = width + '%';
                  }
             });
@@ -454,30 +444,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // ========================================
-    // Loading State for Non-Form Actions (e.g., Proceed to Checkout Link)
+    // Loading State for Non-Form Actions
     // ========================================
     const proceedCheckoutBtn = document.getElementById('btn-proceed-checkout');
     if (proceedCheckoutBtn) {
         const originalCheckoutText = proceedCheckoutBtn.innerHTML;
-        // Retrieve loading text safely, provide default
         const loadingCheckoutText = proceedCheckoutBtn.dataset.loadingText || '<i class="fas fa-spinner fa-spin"></i> Loading...';
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
-            // Check if already loading
             if (proceedCheckoutBtn.classList.contains('loading')) {
                 return;
             }
-
-            // Apply loading state
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
-            proceedCheckoutBtn.style.pointerEvents = 'none'; // Visually disable link
-            proceedCheckoutBtn.setAttribute('aria-disabled', 'true'); // Accessibility
-
-            // Allow navigation to proceed naturally
+            proceedCheckoutBtn.style.pointerEvents = 'none';
+            proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
         });
 
-        // Reset button on page show (e.g., back navigation)
         window.addEventListener('pageshow', function(pageEvent) {
             if (pageEvent.persisted && proceedCheckoutBtn.classList.contains('loading')) {
                 proceedCheckoutBtn.classList.remove('loading');
@@ -504,90 +487,183 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let currentSlideIndex = 0;
         let autoSlideInterval = null;
-        const slideIntervalTime = 5000; // Time in ms (e.g., 5 seconds)
+        const slideIntervalTime = 5000;
 
         function showSlide(index) {
-            if (!slides || slides.length === 0) return; // Exit if no slides
-
-            // Wrap index around if it goes out of bounds
+            if (!slides || slides.length === 0) return;
             const newIndex = (index + slides.length) % slides.length;
-
-            slides.forEach((slide, i) => {
-                slide.classList.remove('active');
-            });
-            dots.forEach(dot => {
-                dot.classList.remove('active');
-            });
-
+            slides.forEach((slide, i) => { slide.classList.remove('active'); });
+            dots.forEach(dot => { dot.classList.remove('active'); });
             slides[newIndex].classList.add('active');
-            if (dots[newIndex]) {
-                dots[newIndex].classList.add('active');
-            }
+            if (dots[newIndex]) { dots[newIndex].classList.add('active'); }
             currentSlideIndex = newIndex;
         }
-
-        function nextSlide() {
-            showSlide(currentSlideIndex + 1);
-        }
-
-        function prevSlide() {
-            showSlide(currentSlideIndex - 1);
-        }
-
+        function nextSlide() { showSlide(currentSlideIndex + 1); }
+        function prevSlide() { showSlide(currentSlideIndex - 1); }
         function startAutoSlide() {
-            // Clear any existing interval before starting a new one
             clearInterval(autoSlideInterval);
-            if (slides.length > 1) { // Only auto-slide if more than one banner
-                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
-            }
+            if (slides.length > 1) { autoSlideInterval = setInterval(nextSlide, slideIntervalTime); }
         }
-
-        // Initial setup
-        if (slides.length > 0) {
-             showSlide(0); // Show the first slide initially
-             startAutoSlide(); // Start automatic sliding
-        }
-
-        // Event Listeners for Arrows
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => {
-                nextSlide();
-                startAutoSlide(); // Reset interval on manual click
-            });
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => {
-                prevSlide();
-                startAutoSlide(); // Reset interval on manual click
-            });
-        }
-
-        // Event Listener for Dots
+        if (slides.length > 0) { showSlide(0); startAutoSlide(); }
+        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
+        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
         if (dotsContainer) {
             dotsContainer.addEventListener('click', (e) => {
                 const targetDot = e.target.closest('[data-slide-to]');
                 if (targetDot) {
                     const index = parseInt(targetDot.dataset.slideTo, 10);
-                    if (!isNaN(index)) {
-                        showSlide(index);
-                        startAutoSlide(); // Reset interval on manual click
-                    }
+                    if (!isNaN(index)) { showSlide(index); startAutoSlide(); }
                 }
             });
         }
-
-        // Pause on Hover
-        sliderContainer.addEventListener('mouseenter', () => {
-            clearInterval(autoSlideInterval);
-        });
-
-        sliderContainer.addEventListener('mouseleave', () => {
-            startAutoSlide();
-        });
-
-    } // End if (sliderContainer)
+        sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
+        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
+    }
     // ========================================
     // End Homepage Banner Slider Logic
+    // ========================================
+
+    // ========================================
+    // Pincode Lookup Logic
+    // ========================================
+    const pincodeInputs = document.querySelectorAll('.pincode-input');
+    let pincodeTimeout;
+
+    pincodeInputs.forEach(input => {
+        input.addEventListener('input', () => {
+            clearTimeout(pincodeTimeout);
+            const pincode = input.value.trim();
+            const targetPrefix = input.dataset.targetPrefix;
+            const statusElement = input.nextElementSibling;
+
+            if (pincode.length < 6) {
+                 clearAutoFilledFields(targetPrefix);
+                 if (statusElement) statusElement.textContent = '';
+                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
+                     if (statusElement) statusElement.textContent = 'Digits only';
+                     statusElement?.classList.add('text-danger');
+                     statusElement?.classList.remove('text-muted');
+                 } else if (statusElement) {
+                     statusElement?.classList.remove('text-danger');
+                     statusElement?.classList.add('text-muted');
+                 }
+            }
+
+            if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+                if (statusElement) statusElement.textContent = 'Looking up...';
+                statusElement?.classList.remove('text-danger');
+                statusElement?.classList.add('text-muted');
+                pincodeTimeout = setTimeout(() => {
+                    fetchPincodeData(pincode, targetPrefix);
+                }, 500);
+            }
+        });
+
+         input.addEventListener('blur', () => {
+             clearTimeout(pincodeTimeout);
+             const pincode = input.value.trim();
+             const targetPrefix = input.dataset.targetPrefix;
+             const statusElement = input.nextElementSibling;
+
+             if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+                 if (statusElement) statusElement.textContent = 'Looking up...';
+                 statusElement?.classList.remove('text-danger');
+                 statusElement?.classList.add('text-muted');
+                 fetchPincodeData(pincode, targetPrefix);
+             } else if (pincode.length > 0) {
+                 clearAutoFilledFields(targetPrefix);
+                 if (statusElement) statusElement.textContent = 'Invalid Pincode';
+                 statusElement?.classList.add('text-danger');
+                 statusElement?.classList.remove('text-muted');
+             } else {
+                  clearAutoFilledFields(targetPrefix);
+                  if (statusElement) statusElement.textContent = '';
+             }
+         });
+
+        const initialPincode = input.value.trim();
+        if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
+            const targetPrefix = input.dataset.targetPrefix;
+            fetchPincodeData(initialPincode, targetPrefix);
+        }
+
+    });
+
+    async function fetchPincodeData(pincode, prefix) {
+        const stateInput = document.getElementById(`${prefix}-state`);
+        const districtInput = document.getElementById(`${prefix}-district`);
+        const mandalInput = document.getElementById(`${prefix}-mandal`);
+        const stateHiddenInput = document.getElementById(`${prefix}-state-hidden`);
+        const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
+        const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
+        const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
+        const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+
+        if (!stateInput || !districtInput || !mandalInput || !containerDiv || !pincodeStatusElement || !stateHiddenInput || !districtHiddenInput || !mandalHiddenInput) {
+            console.error("Pincode target/hidden elements not found for prefix:", prefix);
+            return;
+        }
+
+        pincodeStatusElement.textContent = 'Fetching...';
+        pincodeStatusElement.classList.remove('text-danger', 'text-success');
+        pincodeStatusElement.classList.add('text-muted');
+
+        try {
+            const response = await fetch(`/user/pincode-lookup/${pincode}`);
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                 throw new Error(data.message || `Pincode ${response.statusText}`);
+             }
+
+            const location = data.location;
+            stateInput.value = location.stateName || '';
+            districtInput.value = location.districtName || '';
+            mandalInput.value = location.mandalName || '';
+
+            stateHiddenInput.value = location.stateName || '';
+            districtHiddenInput.value = location.districtName || '';
+            mandalHiddenInput.value = location.mandalName || '';
+
+            containerDiv.style.display = 'block';
+            pincodeStatusElement.textContent = `✓ Location found (${location.postOfficeName || 'Area'})`;
+            pincodeStatusElement.classList.remove('text-danger', 'text-muted');
+            pincodeStatusElement.classList.add('text-success');
+
+        } catch (error) {
+             console.error('Pincode lookup error:', error);
+             clearAutoFilledFields(prefix);
+             pincodeStatusElement.textContent = `Error: ${error.message}`;
+             pincodeStatusElement.classList.remove('text-success', 'text-muted');
+             pincodeStatusElement.classList.add('text-danger');
+        }
+    }
+
+    function clearAutoFilledFields(prefix) {
+         const stateInput = document.getElementById(`${prefix}-state`);
+         const districtInput = document.getElementById(`${prefix}-district`);
+         const mandalInput = document.getElementById(`${prefix}-mandal`);
+         const stateHiddenInput = document.getElementById(`${prefix}-state-hidden`);
+         const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
+         const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
+         const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
+         const pincodeStatusElement = document.getElementById(`${prefix}-pincode`)?.nextElementSibling;
+
+         if (stateInput) stateInput.value = '';
+         if (districtInput) districtInput.value = '';
+         if (mandalInput) mandalInput.value = '';
+         if (stateHiddenInput) stateHiddenInput.value = '';
+         if (districtHiddenInput) districtHiddenInput.value = '';
+         if (mandalHiddenInput) mandalHiddenInput.value = '';
+         if (containerDiv) containerDiv.style.display = 'none';
+         if (pincodeStatusElement) {
+             pincodeStatusElement.textContent = '';
+             pincodeStatusElement.classList.remove('text-danger', 'text-success');
+             pincodeStatusElement.classList.add('text-muted');
+         }
+     }
+    // ========================================
+    // End Pincode Lookup Logic
     // ========================================
 
 
@@ -595,8 +671,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // --- Cart Update AJAX Function ---
-async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) { // Pass input el
-     const originalButtonText = 'Add'; // Adjust if your button text is different
+async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
+     const originalButtonText = 'Update'; // Or use buttonElement.dataset.originalText if set
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -611,13 +687,12 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
             body: JSON.stringify({ productId, quantity })
          });
 
-        const data = await response.json(); // Always parse response
+        const data = await response.json();
 
         if (!response.ok) {
-             // Specific handling for 'removal: true' from backend (unapproved product)
              if (data.removal === true) {
                  showToast(data.message || 'Item unavailable and removed.', 'warning');
-                 if (cartItemDiv) { // Animate removal
+                 if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
                     cartItemDiv.style.opacity = '0';
                     cartItemDiv.style.height = '0';
@@ -627,24 +702,20 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                     cartItemDiv.style.borderWidth = '0';
                      setTimeout(() => {
                          if (cartItemDiv.parentNode) cartItemDiv.remove();
-                         updateCartTotalAndBadge(data.cartTotal); // Update total even on removal
+                         updateCartTotalAndBadge(data.cartTotal);
                          handleEmptyCartDisplay();
                      }, 300);
-                     return; // Exit early after removal
+                     return;
                  }
              } else {
-                 // Throw error for other non-ok responses
                  throw new Error(data.message || `Update failed (Status: ${response.status})`);
              }
         }
 
-         // --- Show toast AFTER response is received ---
          if (data.success) {
-             // Update original value dataset if successful
              if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity;
 
              if (quantity === 0) {
-                 // Handle removal animation and DOM update
                 if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
                     cartItemDiv.style.opacity = '0';
@@ -659,23 +730,18 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                         }
                         updateCartTotalAndBadge(data.cartTotal);
                         handleEmptyCartDisplay();
-                        showToast('Item removed from cart.', 'success'); // Show toast after removing
-                    }, 300); // Wait for CSS transition
-                     return; // Exit early
+                        showToast('Item removed from cart.', 'success');
+                    }, 300);
+                     return;
                 }
              } else {
-                 // Update quantity input and subtotal
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
                 if(quantityInputElement) quantityInputElement.value = data.newQuantity;
-                 // Update total and badge
                  updateCartTotalAndBadge(data.cartTotal);
-                 // showToast('Cart quantity updated.', 'success'); // Optional success message
              }
-         } else { // This block might be less likely if using throw new Error above
-              // Show failure toast using backend message
+         } else {
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
-              // Restore original value on backend failure
               if(quantityInputElement && quantityInputElement.dataset.originalValue) {
                   quantityInputElement.value = quantityInputElement.dataset.originalValue;
               }
@@ -683,46 +749,39 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
 
     } catch (error) {
          console.error('Error updating cart quantity:', error);
-          // Show error toast
           showToast(`Error: ${error.message}`, 'danger');
-          // Restore original value on fetch error
           if(quantityInputElement && quantityInputElement.dataset.originalValue) {
             quantityInputElement.value = quantityInputElement.dataset.originalValue;
           }
 
     } finally {
-         // Re-enable button and input (unless item was removed)
-         // Ensure this runs only if the item wasn't removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = originalButtonText; // Use the stored original button text
+             buttonElement.innerHTML = 'Update'; // Restore button text
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }
 }
 
-// --- Helper Function to Show Toasts Dynamically (FASTER APPEARANCE) ---
+// --- Helper Function to Show Toasts Dynamically ---
 function showToast(message, type = 'info') {
     const toastContainer = document.querySelector('.toast-container');
     if (!toastContainer) {
         console.error("Toast container not found! Falling back to alert.");
-        alert(message); // Fallback
+        alert(message);
         return;
     }
 
-    // Create elements
     const toastElement = document.createElement('div');
-    toastElement.className = `toast toast-${type}`; // Apply classes
+    toastElement.className = `toast toast-${type}`;
     toastElement.setAttribute('role', 'alert');
     toastElement.setAttribute('aria-live', 'assertive');
     toastElement.setAttribute('aria-atomic', 'true');
 
-    // Basic sanitization - Replace with a more robust library (like DOMPurify) if needed for complex user-generated content
     const sanitizedMessage = typeof message === 'string'
         ? message.replace(/</g, "<").replace(/>/g, ">")
-        : 'An unexpected error occurred.'; // Default message for non-strings
+        : 'An unexpected error occurred.';
 
-    // Set inner HTML safely
     toastElement.innerHTML = `
         <div class="toast-body">
             ${sanitizedMessage}
@@ -733,43 +792,31 @@ function showToast(message, type = 'info') {
     const closeButton = toastElement.querySelector('.toast-close-btn');
     toastContainer.appendChild(toastElement);
 
-    // --- Logic to show and hide the new toast ---
     const autoHideDelay = 5000;
     let hideTimeoutId;
 
     const dismissToast = () => {
         clearTimeout(hideTimeoutId);
-        // Check if already hiding or removed to prevent errors/multiple executions
         if (toastElement.classList.contains('hide') || !toastElement.parentNode) return;
         toastElement.classList.remove('show');
         toastElement.classList.add('hide');
         toastElement.addEventListener('transitionend', (event) => {
-            // Ensure transition is for opacity/transform and element still exists with 'hide' class
             if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
                 toastElement.remove();
             }
-        }, { once: true }); // Use 'once' to ensure listener is removed after firing
+        }, { once: true });
     };
 
-    // Show animation (using setTimeout 0 for immediate trigger)
     setTimeout(() => {
-        // Check if element is still in DOM before adding 'show'
         if (toastElement.parentNode) {
            toastElement.classList.add('show');
         }
-    }, 0); // Minimal delay
+    }, 0);
 
-    // Auto Hide Timer
     hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
-
-    // Manual Close Button
-    if (closeButton) { // Check if button exists
-        closeButton.addEventListener('click', dismissToast);
-    }
-
-    // Prevent auto-hide on hover
+    if (closeButton) { closeButton.addEventListener('click', dismissToast); }
     toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
-    toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2)); // Restart timer on mouse out
+    toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 }
 
 
@@ -782,7 +829,7 @@ function updateCartTotalAndBadge(newCartTotal) {
      const cartBadge = document.querySelector('.cart-badge');
      if (cartBadge) {
          if (newCartItemCount > 0) {
-             cartBadge.textContent = newCartItemCount;
+             cartBadge.textContent = newCartItemCount; // Use item count for badge
              cartBadge.classList.remove('hide');
          } else {
             cartBadge.textContent = '0';
@@ -792,21 +839,12 @@ function updateCartTotalAndBadge(newCartTotal) {
 }
 
 function calculateNewCartCount() {
-    // Count only items currently visible and not marked for removal
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
-        // Check opacity style directly for cross-browser compatibility during transition
         const style = window.getComputedStyle(item);
         if (style.display !== 'none' && parseFloat(style.opacity) > 0) {
-            const quantityInput = item.querySelector('input[name="quantity"]');
-            if (quantityInput) {
-                const value = parseInt(quantityInput.value, 10);
-                if (!isNaN(value) && value > 0) {
-                    // Sum the quantities of items remaining in the cart
-                    count += value;
-                }
-            }
+            count++; // Count items, not total quantity
         }
     });
     return count;
@@ -817,8 +855,6 @@ function handleEmptyCartDisplay() {
      const cartContainer = document.querySelector('.cart-container');
      const cartSummary = document.querySelector('.cart-summary');
 
-     // Check if the items container exists and has no *cart-item* children left
-     // or only children that are hidden/fading out
      if (cartItemsContainer && cartContainer) {
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
@@ -826,7 +862,6 @@ function handleEmptyCartDisplay() {
          });
 
          if (visibleItems.length === 0) {
-             // Use innerHTML carefully, ensure no user input is directly included here
              cartContainer.innerHTML = `
                 <h1>Your Shopping Cart</h1>
                 <p class="alert alert-info mt-3">

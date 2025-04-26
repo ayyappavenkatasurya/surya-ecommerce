@@ -7,7 +7,6 @@
         <h1 class="mb-0 me-3">My Profile</h1> <%# Removed bottom margin from h1 %>
         <div class="d-flex align-items-center">
              <%# Display current name - initially visible %>
-             <%# --- UPDATED: Added strong tag with ID --- %>
              <span id="saved-name-display" class="fs-5 me-2">Hi, <strong id="display-user-name"><%= user.name %></strong></span>
              <%# Edit button (icon) - initially visible %>
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
@@ -58,7 +57,12 @@
             <% if (user.address && user.address.name) { %>
                 <p class="mb-1"><strong><%= user.address.name %></strong></p>
                 <p class="mb-1"><%= user.address.phone %></p>
-                <p class="mb-1"><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %>, Pincode: <%= user.address.pincode %></p>
+                <p class="mb-1"><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %>,
+                    <% if (user.address.mandal) { %><%= user.address.mandal %>, <% } %>
+                    <% if (user.address.district) { %><%= user.address.district %>, <% } %>
+                    <% if (user.address.state) { %><%= user.address.state %> - <% } %>
+                    <%= user.address.pincode %>
+                </p>
                 <button type="button" id="edit-address-btn" class="btn btn-outline-secondary btn-sm mt-2">Edit Address</button>
             <% } else { %>
                 <p class="text-muted">No address saved yet.</p>
@@ -66,29 +70,64 @@
             <% } %>
         </div>
 
-        <%# Address Form (Initially hidden if address exists) %>
+        <%# Address Form %>
         <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner mt-3">
              <h3 class="h5"><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
-             <input type="hidden" name="source" value="profile">
+             <input type="hidden" name="source" value="profile"> <%# Keep source %>
+
              <div class="form-group">
-                 <label for="profile-name-addr" class="form-label small">Full Name:</label> <%# Changed ID %>
+                 <label for="profile-name-addr" class="form-label small">Full Name:</label>
                  <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= user.address?.name || '' %>" required autocomplete="name">
              </div>
              <div class="form-group">
-                 <label for="profile-phone" class="form-label small">Phone Number:</label> <%# Changed ID %>
+                 <label for="profile-phone" class="form-label small">Phone Number:</label>
                  <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
              </div>
              <div class="form-group">
-                 <label for="profile-pincode" class="form-label small">Pincode:</label> <%# Changed ID %>
-                 <input type="text" id="profile-pincode" name="pincode" class="form-control" value="<%= user.address?.pincode || '' %>" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
+                 <label for="profile-pincode" class="form-label small">Pincode:</label>
+                 <input type="text"
+                        id="profile-pincode"
+                        name="pincode"
+                        class="form-control pincode-input" <%# Added pincode-input class %>
+                        data-target-prefix="profile" <%# Data attribute to target related fields %>
+                        value="<%= user.address?.pincode || '' %>"
+                        required
+                        pattern="\d{6}"
+                        maxlength="6"
+                        inputmode="numeric"
+                        title="Enter 6-digit Pincode"
+                        autocomplete="postal-code">
+                 <small class="pincode-status text-muted"></small> <%# Area for loading/error messages %>
+             </div>
+
+             <%# Auto-filled Fields Container %>
+             <div class="auto-filled-fields-container mb-2" id="profile-auto-filled-fields" style="<%= (user.address && user.address.state) ? 'display: block;' : 'display: none;' %>"> <%# Show if data exists %>
+                 <div class="form-group">
+                    <label for="profile-mandal" class="form-label small">Mandal / Taluk:</label>
+                    <input type="text" id="profile-mandal" class="form-control auto-filled-field" value="<%= user.address?.mandal || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                </div>
+                 <div class="form-group">
+                    <label for="profile-district" class="form-label small">District:</label>
+                    <input type="text" id="profile-district" class="form-control auto-filled-field" value="<%= user.address?.district || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                </div>
+                <div class="form-group">
+                    <label for="profile-state" class="form-label small">State:</label>
+                    <input type="text" id="profile-state" class="form-control auto-filled-field" value="<%= user.address?.state || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                </div>
+             </div>
+
+             <%# Hidden Inputs to Submit Derived Data %>
+             <input type="hidden" id="profile-mandal-hidden" name="mandal" value="<%= user.address?.mandal || '' %>">
+             <input type="hidden" id="profile-district-hidden" name="district" value="<%= user.address?.district || '' %>">
+             <input type="hidden" id="profile-state-hidden" name="state" value="<%= user.address?.state || '' %>">
+
+             <div class="form-group">
+                 <label for="profile-cityVillage" class="form-label small">City / Village / Area:</label>
+                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-line1">
              </div>
              <div class="form-group">
-                 <label for="profile-cityVillage" class="form-label small">City / Village:</label> <%# Changed ID %>
-                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-level2">
-             </div>
-             <div class="form-group">
-                 <label for="profile-landmarkNearby" class="form-label small">Landmark / Nearby (Optional):</label> <%# Changed ID %>
-                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>">
+                 <label for="profile-landmarkNearby" class="form-label small">House No. / Building / Landmark (Optional):</label>
+                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>" autocomplete="address-line2">
              </div>
              <button type="submit" class="btn btn-primary me-2">Save Address</button>
              <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel Edit</button>
@@ -104,7 +143,4 @@
     </div>
 
 </div>
-
-<%# --- JavaScript is now external in main.js --- %>
-
 <%- include('../partials/footer') %>

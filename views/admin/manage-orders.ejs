@@ -1,7 +1,7 @@
 <%# views/admin/manage-orders.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
-<div class="admin-manage-container order-manage-page"> <%# Added 'order-manage-page' class %>
+<div class="admin-manage-container order-manage-page">
     <h1><%= title %></h1>
 
     <% if (orders.length > 0) { %>
@@ -10,7 +10,7 @@
                 <thead>
                     <tr>
                         <th>Details</th>
-                        <th>Customer</th>
+                        <th>Customer & Shipping Address</th>
                         <th>Items</th>
                         <th>Total</th>
                         <th>Status</th>
@@ -27,11 +27,33 @@
                                     <small class="text-muted">Contains items from seller(s)</small>
                                 <% } %>
                             </td>
-                            <td data-label="Customer">
-                                <strong><%= order.shippingAddress.name %></strong><br>
-                                <small class="text-muted"><%= order.userEmail || order.userId?.email %></small><br>
-                                <small><%= order.shippingAddress.cityVillage %>, <%= order.shippingAddress.pincode %></small><br>
-                                <small><strong>Ph:</strong> <%= order.shippingAddress.phone %></small>
+                            <td data-label="Customer & Shipping Address">
+                                <%# Customer Info %>
+                                <div>
+                                    <strong>Customer:</strong> <%= order.userId?.name || order.shippingAddress.name || '[Name Missing]' %><br>
+                                    <small class="text-muted"><%= order.userEmail || order.userId?.email || '[Email Missing]' %></small>
+                                </div>
+                                <%# Full Shipping Address %>
+                                <div class="mt-2 pt-2 border-top">
+                                    <strong>Shipping To:</strong><br>
+                                    <strong><%= order.shippingAddress.name %></strong><br>
+                                    Ph: <%= order.shippingAddress.phone %><br>
+                                    <% if (order.shippingAddress.landmarkNearby) { %>
+                                        <%= order.shippingAddress.landmarkNearby %>,<br>
+                                    <% } %>
+                                    <%= order.shippingAddress.cityVillage %>,<br>
+                                    <%# Display Mandal, District, State if available %>
+                                    <% if (order.shippingAddress.mandal) { %>
+                                        <%= order.shippingAddress.mandal %>,<br>
+                                    <% } %>
+                                     <% if (order.shippingAddress.district) { %>
+                                        <%= order.shippingAddress.district %>,<br>
+                                    <% } %>
+                                    <% if (order.shippingAddress.state) { %>
+                                        <%= order.shippingAddress.state %> -
+                                    <% } %>
+                                    <%= order.shippingAddress.pincode %>
+                                </div>
                             </td>
                             <td data-label="Items">
                                 <div class="order-items-summary">
@@ -58,24 +80,17 @@
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
-                                <%# Display cancellation reason, whether from admin or seller %>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %><br><small class="text-danger mt-1 d-block">Reason: <%= order.cancellationReason %></small><% } %>
                                 <% if(order.status === 'Delivered' && order.receivedByDate) { %><br><small class="text-success mt-1 d-block">Delivered:<br><%= formatDateIST(order.receivedByDate) %></small><% } %>
-
-                                <%# Display OTP Hint conditionally %>
                                 <% if (order.showDeliveryOtp) { %>
                                   <div class="delivery-otp-display mt-1">
                                     <p>Customer OTP Sent</p>
-                                    <%# Display partial OTP for security hint %>
                                     <small class="text-muted">Ask customer for code: <strong class="delivery-otp-code">****<%= order.orderOTP ? order.orderOTP.slice(-2) : 'XX' %></strong></small>
-                                     <%# Display expiry time %>
                                      <% if (order.orderOTPExpires) { %>
                                          <small class="text-muted d-block">Expires: <%= formatDateIST(order.orderOTPExpires) %></small>
                                      <% } %>
                                   </div>
                                 <% } %>
-                                <%# End: Display OTP Hint %>
-
                             </td>
                             <td data-label="Actions" class="actions-cell">
                                 <%# Admin Direct Delivery Confirmation %>

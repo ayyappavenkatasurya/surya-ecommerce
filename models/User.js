@@ -6,8 +6,13 @@ const AddressSchema = new mongoose.Schema({
     name: { type: String, trim: true },
     phone: { type: String, trim: true },
     pincode: { type: String, trim: true },
-    cityVillage: { type: String, trim: true },
+    cityVillage: { type: String, trim: true }, // Area/Town/Village
     landmarkNearby: { type: String, trim: true },
+    // **** NEW FIELDS ****
+    mandal: { type: String, trim: true },     // Derived from pincode lookup
+    district: { type: String, trim: true },   // Derived from pincode lookup
+    state: { type: String, trim: true },      // Derived from pincode lookup
+    // **** END NEW FIELDS ****
 }, { _id: false });
 
 const CartItemSchema = new mongoose.Schema({
@@ -22,7 +27,7 @@ const CartItemSchema = new mongoose.Schema({
         min: 1,
         default: 1,
     }
-}, { _id: false }); // Changed _id back to false as per original
+}, { _id: false });
 
 const UserSchema = new mongoose.Schema({
     name: {
@@ -49,7 +54,6 @@ const UserSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        // *** UPDATED: Added 'seller' role ***
         enum: ['user', 'admin', 'seller'],
         default: 'user',
     },
@@ -59,7 +63,7 @@ const UserSchema = new mongoose.Schema({
     },
     otp: { type: String },
     otpExpires: { type: Date },
-    address: AddressSchema,
+    address: AddressSchema, // Contains the new fields now
     cart: [CartItemSchema],
 
     resetPasswordToken: String,
@@ -71,7 +75,6 @@ const UserSchema = new mongoose.Schema({
 // Hash password before saving
 UserSchema.pre('save', async function(next) {
     if (!this.isModified('password')) return next();
-
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -83,12 +86,9 @@ UserSchema.pre('save', async function(next) {
 
 // Method to compare entered password with hashed password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
-    // Need to explicitly select password if it was excluded in the query
-    // If the user instance was fetched without `+password`, this.password will be undefined.
-    // It's safer to fetch the user with password when matching is needed.
     if (!this.password) {
         const userWithPassword = await mongoose.model('User').findById(this._id).select('+password').exec();
-        if (!userWithPassword) return false; // Should not happen if instance exists
+        if (!userWithPassword) return false;
         return await bcrypt.compare(enteredPassword, userWithPassword.password);
     }
     return await bcrypt.compare(enteredPassword, this.password);

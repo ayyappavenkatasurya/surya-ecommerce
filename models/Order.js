@@ -6,15 +6,22 @@ const OrderProductSchema = new mongoose.Schema({
     name: { type: String, required: true },
     priceAtOrder: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
-    imageUrl: { type: String }
+    imageUrl: { type: String }, // <<<--- MISSING COMMA WAS HERE
+    // **** ADDED: Seller ID for reference ****
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' } // Optional, but good for order context
 }, { _id: false });
 
 const OrderAddressSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
     phone: { type: String, trim: true, required: true },
     pincode: { type: String, trim: true, required: true },
-    cityVillage: { type: String, trim: true, required: true },
+    cityVillage: { type: String, trim: true, required: true }, // Area/Town/Village
     landmarkNearby: { type: String, trim: true },
+    // **** NEW FIELDS ****
+    mandal: { type: String, trim: true },     // Derived from pincode lookup
+    district: { type: String, trim: true },   // Derived from pincode lookup
+    state: { type: String, trim: true },      // Derived from pincode lookup
+    // **** END NEW FIELDS ****
 }, { _id: false });
 
 
@@ -37,7 +44,7 @@ const OrderSchema = new mongoose.Schema({
         min: 0,
     },
     shippingAddress: {
-        type: OrderAddressSchema,
+        type: OrderAddressSchema, // Now includes the new fields
         required: true
     },
     paymentMethod: {

@@ -16,7 +16,7 @@ const { categoryNames } = require('../config/categories');
 const sellerCancellationReasons = [
     "❗ Item Out of Stock",
     "🚚 Unable to Fulfill/Ship",
-    "👤 Customer Requested Cancellation",
+    "👤 Technical Issue",
     "❓ Other Reason",
 ];
 
