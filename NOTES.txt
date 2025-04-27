@@ -1879,8 +1879,16 @@ controllers/userController.js:
 // controllers/userController.js
 const User = require('../models/User');
 const Product = require('../models/Product');
-const mongoose = require('mongoose'); // Import mongoose for ID validation
-const pincodeSearch = require('india-pincode-search'); // <<<--- IMPORT LIBRARY
+const mongoose = require('mongoose');
+// *** REMOVE OLD LIBRARY REQUIRE (if it existed) ***
+// const pincodeSearch = require('india-pincode-search'); // Remove this line
+
+// *** ADD AXIOS REQUIRE ***
+const axios = require('axios');
+
+// ===================================================
+// Existing functions (NO CHANGES needed in these)
+// ===================================================
 
 exports.getUserProfilePage = async (req, res, next) => {
     try {
@@ -1957,9 +1965,8 @@ exports.updateUserName = async (req, res, next) => {
 
 
 exports.saveAddress = async (req, res, next) => {
-    // **** MODIFIED: Destructure new fields ****
+    // Note: This function relies on hidden inputs being populated by the JS lookup
     const { name, phone, pincode, cityVillage, landmarkNearby, source, state, district, mandal } = req.body;
-    // **** END MODIFIED ****
     const userId = req.session.user._id;
 
     const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
@@ -1975,6 +1982,10 @@ exports.saveAddress = async (req, res, next) => {
      if (pincode && !/^\d{6}$/.test(pincode.trim())) {
         errors.push('Please enter a valid 6-digit pincode.');
     }
+     // Check if derived fields are present AFTER pincode lookup was expected
+     if (!state || !district || !mandal) {
+        errors.push('State, District, and Mandal/Taluk could not be determined. Please verify the Pincode and try saving again.');
+     }
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
         return res.redirect(redirectPath);
@@ -1988,19 +1999,17 @@ exports.saveAddress = async (req, res, next) => {
             return res.redirect('/auth/login');
         }
 
-        // **** MODIFIED: Include new fields in the address object ****
         user.address = {
             name: name.trim(),
             phone: phone.trim(),
             pincode: pincode.trim(),
             cityVillage: cityVillage.trim(),
             landmarkNearby: landmarkNearby ? landmarkNearby.trim() : undefined,
-            // Add the derived fields (use optional chaining and trim for safety)
+            // Use hidden input values that should be populated by JS/API lookup
             mandal: mandal?.trim() || undefined,
             district: district?.trim() || undefined,
             state: state?.trim() || undefined
         };
-        // **** END MODIFIED ****
 
         await user.save();
 
@@ -2014,7 +2023,12 @@ exports.saveAddress = async (req, res, next) => {
     } catch (error) {
         if (error.name === 'ValidationError') {
             let validationErrors = Object.values(error.errors).map(el => el.message);
+             if (!state || !district || !mandal) {
+                validationErrors.unshift('Pincode data (State/District/Mandal) might be missing.');
+             }
             req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
+            // Re-rendering with old data is complex here due to redirect path and potential checkout state.
+            // Redirecting is simpler, though loses input values on validation fail.
             return res.redirect(redirectPath);
         }
         next(error);
@@ -2069,6 +2083,7 @@ exports.getCart = async (req, res, next) => {
              if (cartUpdated) {
                  const validCartItems = populatedCart.map(item => ({ productId: item.productId, quantity: item.quantity }));
                  req.session.user.cart = validCartItems;
+                 await req.session.save(); // Save updated session cart
                   console.log(`Session cart updated for user ${user.email} due to invalid/unapproved items found.`);
              }
          }
@@ -2205,26 +2220,34 @@ exports.updateCartQuantity = async (req, res, next) => {
                 if (cartItemIndex > -1) {
                     user.cart[cartItemIndex].quantity = numQuantity;
                 } else {
-                    user.cart.push({ productId, quantity: numQuantity });
+                     // Avoid adding if quantity > stock during direct update
+                    if (product.stock >= numQuantity) {
+                       user.cart.push({ productId, quantity: numQuantity });
+                    } else {
+                         return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}. Only ${product.stock} available.` });
+                    }
                  }
             }
 
             await user.save();
+            // Refresh session data after save
             req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
 
             let cartTotal = 0;
             let itemSubtotal = 0;
-             for (const item of user.cart) {
-                 const relatedProduct = await Product.findById(item.productId).select('price').lean();
-                 if (relatedProduct) {
-                    const currentItemSubtotal = relatedProduct.price * item.quantity;
+             // Repopulate with prices after save
+            const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
+
+             for (const item of updatedUser.cart) {
+                 if (item.productId && typeof item.productId.price === 'number') {
+                    const currentItemSubtotal = item.productId.price * item.quantity;
                     cartTotal += currentItemSubtotal;
-                    if (item.productId.toString() === productId.toString()) {
+                    if (item.productId._id.toString() === productId.toString()) {
                          itemSubtotal = currentItemSubtotal;
                      }
                  }
             }
-             await req.session.save();
+             await req.session.save(); // Save the potentially updated cart count/total info
 
             res.json({
                  success: true,
@@ -2251,10 +2274,14 @@ exports.removeFromCart = async (req, res, next) => {
      }
 
     try {
+        // Fetch user to get the current cart before update
+        const userBeforeUpdate = await User.findById(userId).lean();
+        const initialCartLength = userBeforeUpdate ? userBeforeUpdate.cart.length : 0;
+
         const user = await User.findOneAndUpdate(
             { _id: userId },
             { $pull: { cart: { productId: productId } } },
-            { new: true }
+            { new: true } // Return updated document
         );
 
          if (!user) {
@@ -2262,10 +2289,16 @@ exports.removeFromCart = async (req, res, next) => {
             return res.redirect('/auth/login');
          }
 
+         // Update session cart
          req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
          await req.session.save();
 
-         req.flash('success_msg', 'Item removed from cart.');
+         // Check if an item was actually removed
+         if (user.cart.length < initialCartLength) {
+             req.flash('success_msg', 'Item removed from cart.');
+         } else {
+              req.flash('info_msg', 'Item not found in cart.'); // Or no message
+         }
          res.redirect('/user/cart');
 
     } catch (error) {
@@ -2294,37 +2327,58 @@ exports.getCheckoutPage = async (req, res, next) => {
         let checkoutItems = [];
         let issuesFound = false;
         let issueMessages = [];
+        let itemsToRemoveFromCartOnRedirect = []; // Track items to remove
 
        for (const item of user.cart) {
+            // Safely access potentially missing productId
+           const productName = item.productId?.name || '[Unknown Product]';
+           const productStock = item.productId?.stock ?? 0; // Default stock to 0 if product missing
+           const productStatus = item.productId?.reviewStatus ?? 'unavailable'; // Default status
+
            if (!item.productId || !item.productId._id) {
-               issueMessages.push('An invalid item reference was detected.');
+               issueMessages.push(`An invalid item was detected in your cart.`);
                issuesFound = true;
+               itemsToRemoveFromCartOnRedirect.push(item._id);
                continue;
            }
-            if(item.productId.reviewStatus !== 'approved'){
-                issueMessages.push(`"${item.productId.name}" is unavailable.`);
+            if(productStatus !== 'approved'){
+                issueMessages.push(`"${productName}" is currently unavailable.`);
                 issuesFound = true;
+                itemsToRemoveFromCartOnRedirect.push(item._id);
                 continue;
             }
-            if(item.productId.stock < item.quantity){
-                issueMessages.push(`Insufficient stock for "${item.productId.name}" (Only ${item.productId.stock} left).`);
+            if(productStock < item.quantity){
+                issueMessages.push(`Insufficient stock for "${productName}" (Only ${productStock} left).`);
                 issuesFound = true;
-                 continue;
+                 continue; // Let user fix quantity in cart page
             }
-            const itemTotal = item.productId.price * item.quantity;
+            // Use price from populated product, check if it's a valid number
+            const itemPrice = typeof item.productId.price === 'number' ? item.productId.price : 0;
+            const itemTotal = itemPrice * item.quantity;
             subTotal += itemTotal;
            checkoutItems.push({
                productId: item.productId._id,
-               name: item.productId.name,
-               price: item.productId.price,
-               imageUrl: item.productId.imageUrl,
+               name: productName,
+               price: itemPrice,
+               imageUrl: item.productId.imageUrl || '/images/placeholder.png', // Fallback image
                quantity: item.quantity,
-               stock: item.productId.stock,
+               stock: productStock,
                itemTotal: itemTotal
             });
        }
 
         if (issuesFound) {
+             // Remove specific problematic items if identified
+             if (itemsToRemoveFromCartOnRedirect.length > 0) {
+                 await User.updateOne(
+                     { _id: userId },
+                     { $pull: { cart: { _id: { $in: itemsToRemoveFromCartOnRedirect } } } }
+                 );
+                 const updatedUser = await User.findById(userId).select('cart').lean(); // Re-fetch lean cart
+                 req.session.user.cart = updatedUser ? updatedUser.cart.map(i => ({ productId: i.productId, quantity: i.quantity })) : [];
+                 await req.session.save();
+                 issueMessages.push('Problematic items have been removed.');
+             }
              req.flash('error_msg', "Please resolve the following issues in your cart: " + issueMessages.join(' '));
              return res.redirect('/user/cart');
         }
@@ -2333,7 +2387,7 @@ exports.getCheckoutPage = async (req, res, next) => {
 
        res.render('user/checkout', {
            title: 'Checkout',
-           userAddress: user.address,
+           userAddress: user.address, // Already lean
            items: checkoutItems,
            subTotal: subTotal,
            totalAmount: totalAmount,
@@ -2345,35 +2399,105 @@ exports.getCheckoutPage = async (req, res, next) => {
    }
 };
 
-exports.lookupPincode = (req, res) => {
+// ============================================================
+// *** UPDATED Pincode Lookup using api.postalpincode.in ***
+// ============================================================
+exports.lookupPincode = async (req, res) => { // Marked async
     const pincode = req.params.pincode;
+    const API_URL = `https://api.postalpincode.in/pincode/${pincode}`;
 
+    // Validate Pincode Format
     if (!pincode || !/^\d{6}$/.test(pincode)) {
         return res.status(400).json({ success: false, message: 'Invalid Pincode format (must be 6 digits).' });
     }
 
     try {
-        const results = pincodeSearch.search(pincode);
+        console.log(`[Pincode Lookup] Requesting data for Pincode: ${pincode}`);
 
-        if (!results || results.length === 0) {
-            return res.status(404).json({ success: false, message: 'Pincode not found.' });
+        // Make the API Request using Axios
+        const response = await axios.get(API_URL, {
+            timeout: 7000 // Set a timeout (e.g., 7 seconds)
+        });
+
+        // --- Check HTTP Status Code ---
+        if (response.status !== 200) {
+             console.error(`[Pincode Lookup] API request failed for ${pincode}. Status: ${response.status}`);
+             // Return a generic error for non-200 status codes
+             return res.status(502).json({ success: false, message: `Pincode API unavailable (${response.statusText})` });
         }
 
-        const locationData = results[0];
+        const data = response.data;
+
+        // --- Validate API Response Structure ---
+        // The API returns an array, usually with one element [{ Status: '...', PostOffice: [...] }]
+        if (!Array.isArray(data) || data.length === 0 || !data[0]) {
+            console.error(`[Pincode Lookup] Unexpected API response format for ${pincode}. Data:`, JSON.stringify(data));
+            return res.status(500).json({ success: false, message: 'Unexpected API response format.' });
+        }
+
+        const result = data[0];
+
+        // --- Check API Status Message ---
+        if (result.Status !== 'Success') {
+            console.log(`[Pincode Lookup] Pincode ${pincode} not found by API. Message: ${result.Message}`);
+            // Use 404 specifically for "not found" type errors from the API
+            return res.status(404).json({ success: false, message: `Pincode not found (${result.Message || 'No records'})` });
+        }
+
+        // Check if PostOffice data exists
+        if (!result.PostOffice || !Array.isArray(result.PostOffice) || result.PostOffice.length === 0) {
+            console.warn(`[Pincode Lookup] Pincode ${pincode} found (Status: Success) but no PostOffice data returned.`);
+            return res.status(404).json({ success: false, message: 'Pincode found, but no location details available.' });
+        }
+
+        // --- Extract and Map Data ---
+        // We typically use the first Post Office listed for simplicity
+        const locationData = result.PostOffice[0];
+
+        // Map the fields from the API response to the names the frontend JavaScript expects
         const transformedLocation = {
-            pinCode: locationData.pincode,
-            locality: locationData.village,
-            mandalName: locationData.district,
-            districtName: locationData.city,
-            stateName: locationData.state,
-            postOfficeName: locationData.office
+            pinCode: locationData.Pincode || pincode, // Use original if missing
+            locality: locationData.Name || '',        // Main locality name (Post Office Name)
+            // Combine Block/Taluk/Division as 'Mandal' - prioritize Block
+            mandalName: locationData.Block && locationData.Block !== 'NA'
+                            ? locationData.Block
+                            : (locationData.Taluk && locationData.Taluk !== 'NA'
+                                ? locationData.Taluk
+                                : locationData.Division || ''),
+            districtName: locationData.District || '',   // District name
+            stateName: locationData.State || '',         // State name
+            postOfficeName: locationData.Name || '',     // Re-use PO Name for clarity
         };
 
+        console.log(`[Pincode Lookup] Success for ${pincode}. Location:`, transformedLocation);
+        // Send the transformed data back to the frontend
         res.json({ success: true, location: transformedLocation });
 
     } catch (error) {
-        console.error(`Error looking up pincode ${pincode}:`, error);
-        res.status(500).json({ success: false, message: 'Error looking up pincode information.' });
+        console.error(`[Pincode Lookup] Network/Request Error for pincode ${pincode}:`, error.message);
+
+        let statusCode = 500;
+        let message = 'Error looking up pincode information.';
+
+        // Handle Axios-specific errors
+        if (axios.isAxiosError(error)) {
+            if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+                message = 'Pincode lookup timed out. Please try again.';
+                statusCode = 504; // Gateway Timeout
+            } else if (error.response) {
+                 // This case is less likely here since we check status 200 above,
+                 // but good practice for other Axios uses.
+                 message = `Pincode API error (${error.response.status}).`;
+                 statusCode = 502; // Bad Gateway if API itself errored significantly
+            } else if (error.request) {
+                // Request made but no response received (network issue)
+                message = 'Network error during pincode lookup.';
+                statusCode = 502; // Bad Gateway
+            }
+        }
+
+        // Return the error response
+        res.status(statusCode).json({ success: false, message: message });
     }
 };
 
@@ -6780,8 +6904,7 @@ const { isAuthenticated } = require('../middleware/authMiddleware'); // Protect 
 
 const router = express.Router();
 
-// --- NEW: Pincode Lookup Route ---
-// Placing it before other user routes that might have similar patterns
+// --- Pincode Lookup Route (No changes needed here) ---
 router.get('/pincode-lookup/:pincode', userController.lookupPincode);
 // --- End Pincode Lookup Route ---
 

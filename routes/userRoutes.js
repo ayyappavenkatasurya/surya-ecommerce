@@ -5,8 +5,7 @@ const { isAuthenticated } = require('../middleware/authMiddleware'); // Protect 
 
 const router = express.Router();
 
-// --- NEW: Pincode Lookup Route ---
-// Placing it before other user routes that might have similar patterns
+// --- Pincode Lookup Route (No changes needed here) ---
 router.get('/pincode-lookup/:pincode', userController.lookupPincode);
 // --- End Pincode Lookup Route ---
 
