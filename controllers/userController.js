@@ -2,26 +2,19 @@
 const User = require('../models/User');
 const Product = require('../models/Product');
 const mongoose = require('mongoose');
-// *** REMOVE OLD LIBRARY REQUIRE (if it existed) ***
-// const pincodeSearch = require('india-pincode-search'); // Remove this line
-
-// *** ADD AXIOS REQUIRE ***
 const axios = require('axios');
 
 // ===================================================
-// Existing functions (NO CHANGES needed in these)
+// Existing functions (getUserProfilePage, updateUserName - NO CHANGES needed)
 // ===================================================
-
 exports.getUserProfilePage = async (req, res, next) => {
     try {
         const userId = req.session.user._id;
-        // Select only necessary fields for profile display
         const user = await User.findById(userId)
-                            .select('name email role address createdAt') // Added createdAt for info if needed
-                            .lean(); // Use lean for read-only
+                            .select('name email role address createdAt')
+                            .lean();
 
         if (!user) {
-            // This case should ideally be handled by isAuthenticated middleware
             console.warn(`User not found in DB despite active session: ${userId}`);
             req.flash('error_msg', 'User session invalid. Please log in again.');
             return req.session.destroy(err => {
@@ -32,12 +25,11 @@ exports.getUserProfilePage = async (req, res, next) => {
 
         res.render('user/profile', {
             title: 'My Profile',
-            user: user // Pass user data to the view
-            // currentUser is available via res.locals
+            user: user
         });
 
     } catch (error) {
-        next(error); // Pass error to handler
+        next(error);
     }
 };
 
@@ -45,7 +37,6 @@ exports.updateUserName = async (req, res, next) => {
     const { name } = req.body;
     const userId = req.session.user._id;
 
-    // --- Input Validation ---
     if (!name || typeof name !== 'string' || name.trim().length < 2) {
         req.flash('error_msg', 'Please enter a valid name (at least 2 characters).');
         return res.redirect('/user/profile');
@@ -54,62 +45,59 @@ exports.updateUserName = async (req, res, next) => {
     const trimmedName = name.trim();
 
     try {
-        // Find user (not lean, need to save)
         const user = await User.findById(userId);
         if (!user) {
             req.flash('error_msg', 'User not found. Please log in again.');
             return res.redirect('/auth/login');
         }
 
-        // Update the name
         user.name = trimmedName;
         await user.save();
 
-        // --- Update Session ---
-        req.session.user.name = user.name; // Update name in session
-        await req.session.save(); // Wait for session save to complete
+        req.session.user.name = user.name;
+        await req.session.save();
 
         req.flash('success_msg', 'Name updated successfully.');
-        res.redirect('/user/profile'); // Redirect back to profile
+        res.redirect('/user/profile');
 
     } catch (error) {
-        // Handle Mongoose validation errors specifically
         if (error.name === 'ValidationError') {
             let validationErrors = Object.values(error.errors).map(el => el.message);
             req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
             return res.redirect('/user/profile');
         }
-        // Pass other errors to the central handler
         console.error("Error updating user name:", error);
         next(error);
     }
 };
 
-
+// ===================================================
+// UPDATED saveAddress function
+// ===================================================
 exports.saveAddress = async (req, res, next) => {
-    // Note: This function relies on hidden inputs being populated by the JS lookup
-    const { name, phone, pincode, cityVillage, landmarkNearby, source, state, district, mandal } = req.body;
+    // Destructure locality along with other fields
+    const { name, phone, pincode, locality, cityVillage, landmarkNearby, source, state, district, mandal } = req.body;
     const userId = req.session.user._id;
-
     const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
 
     // --- Input Validation ---
     let errors = [];
-    if (!name || !phone || !pincode || !cityVillage) {
-        errors.push('Please provide Name, Phone, Pincode, and City/Village/Area.');
+    // Add locality check
+    if (!name || !phone || !pincode || !locality || !cityVillage) {
+        errors.push('Please provide Name, Phone, Pincode, select a Locality, and enter House No/Building/Area.');
     }
-    if (phone && !/^\d{10,15}$/.test(phone.trim())) {
-        errors.push('Please enter a valid phone number (10-15 digits, numbers only).');
+    if (phone && !/^\d{10,15}$/.test(phone.trim())) { errors.push('Please enter a valid phone number (10-15 digits, numbers only).'); }
+    if (pincode && !/^\d{6}$/.test(pincode.trim())) { errors.push('Please enter a valid 6-digit pincode.'); }
+    if (!state || !district || !mandal) { errors.push('State, District, and Mandal/Taluk could not be determined. Please verify the Pincode and try saving again.'); }
+    // Check if locality is empty if state/district/mandal were determined
+    if (state && (!locality || locality.trim() === '')) {
+        errors.push('Please select a Locality/Post Office from the dropdown after entering the Pincode.');
     }
-     if (pincode && !/^\d{6}$/.test(pincode.trim())) {
-        errors.push('Please enter a valid 6-digit pincode.');
-    }
-     // Check if derived fields are present AFTER pincode lookup was expected
-     if (!state || !district || !mandal) {
-        errors.push('State, District, and Mandal/Taluk could not be determined. Please verify the Pincode and try saving again.');
-     }
+
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
+        // Pass back data to repopulate form
+        req.session.addressFormData = req.body; // Store temporarily
         return res.redirect(redirectPath);
     }
 
@@ -118,6 +106,7 @@ exports.saveAddress = async (req, res, next) => {
         const user = await User.findById(userId);
         if (!user) {
             req.flash('error_msg', 'User not found.');
+            delete req.session.addressFormData; // Clean up session data
             return res.redirect('/auth/login');
         }
 
@@ -125,9 +114,9 @@ exports.saveAddress = async (req, res, next) => {
             name: name.trim(),
             phone: phone.trim(),
             pincode: pincode.trim(),
-            cityVillage: cityVillage.trim(),
-            landmarkNearby: landmarkNearby ? landmarkNearby.trim() : undefined,
-            // Use hidden input values that should be populated by JS/API lookup
+            locality: locality.trim(), // Save locality
+            cityVillage: cityVillage.trim(), // Save House No/Building/Area
+            landmarkNearby: landmarkNearby ? landmarkNearby.trim() : undefined, // Save Landmark
             mandal: mandal?.trim() || undefined,
             district: district?.trim() || undefined,
             state: state?.trim() || undefined
@@ -138,25 +127,29 @@ exports.saveAddress = async (req, res, next) => {
         // --- Update Session ---
         req.session.user.address = user.address.toObject();
         await req.session.save();
+        delete req.session.addressFormData; // Clean up temporary form data
 
         req.flash('success_msg', 'Address saved successfully.');
         res.redirect(redirectPath);
 
     } catch (error) {
+        delete req.session.addressFormData; // Clean up session data
         if (error.name === 'ValidationError') {
             let validationErrors = Object.values(error.errors).map(el => el.message);
-             if (!state || !district || !mandal) {
-                validationErrors.unshift('Pincode data (State/District/Mandal) might be missing.');
+             if (!state || !district || !mandal || !locality) {
+                validationErrors.unshift('Pincode or Locality data might be missing.');
              }
             req.flash('error_msg', `Validation Error: ${validationErrors.join(' ')}`);
-            // Re-rendering with old data is complex here due to redirect path and potential checkout state.
-            // Redirecting is simpler, though loses input values on validation fail.
+            req.session.addressFormData = req.body; // Store temporarily for repopulation
             return res.redirect(redirectPath);
         }
         next(error);
     }
 };
 
+// ===================================================
+// Existing Cart/Checkout functions (NO CHANGES needed)
+// ===================================================
 exports.getCart = async (req, res, next) => {
     try {
         const userId = req.session.user._id;
@@ -452,10 +445,9 @@ exports.getCheckoutPage = async (req, res, next) => {
         let itemsToRemoveFromCartOnRedirect = []; // Track items to remove
 
        for (const item of user.cart) {
-            // Safely access potentially missing productId
            const productName = item.productId?.name || '[Unknown Product]';
-           const productStock = item.productId?.stock ?? 0; // Default stock to 0 if product missing
-           const productStatus = item.productId?.reviewStatus ?? 'unavailable'; // Default status
+           const productStock = item.productId?.stock ?? 0;
+           const productStatus = item.productId?.reviewStatus ?? 'unavailable';
 
            if (!item.productId || !item.productId._id) {
                issueMessages.push(`An invalid item was detected in your cart.`);
@@ -472,9 +464,8 @@ exports.getCheckoutPage = async (req, res, next) => {
             if(productStock < item.quantity){
                 issueMessages.push(`Insufficient stock for "${productName}" (Only ${productStock} left).`);
                 issuesFound = true;
-                 continue; // Let user fix quantity in cart page
+                 continue;
             }
-            // Use price from populated product, check if it's a valid number
             const itemPrice = typeof item.productId.price === 'number' ? item.productId.price : 0;
             const itemTotal = itemPrice * item.quantity;
             subTotal += itemTotal;
@@ -482,7 +473,7 @@ exports.getCheckoutPage = async (req, res, next) => {
                productId: item.productId._id,
                name: productName,
                price: itemPrice,
-               imageUrl: item.productId.imageUrl || '/images/placeholder.png', // Fallback image
+               imageUrl: item.productId.imageUrl || '/images/placeholder.png',
                quantity: item.quantity,
                stock: productStock,
                itemTotal: itemTotal
@@ -490,13 +481,12 @@ exports.getCheckoutPage = async (req, res, next) => {
        }
 
         if (issuesFound) {
-             // Remove specific problematic items if identified
              if (itemsToRemoveFromCartOnRedirect.length > 0) {
                  await User.updateOne(
                      { _id: userId },
                      { $pull: { cart: { _id: { $in: itemsToRemoveFromCartOnRedirect } } } }
                  );
-                 const updatedUser = await User.findById(userId).select('cart').lean(); // Re-fetch lean cart
+                 const updatedUser = await User.findById(userId).select('cart').lean();
                  req.session.user.cart = updatedUser ? updatedUser.cart.map(i => ({ productId: i.productId, quantity: i.quantity })) : [];
                  await req.session.save();
                  issueMessages.push('Problematic items have been removed.');
@@ -509,7 +499,7 @@ exports.getCheckoutPage = async (req, res, next) => {
 
        res.render('user/checkout', {
            title: 'Checkout',
-           userAddress: user.address, // Already lean
+           userAddress: user.address,
            items: checkoutItems,
            subTotal: subTotal,
            totalAmount: totalAmount,
@@ -524,34 +514,25 @@ exports.getCheckoutPage = async (req, res, next) => {
 // ============================================================
 // *** UPDATED Pincode Lookup using api.postalpincode.in ***
 // ============================================================
-exports.lookupPincode = async (req, res) => { // Marked async
+exports.lookupPincode = async (req, res) => {
     const pincode = req.params.pincode;
     const API_URL = `https://api.postalpincode.in/pincode/${pincode}`;
 
-    // Validate Pincode Format
     if (!pincode || !/^\d{6}$/.test(pincode)) {
         return res.status(400).json({ success: false, message: 'Invalid Pincode format (must be 6 digits).' });
     }
 
     try {
         console.log(`[Pincode Lookup] Requesting data for Pincode: ${pincode}`);
+        const response = await axios.get(API_URL, { timeout: 7000 });
 
-        // Make the API Request using Axios
-        const response = await axios.get(API_URL, {
-            timeout: 7000 // Set a timeout (e.g., 7 seconds)
-        });
-
-        // --- Check HTTP Status Code ---
         if (response.status !== 200) {
-             console.error(`[Pincode Lookup] API request failed for ${pincode}. Status: ${response.status}`);
-             // Return a generic error for non-200 status codes
-             return res.status(502).json({ success: false, message: `Pincode API unavailable (${response.statusText})` });
+            console.error(`[Pincode Lookup] API request failed for ${pincode}. Status: ${response.status}`);
+            return res.status(502).json({ success: false, message: `Pincode API unavailable (${response.statusText})` });
         }
 
         const data = response.data;
 
-        // --- Validate API Response Structure ---
-        // The API returns an array, usually with one element [{ Status: '...', PostOffice: [...] }]
         if (!Array.isArray(data) || data.length === 0 || !data[0]) {
             console.error(`[Pincode Lookup] Unexpected API response format for ${pincode}. Data:`, JSON.stringify(data));
             return res.status(500).json({ success: false, message: 'Unexpected API response format.' });
@@ -559,66 +540,74 @@ exports.lookupPincode = async (req, res) => { // Marked async
 
         const result = data[0];
 
-        // --- Check API Status Message ---
         if (result.Status !== 'Success') {
             console.log(`[Pincode Lookup] Pincode ${pincode} not found by API. Message: ${result.Message}`);
-            // Use 404 specifically for "not found" type errors from the API
             return res.status(404).json({ success: false, message: `Pincode not found (${result.Message || 'No records'})` });
         }
 
         // Check if PostOffice data exists
         if (!result.PostOffice || !Array.isArray(result.PostOffice) || result.PostOffice.length === 0) {
             console.warn(`[Pincode Lookup] Pincode ${pincode} found (Status: Success) but no PostOffice data returned.`);
-            return res.status(404).json({ success: false, message: 'Pincode found, but no location details available.' });
+            return res.json({
+                success: true,
+                location: {
+                    pinCode: pincode,
+                    mandalName: '',
+                    districtName: '',
+                    stateName: '',
+                    localities: [] // Return empty array
+                }
+            });
+            // OR: return res.status(404).json({ success: false, message: 'Pincode found, but no location details available.' });
         }
 
         // --- Extract and Map Data ---
-        // We typically use the first Post Office listed for simplicity
-        const locationData = result.PostOffice[0];
+        const postOffices = result.PostOffice;
+        const firstPO = postOffices[0];
 
-        // Map the fields from the API response to the names the frontend JavaScript expects
+        // --- Extract list of localities ---
+        const localitiesList = postOffices
+            .map(po => po.Name)
+            .filter(name => name && name.trim() !== '' && name.toUpperCase() !== 'NA')
+            .sort(); // Optional: sort
+
+        const uniqueLocalities = [...new Set(localitiesList)];
+
         const transformedLocation = {
-            pinCode: locationData.Pincode || pincode, // Use original if missing
-            locality: locationData.Name || '',        // Main locality name (Post Office Name)
-            // Combine Block/Taluk/Division as 'Mandal' - prioritize Block
-            mandalName: locationData.Block && locationData.Block !== 'NA'
-                            ? locationData.Block
-                            : (locationData.Taluk && locationData.Taluk !== 'NA'
-                                ? locationData.Taluk
-                                : locationData.Division || ''),
-            districtName: locationData.District || '',   // District name
-            stateName: locationData.State || '',         // State name
-            postOfficeName: locationData.Name || '',     // Re-use PO Name for clarity
+            pinCode: firstPO.Pincode || pincode,
+            mandalName: firstPO.Block && firstPO.Block !== 'NA'
+                            ? firstPO.Block
+                            : (firstPO.Taluk && firstPO.Taluk !== 'NA'
+                                ? firstPO.Taluk
+                                : firstPO.Division || ''),
+            districtName: firstPO.District || '',
+            stateName: firstPO.State || '',
+            // --- Add localities array ---
+            localities: uniqueLocalities
         };
 
         console.log(`[Pincode Lookup] Success for ${pincode}. Location:`, transformedLocation);
-        // Send the transformed data back to the frontend
         res.json({ success: true, location: transformedLocation });
 
     } catch (error) {
         console.error(`[Pincode Lookup] Network/Request Error for pincode ${pincode}:`, error.message);
-
         let statusCode = 500;
         let message = 'Error looking up pincode information.';
-
-        // Handle Axios-specific errors
         if (axios.isAxiosError(error)) {
             if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
                 message = 'Pincode lookup timed out. Please try again.';
-                statusCode = 504; // Gateway Timeout
+                statusCode = 504;
             } else if (error.response) {
-                 // This case is less likely here since we check status 200 above,
-                 // but good practice for other Axios uses.
                  message = `Pincode API error (${error.response.status}).`;
-                 statusCode = 502; // Bad Gateway if API itself errored significantly
+                 statusCode = 502;
             } else if (error.request) {
-                // Request made but no response received (network issue)
                 message = 'Network error during pincode lookup.';
-                statusCode = 502; // Bad Gateway
+                statusCode = 502;
             }
         }
-
-        // Return the error response
         res.status(statusCode).json({ success: false, message: message });
     }
 };
+// ============================================================
+// End Updated Pincode Lookup
+// ============================================================

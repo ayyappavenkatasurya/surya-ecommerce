@@ -11,6 +11,8 @@
   <% const currentMetaUrl = typeof fullUrl !== 'undefined' ? fullUrl : ''; %>
   <% const currentMetaType = typeof metaType !== 'undefined' ? metaType : 'website'; %>
 
+  <%# --- REMOVED the problematic EJS block that tried to set res.locals --- %>
+
   <title><%= pageTitle %></title>
   <meta name="description" content="<%= currentMetaDesc %>">
   <meta property="og:title" content="<%= currentMetaTitle %>" />
@@ -41,7 +43,6 @@
         </a>
       </div>
 
-      <%# --- NEW Dynamic Search Bar Container --- %>
       <div class="search-container-dynamic" id="dynamic-search-container">
           <form action="/products" method="GET" class="search-form-dynamic" id="dynamic-search-form">
               <input type="search"
@@ -58,16 +59,13 @@
               <%# Suggestions will be populated here by JS %>
           </div>
       </div>
-      <%# --- END Dynamic Search Bar Container --- %>
 
       <div class="nav-right">
-          <%# Search Icon Toggle (controls the container above) %>
           <button class="nav-link search-toggle-btn" id="search-toggle-btn" aria-label="Toggle Search Bar">
               <i class="fas fa-search"></i>
               <span>Search</span>
           </button>
 
-        <%# Rest of the nav items %>
         <% if (currentUser) { %>
           <a href="/" class="nav-link <%= currentUrl === '/' ? 'active' : '' %>" title="Home Page">
             <i class="fas fa-home"></i> <span>Home</span>
@@ -77,11 +75,6 @@
             <span class="cart-badge <%= cartItemCount > 0 ? '' : 'hide' %>"><%= cartItemCount %></span>
             <span>Cart</span>
           </a>
-
-          <%# --- ORDERS LINK HAS BEEN REMOVED FROM HERE --- %>
-
-          <%# --- REMOVED Admin and Seller Dashboard Links --- %>
-
           <a href="/user/profile" class="profile-avatar-link <%= currentUrl === '/user/profile' ? 'active' : '' %>" title="My Profile Page">
             <span class="profile-avatar-initials"><%= userInitials %></span>
           </a>

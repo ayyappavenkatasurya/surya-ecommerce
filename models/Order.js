@@ -6,22 +6,22 @@ const OrderProductSchema = new mongoose.Schema({
     name: { type: String, required: true },
     priceAtOrder: { type: Number, required: true },
     quantity: { type: Number, required: true, min: 1 },
-    imageUrl: { type: String }, // <<<--- MISSING COMMA WAS HERE
-    // **** ADDED: Seller ID for reference ****
-    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' } // Optional, but good for order context
+    imageUrl: { type: String },
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 }, { _id: false });
 
 const OrderAddressSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
     phone: { type: String, trim: true, required: true },
     pincode: { type: String, trim: true, required: true },
-    cityVillage: { type: String, trim: true, required: true }, // Area/Town/Village
-    landmarkNearby: { type: String, trim: true },
-    // **** NEW FIELDS ****
+    // **** ADD LOCALITY ****
+    locality: { type: String, trim: true, required: true }, // Selected from dropdown
+    // **** END LOCALITY ****
+    cityVillage: { type: String, trim: true, required: true }, // For House No / Building / Area
+    landmarkNearby: { type: String, trim: true }, // Optional Landmark
     mandal: { type: String, trim: true },     // Derived from pincode lookup
     district: { type: String, trim: true },   // Derived from pincode lookup
     state: { type: String, trim: true },      // Derived from pincode lookup
-    // **** END NEW FIELDS ****
 }, { _id: false });
 
 
@@ -44,7 +44,7 @@ const OrderSchema = new mongoose.Schema({
         min: 0,
     },
     shippingAddress: {
-        type: OrderAddressSchema, // Now includes the new fields
+        type: OrderAddressSchema, // Now includes the locality field
         required: true
     },
     paymentMethod: {
@@ -65,10 +65,8 @@ const OrderSchema = new mongoose.Schema({
     receivedByDate: {
         type: Date,
     },
-
     orderOTP: String,
     orderOTPExpires: Date,
-
     cancellationAllowedUntil: {
         type: Date,
     },
@@ -83,21 +81,20 @@ const OrderSchema = new mongoose.Schema({
 OrderSchema.pre('save', function(next) {
     if (this.isNew && !this.cancellationAllowedUntil) {
         const now = this.orderDate || Date.now();
-        this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000);
+        this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
     }
 
-    if (this.isModified('status') && this.status === 'Cancelled') {
+    // Clear OTP and related fields on cancellation or delivery
+    if (this.isModified('status') && (this.status === 'Cancelled' || this.status === 'Delivered')) {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
-        this.receivedByDate = undefined;
-        this.cancellationAllowedUntil = undefined;
+        this.cancellationAllowedUntil = undefined; // Disable cancellation
+        if (this.status === 'Cancelled') {
+            this.receivedByDate = undefined; // Clear received date if cancelled
+        }
     }
-
-    if (this.isModified('status') && this.status !== 'Pending') {
-         this.orderOTP = undefined;
-         this.orderOTPExpires = undefined;
-    }
-    if (this.status === 'Delivered' || this.status === 'Cancelled') {
+     // Also clear OTP if status changes FROM Pending to something else (but might be redundant with above)
+     if (this.isModified('status') && this.status !== 'Pending') {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
     }

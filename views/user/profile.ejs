@@ -3,50 +3,45 @@
 
 <div class="profile-container">
     <%# --- Combine Welcome and Name Edit --- %>
-    <div class="profile-header mb-4 d-flex align-items-center justify-content-center flex-wrap"> <%# Flex container %>
-        <h1 class="mb-0 me-3">My Profile</h1> <%# Removed bottom margin from h1 %>
+    <div class="profile-header mb-4 d-flex align-items-center justify-content-center flex-wrap">
+        <h1 class="mb-0 me-3">My Profile</h1>
         <div class="d-flex align-items-center">
-             <%# Display current name - initially visible %>
-             <span id="saved-name-display" class="fs-5 me-2">Hi, <strong id="display-user-name"><%= user.name %></strong></span>
-             <%# Edit button (icon) - initially visible %>
+            <span id="saved-name-display" class="fs-5 me-2">Hi, <strong id="display-user-name"><%= user.name %></strong></span>
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
-
-             <%# Name edit form - initially hidden %>
-             <form action="/user/profile/update-name" method="POST" id="name-form" class="hidden inline-form align-items-center ms-2 form-submit-spinner">
-                 <label for="name-input" class="visually-hidden">New Name:</label>
-                 <input type="text" id="name-input" name="name" class="form-control form-control-sm me-2" value="<%= user.name %>" required minlength="2" placeholder="Enter new name">
-                 <button type="submit" class="btn btn-primary btn-sm me-1">Save</button>
-                 <button type="button" id="cancel-edit-name-btn" class="btn btn-secondary btn-sm">Cancel</button>
-             </form>
-         </div>
+            <form action="/user/profile/update-name" method="POST" id="name-form" class="hidden inline-form align-items-center ms-2 form-submit-spinner">
+                <label for="name-input" class="visually-hidden">New Name:</label>
+                <input type="text" id="name-input" name="name" class="form-control form-control-sm me-2" value="<%= user.name %>" required minlength="2" placeholder="Enter new name">
+                <button type="submit" class="btn btn-primary btn-sm me-1">Save</button>
+                <button type="button" id="cancel-edit-name-btn" class="btn btn-secondary btn-sm">Cancel</button>
+            </form>
+        </div>
     </div>
-    <p class="text-muted text-center small mb-3">Email: <strong><%= user.email %></strong></p> <%# Moved email below %>
+    <p class="text-muted text-center small mb-3">Email: <strong><%= user.email %></strong></p>
 
-    <%# --- NEW: My Orders Section --- %>
+    <%# --- My Orders Section --- %>
     <div class="profile-section orders-section mb-4">
         <h2>My Orders</h2>
         <div class="d-flex flex-wrap gap-2">
-            <a href="/orders/my-orders" class="btn btn-secondary"> <%# Using btn-secondary style %>
+            <a href="/orders/my-orders" class="btn btn-secondary">
                 <i class="fas fa-box"></i> View My Orders
             </a>
         </div>
     </div>
-    <%# --- End: My Orders Section --- %>
 
     <%# --- Conditional Dashboards Section --- %>
     <div class="profile-section dashboards-section mb-4">
         <h2>Dashboards</h2>
-        <div class="d-flex flex-wrap gap-2"> <%# Use flex for button layout %>
+        <div class="d-flex flex-wrap gap-2">
             <% if (user.role === 'admin') { %>
                 <a href="/admin/dashboard" class="btn btn-info"><i class="fas fa-user-shield"></i> Admin Dashboard</a>
             <% } %>
-             <% if (user.role === 'seller') { %>
-                 <a href="/seller/dashboard" class="btn btn-success"><i class="fas fa-store"></i> Seller Dashboard</a>
-             <% } %>
-             <% if (user.role === 'user') { %> <%# Explicitly show user status %>
-                 <p class="mb-0 align-self-center">Standard User Account</p>
+            <% if (user.role === 'seller') { %>
+                <a href="/seller/dashboard" class="btn btn-success"><i class="fas fa-store"></i> Seller Dashboard</a>
             <% } %>
-         </div>
+            <% if (user.role === 'user') { %>
+                <p class="mb-0 align-self-center">Standard User Account</p>
+            <% } %>
+        </div>
     </div>
 
     <%# --- Address Management Section --- %>
@@ -57,80 +52,101 @@
             <% if (user.address && user.address.name) { %>
                 <p class="mb-1"><strong><%= user.address.name %></strong></p>
                 <p class="mb-1"><%= user.address.phone %></p>
-                <p class="mb-1"><%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %><%= user.address.cityVillage %>,
-                    <% if (user.address.mandal) { %><%= user.address.mandal %>, <% } %>
-                    <% if (user.address.district) { %><%= user.address.district %>, <% } %>
-                    <% if (user.address.state) { %><%= user.address.state %> - <% } %>
+                <p class="mb-1">
+                    <%# Display House/Area first %>
+                    <%= user.address.cityVillage ? user.address.cityVillage + ', ' : '' %>
+                    <%# Landmark Optional %>
+                    <%= user.address.landmarkNearby ? user.address.landmarkNearby + ', ' : '' %>
+                    <%# Locality %>
+                    <%= user.address.locality ? user.address.locality + ', ' : '' %>
+                    <%# Derived Fields %>
+                    <%= user.address.mandal ? user.address.mandal + ', ' : '' %>
+                    <%= user.address.district ? user.address.district + ', ' : '' %>
+                    <%= user.address.state ? user.address.state + ' - ' : '' %>
                     <%= user.address.pincode %>
                 </p>
                 <button type="button" id="edit-address-btn" class="btn btn-outline-secondary btn-sm mt-2">Edit Address</button>
             <% } else { %>
                 <p class="text-muted">No address saved yet.</p>
-                 <button type="button" id="add-address-btn" class="btn btn-outline-primary btn-sm mt-2 hidden">Add Address</button> <%# Hide initially, JS will show %>
+                <button type="button" id="add-address-btn" class="btn btn-outline-primary btn-sm mt-2 hidden">Add Address</button>
             <% } %>
         </div>
 
         <%# Address Form %>
         <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (user.address && user.address.name) ? 'hidden' : '' %> form-submit-spinner mt-3">
-             <h3 class="h5"><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
-             <input type="hidden" name="source" value="profile"> <%# Keep source %>
+            <h3 class="h5"><%= (user.address && user.address.name) ? 'Edit Address' : 'Add Address' %></h3>
+            <input type="hidden" name="source" value="profile">
 
-             <div class="form-group">
-                 <label for="profile-name-addr" class="form-label small">Full Name:</label>
-                 <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= user.address?.name || '' %>" required autocomplete="name">
-             </div>
-             <div class="form-group">
-                 <label for="profile-phone" class="form-label small">Phone Number:</label>
-                 <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
-             </div>
-             <div class="form-group">
-                 <label for="profile-pincode" class="form-label small">Pincode:</label>
-                 <input type="text"
-                        id="profile-pincode"
-                        name="pincode"
-                        class="form-control pincode-input" <%# Added pincode-input class %>
-                        data-target-prefix="profile" <%# Data attribute to target related fields %>
-                        value="<%= user.address?.pincode || '' %>"
+            <div class="form-group">
+                <label for="profile-name-addr" class="form-label small">Full Name:</label>
+                <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || user.address?.name || '' %>" required autocomplete="name">
+            </div>
+            <div class="form-group">
+                <label for="profile-phone" class="form-label small">Phone Number:</label>
+                <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+            </div>
+            <div class="form-group">
+                <label for="profile-pincode" class="form-label small">Pincode:</label>
+                <input type="text"
+                       id="profile-pincode"
+                       name="pincode"
+                       class="form-control pincode-input"
+                       data-target-prefix="profile"
+                       value="<%= addressFormData?.pincode || user.address?.pincode || '' %>"
+                       required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                       title="Enter 6-digit Pincode" autocomplete="postal-code">
+                <small class="pincode-status text-muted"></small>
+            </div>
+
+            <%# --- NEW: Locality Dropdown --- %>
+            <div class="form-group">
+                <label for="profile-locality" class="form-label small">Locality / Post Office:</label>
+                <%# Populate dataset if editing/repopulating for JS pre-selection %>
+                <select id="profile-locality"
+                        name="locality"
+                        class="form-control"
                         required
-                        pattern="\d{6}"
-                        maxlength="6"
-                        inputmode="numeric"
-                        title="Enter 6-digit Pincode"
-                        autocomplete="postal-code">
-                 <small class="pincode-status text-muted"></small> <%# Area for loading/error messages %>
-             </div>
+                        disabled
+                        data-saved-value="<%= addressFormData?.locality || user.address?.locality || '' %>">
+                    <option value="" selected disabled>Enter Pincode First</option>
+                    <%# Options will be populated by JavaScript %>
+                </select>
+                <small class="locality-status text-muted"></small>
+            </div>
+            <%# --- End: Locality Dropdown --- %>
 
-             <%# Auto-filled Fields Container %>
-             <div class="auto-filled-fields-container mb-2" id="profile-auto-filled-fields" style="<%= (user.address && user.address.state) ? 'display: block;' : 'display: none;' %>"> <%# Show if data exists %>
-                 <div class="form-group">
+            <%# Auto-filled Fields Container %>
+            <div class="auto-filled-fields-container mb-2" id="profile-auto-filled-fields"
+                 style="<%= (addressFormData?.state || user.address?.state) ? 'display: block;' : 'display: none;' %>">
+                <div class="form-group">
                     <label for="profile-mandal" class="form-label small">Mandal / Taluk:</label>
-                    <input type="text" id="profile-mandal" class="form-control auto-filled-field" value="<%= user.address?.mandal || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                    <input type="text" id="profile-mandal" class="form-control auto-filled-field" value="<%= addressFormData?.mandal || user.address?.mandal || '' %>" readonly tabindex="-1">
                 </div>
-                 <div class="form-group">
+                <div class="form-group">
                     <label for="profile-district" class="form-label small">District:</label>
-                    <input type="text" id="profile-district" class="form-control auto-filled-field" value="<%= user.address?.district || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                    <input type="text" id="profile-district" class="form-control auto-filled-field" value="<%= addressFormData?.district || user.address?.district || '' %>" readonly tabindex="-1">
                 </div>
                 <div class="form-group">
                     <label for="profile-state" class="form-label small">State:</label>
-                    <input type="text" id="profile-state" class="form-control auto-filled-field" value="<%= user.address?.state || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                    <input type="text" id="profile-state" class="form-control auto-filled-field" value="<%= addressFormData?.state || user.address?.state || '' %>" readonly tabindex="-1">
                 </div>
-             </div>
+            </div>
 
-             <%# Hidden Inputs to Submit Derived Data %>
-             <input type="hidden" id="profile-mandal-hidden" name="mandal" value="<%= user.address?.mandal || '' %>">
-             <input type="hidden" id="profile-district-hidden" name="district" value="<%= user.address?.district || '' %>">
-             <input type="hidden" id="profile-state-hidden" name="state" value="<%= user.address?.state || '' %>">
+            <%# Hidden Inputs to Submit Derived Data %>
+            <input type="hidden" id="profile-mandal-hidden" name="mandal" value="<%= addressFormData?.mandal || user.address?.mandal || '' %>">
+            <input type="hidden" id="profile-district-hidden" name="district" value="<%= addressFormData?.district || user.address?.district || '' %>">
+            <input type="hidden" id="profile-state-hidden" name="state" value="<%= addressFormData?.state || user.address?.state || '' %>">
 
-             <div class="form-group">
-                 <label for="profile-cityVillage" class="form-label small">City / Village / Area:</label>
-                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= user.address?.cityVillage || '' %>" required autocomplete="address-line1">
-             </div>
-             <div class="form-group">
-                 <label for="profile-landmarkNearby" class="form-label small">House No. / Building / Landmark (Optional):</label>
-                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= user.address?.landmarkNearby || '' %>" autocomplete="address-line2">
-             </div>
-             <button type="submit" class="btn btn-primary me-2">Save Address</button>
-             <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel Edit</button>
+            <div class="form-group">
+                <label for="profile-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || user.address?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
+            </div>
+            <div class="form-group">
+                <label for="profile-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || user.address?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
+            </div>
+            <button type="submit" class="btn btn-primary me-2">Save Address</button>
+            <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!user.address || !user.address.name) ? 'hidden' : '' %>">Cancel Edit</button>
         </form>
     </div>
 

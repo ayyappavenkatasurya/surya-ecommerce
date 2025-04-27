@@ -10,80 +10,101 @@
             <%# Display Saved Address %>
             <div class="saved-address <%= (!userAddress || !userAddress.name) ? 'hidden' : '' %>">
                 <% if (userAddress && userAddress.name) { %>
-                    <p><strong><%= userAddress.name %></strong></p>
-                    <p><%= userAddress.phone %></p>
-                    <p><%= userAddress.landmarkNearby ? userAddress.landmarkNearby + ', ' : '' %><%= userAddress.cityVillage %>,
-                        <% if (userAddress.mandal) { %><%= userAddress.mandal %>, <% } %>
-                        <% if (userAddress.district) { %><%= userAddress.district %>, <% } %>
-                        <% if (userAddress.state) { %><%= userAddress.state %> - <% } %>
+                    <p class="mb-1"><strong><%= userAddress.name %></strong></p>
+                    <p class="mb-1"><%= userAddress.phone %></p>
+                    <p class="mb-1">
+                        <%# Display House/Area first %>
+                        <%= userAddress.cityVillage ? userAddress.cityVillage + ', ' : '' %>
+                        <%# Landmark Optional %>
+                        <%= userAddress.landmarkNearby ? userAddress.landmarkNearby + ', ' : '' %>
+                        <%# Locality %>
+                        <%= userAddress.locality ? userAddress.locality + ', ' : '' %>
+                        <%# Derived Fields %>
+                        <%= userAddress.mandal ? userAddress.mandal + ', ' : '' %>
+                        <%= userAddress.district ? userAddress.district + ', ' : '' %>
+                        <%= userAddress.state ? userAddress.state + ' - ' : '' %>
                         <%= userAddress.pincode %>
                     </p>
                     <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm mt-2">Edit Address</button>
+                <% } else { %>
+                    <%# This part is less likely needed if checkout requires address, but keep for robustness %>
+                    <p class="text-muted">No address found. Please add one below.</p>
                 <% } %>
             </div>
 
             <%# Address Form %>
             <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (userAddress && userAddress.name) ? 'hidden' : '' %> form-submit-spinner">
-                <h3 class="h5"><%= (userAddress && userAddress.name) ? 'Edit Address' : 'Add Shipping Address' %></h3> <%# Adjusted title %>
-                 <input type="hidden" name="source" value="checkout"> <%# Keep source %>
+                 <h3 class="h5"><%= (userAddress && userAddress.name) ? 'Edit Address' : 'Add Shipping Address' %></h3>
+                 <input type="hidden" name="source" value="checkout">
 
                  <div class="form-group">
-                     <label for="checkout-name-addr" class="form-label small">Full Name:</label> <%# Changed ID %>
-                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= userAddress?.name || '' %>" required autocomplete="name">
+                     <label for="checkout-name-addr" class="form-label small">Full Name:</label>
+                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" required autocomplete="name">
                  </div>
                  <div class="form-group">
-                     <label for="checkout-phone" class="form-label small">Phone Number:</label> <%# Changed ID %>
-                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= userAddress?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                     <label for="checkout-phone" class="form-label small">Phone Number:</label>
+                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
                  </div>
                  <div class="form-group">
-                    <label for="checkout-pincode" class="form-label small">Pincode:</label> <%# Changed ID %>
+                    <label for="checkout-pincode" class="form-label small">Pincode:</label>
                     <input type="text"
                            id="checkout-pincode"
                            name="pincode"
-                           class="form-control pincode-input" <%# Added pincode-input class %>
-                           data-target-prefix="checkout" <%# Data attribute to target related fields %>
-                           value="<%= userAddress?.pincode || '' %>"
-                           required
-                           pattern="\d{6}"
-                           maxlength="6"
-                           inputmode="numeric"
-                           title="Enter 6-digit Pincode"
-                           autocomplete="postal-code">
-                    <small class="pincode-status text-muted"></small> <%# Area for loading/error messages %>
+                           class="form-control pincode-input"
+                           data-target-prefix="checkout"
+                           value="<%= addressFormData?.pincode || userAddress?.pincode || '' %>"
+                           required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                           title="Enter 6-digit Pincode" autocomplete="postal-code">
+                    <small class="pincode-status text-muted"></small>
                 </div>
 
+                <%# --- NEW: Locality Dropdown --- %>
+                <div class="form-group">
+                    <label for="checkout-locality" class="form-label small">Locality / Post Office:</label>
+                    <select id="checkout-locality"
+                            name="locality"
+                            class="form-control"
+                            required
+                            disabled
+                            data-saved-value="<%= addressFormData?.locality || userAddress?.locality || '' %>">
+                        <option value="" selected disabled>Enter Pincode First</option>
+                        <%# Options will be populated by JavaScript %>
+                    </select>
+                    <small class="locality-status text-muted"></small>
+                </div>
+                <%# --- End: Locality Dropdown --- %>
+
                 <%# Auto-filled Fields Container %>
-                <%# The inline style below IS CORRECT for EJS. Linters might flag it, but it works. %>
-                <div class="auto-filled-fields-container mb-2" id="checkout-auto-filled-fields" style="<%= (userAddress && userAddress.state) ? 'display: block;' : 'display: none;' %>"> <%# Show if data exists %>
+                <div class="auto-filled-fields-container mb-2" id="checkout-auto-filled-fields"
+                     style="<%= (addressFormData?.state || userAddress?.state) ? 'display: block;' : 'display: none;' %>">
                     <div class="form-group">
                        <label for="checkout-mandal" class="form-label small">Mandal / Taluk:</label>
-                       <input type="text" id="checkout-mandal" class="form-control auto-filled-field" value="<%= userAddress?.mandal || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                       <input type="text" id="checkout-mandal" class="form-control auto-filled-field" value="<%= addressFormData?.mandal || userAddress?.mandal || '' %>" readonly tabindex="-1">
                    </div>
                     <div class="form-group">
                        <label for="checkout-district" class="form-label small">District:</label>
-                       <input type="text" id="checkout-district" class="form-control auto-filled-field" value="<%= userAddress?.district || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                       <input type="text" id="checkout-district" class="form-control auto-filled-field" value="<%= addressFormData?.district || userAddress?.district || '' %>" readonly tabindex="-1">
                    </div>
                    <div class="form-group">
                        <label for="checkout-state" class="form-label small">State:</label>
-                       <input type="text" id="checkout-state" class="form-control auto-filled-field" value="<%= userAddress?.state || '' %>" readonly tabindex="-1"> <%# Display initial value %>
+                       <input type="text" id="checkout-state" class="form-control auto-filled-field" value="<%= addressFormData?.state || userAddress?.state || '' %>" readonly tabindex="-1">
                    </div>
                 </div>
 
                 <%# Hidden Inputs to Submit Derived Data %>
-                <input type="hidden" id="checkout-mandal-hidden" name="mandal" value="<%= userAddress?.mandal || '' %>">
-                <input type="hidden" id="checkout-district-hidden" name="district" value="<%= userAddress?.district || '' %>">
-                <input type="hidden" id="checkout-state-hidden" name="state" value="<%= userAddress?.state || '' %>">
+                <input type="hidden" id="checkout-mandal-hidden" name="mandal" value="<%= addressFormData?.mandal || userAddress?.mandal || '' %>">
+                <input type="hidden" id="checkout-district-hidden" name="district" value="<%= addressFormData?.district || userAddress?.district || '' %>">
+                <input type="hidden" id="checkout-state-hidden" name="state" value="<%= addressFormData?.state || userAddress?.state || '' %>">
 
                 <div class="form-group">
-                    <label for="checkout-cityVillage" class="form-label small">City / Village / Area:</label> <%# Changed ID & Label %>
-                    <input type="text" id="checkout-cityVillage" name="cityVillage" class="form-control" value="<%= userAddress?.cityVillage || '' %>" required autocomplete="address-line1">
+                    <label for="checkout-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                    <input type="text" id="checkout-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || userAddress?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
                 </div>
                  <div class="form-group">
-                    <label for="checkout-landmarkNearby" class="form-label small">House No. / Building / Landmark (Optional):</label> <%# Changed ID & Label %>
-                    <input type="text" id="checkout-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= userAddress?.landmarkNearby || '' %>" autocomplete="address-line2">
+                    <label for="checkout-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                    <input type="text" id="checkout-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || userAddress?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
                  </div>
                 <button type="submit" class="btn btn-primary me-2">Save Address</button>
-                 <%# Only show Cancel Edit button if editing existing address %>
                  <button type="button" id="cancel-edit-btn" class="btn btn-secondary <%= (!userAddress || !userAddress.name) ? 'hidden' : '' %>">Cancel Edit</button>
              </form>
         </div>
@@ -121,11 +142,12 @@
 
             <form action="/orders/place" method="POST" class="place-order-form form-submit-spinner">
                  <input type="hidden" name="paymentMethod" value="COD">
-                 <button type="submit" class="btn btn-success btn-block btn-place-order" <%= (!userAddress || !userAddress.name) ? 'disabled' : '' %>>
+                 <%# Check for existing user address OR addressFormData (if redirected after error) %>
+                 <button type="submit" class="btn btn-success btn-block btn-place-order" <%= (!userAddress || !userAddress.name) && !addressFormData ? 'disabled' : '' %>>
                     Place Order
                  </button>
-                 <% if (!userAddress || !userAddress.name) { %>
-                    <p class="text-danger small">Please add/save your shipping address first.</p>
+                 <% if ((!userAddress || !userAddress.name) && !addressFormData) { %>
+                    <p class="text-danger small mt-1">Please add/save your shipping address first.</p>
                  <% } %>
              </form>
          </div>

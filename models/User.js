@@ -6,13 +6,14 @@ const AddressSchema = new mongoose.Schema({
     name: { type: String, trim: true },
     phone: { type: String, trim: true },
     pincode: { type: String, trim: true },
-    cityVillage: { type: String, trim: true }, // Area/Town/Village
-    landmarkNearby: { type: String, trim: true },
-    // **** NEW FIELDS ****
+    // **** ADD LOCALITY ****
+    locality: { type: String, trim: true }, // Selected from dropdown
+    // **** END LOCALITY ****
+    cityVillage: { type: String, trim: true }, // For House No / Building / Area
+    landmarkNearby: { type: String, trim: true }, // Optional Landmark
     mandal: { type: String, trim: true },     // Derived from pincode lookup
     district: { type: String, trim: true },   // Derived from pincode lookup
     state: { type: String, trim: true },      // Derived from pincode lookup
-    // **** END NEW FIELDS ****
 }, { _id: false });
 
 const CartItemSchema = new mongoose.Schema({
