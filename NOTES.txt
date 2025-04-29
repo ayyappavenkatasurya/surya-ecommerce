@@ -3852,14 +3852,7 @@ select.form-control-sm { height: auto; }
 .close-alert { /* Positioned absolutely via JS if needed */ }
 
 /* Toast Notifications (Positioning from JS, styling here) */
-.toast-container {
-    position: fixed;
-    top: var(--space-lg);
-    right: var(--space-lg);
-    z-index: 1055;
-    width: auto;
-    max-width: 350px;
-}
+.toast-container { /* Positioned fixed in JS */ z-index: 1055; }
 .toast {
   background-color: var(--neutral-white); border: 1px solid var(--border-color);
   border-radius: var(--border-radius); box-shadow: var(--box-shadow-md);
@@ -4034,6 +4027,19 @@ select.form-control-sm { height: auto; }
 /* --- Product Detail --- */
 .product-detail-container { background-color: var(--neutral-white); padding: var(--space-xl); border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm); }
 .product-detail-main { display: flex; flex-direction: column; gap: var(--space-xl); }
+.product-detail-image-section { position: relative; width: 100%; max-width: 450px; margin: 0 auto var(--space-lg) auto; aspect-ratio: 1 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-lighter); border: 1px solid var(--border-color); }
+.product-image-slider-container, .product-detail-image-single { width: 100%; height: 100%; }
+.product-image-slides { position: relative; width: 100%; height: 100%; }
+.product-image-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.5s ease-in-out; }
+.product-image-slide.active { opacity: 1; visibility: visible; z-index: 1; }
+.product-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.product-image-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; -webkit-tap-highlight-color: transparent; }
+.product-image-nav:hover, .product-image-nav:focus { background-color: rgba(0, 0, 0, 0.6); opacity: 1; outline: none; }
+.product-image-prev { left: var(--space-sm); } .product-image-next { right: var(--space-sm); }
+.product-image-dots { position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
+.product-image-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.3); cursor: pointer; padding: 0; transition: background-color 0.3s ease; -webkit-tap-highlight-color: transparent; }
+.product-image-dot.active { background-color: white; }
+.product-image-dot:focus { outline: 1px dotted white; outline-offset: 1px; }
 
 .product-detail-info h1 { font-size: 1.75rem; margin-bottom: var(--space-sm); }
 .product-short-description { font-size: var(--font-size-sm); color: var(--neutral-secondary); }
@@ -4284,6 +4290,20 @@ select.form-control-sm { height: auto; }
 .dashboards-section .btn, .orders-section .btn { margin-right: var(--space-sm); margin-bottom: var(--space-sm); font-weight: var(--font-weight-normal); }
 .logout-section .btn { min-width: 120px; }
 
+/* --- Banner Slider --- */
+.banner-slider-container { position: relative; width: 100%; aspect-ratio: 2.5 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-light); touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+.banner-slides { position: relative; width: 100%; height: 100%; }
+.banner-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.6s ease-in-out; background-color: var(--neutral-lighter); }
+.banner-slide.active { opacity: 1; visibility: visible; z-index: 1; }
+.banner-link { display: block; width: 100%; height: 100%; }
+.banner-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.banner-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-size: 0.9rem; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; }
+.banner-nav:hover { background-color: rgba(0, 0, 0, 0.6); opacity: 1; }
+.banner-prev { left: var(--space-md); } .banner-next { right: var(--space-md); }
+.banner-dots { position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
+.banner-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0, 0, 0, 0.2); cursor: pointer; padding: 0; transition: background-color 0.3s ease; }
+.banner-dot.active { background-color: white; }
+
 /* --- Category Icons --- */
 .category-icons-section h2 { font-size: 1.25rem; font-weight: var(--font-weight-semibold); color: var(--neutral-primary); text-align: center; margin-bottom: var(--space-lg); }
 .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
@@ -4307,123 +4327,6 @@ select.form-control-sm { height: auto; }
 #no-admin-orders-found td, #no-seller-orders-found td, #no-admin-products-found td, #no-seller-products-found td, #no-admin-users-found td { text-align: center; padding: var(--space-lg); color: var(--neutral-secondary); font-style: italic; }
 tr.hidden { display: none !important; }
 
-/* ============================ */
-/* Slider Styles (NEW/UPDATED) */
-/* ============================ */
-
-/* --- Banner Slider --- */
-.banner-slider-container {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 2.5 / 1; /* Adjust as needed */
-    overflow: hidden; /* Hide slides outside the container */
-    border-radius: var(--border-radius);
-    background-color: var(--neutral-light);
-    touch-action: pan-y; /* Allow vertical scroll, handle horizontal in JS */
-    -webkit-tap-highlight-color: transparent;
-    margin-bottom: var(--space-lg); /* Ensure margin exists */
-}
-
-.banner-slides-wrapper {
-    display: flex; /* Arrange slides horizontally */
-    height: 100%;
-    position: relative;
-    /* Transition applied via JS for initial load and jumps */
-}
-
-.banner-slide {
-    width: 100%; /* Each slide takes full container width */
-    flex-shrink: 0; /* Prevent slides from shrinking */
-    height: 100%;
-    position: relative; /* Needed if content needs positioning inside */
-    background-color: var(--neutral-lighter);
-    /* Removed old opacity/visibility styles */
-}
-
-.banner-link { display: block; width: 100%; height: 100%; }
-.banner-image { display: block; width: 100%; height: 100%; object-fit: cover; }
-
-/* Keep Nav and Dots positioning relative to the main container */
-.banner-nav {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.4); color: white; border: none;
-    border-radius: 50%; width: 35px; height: 35px; font-size: 0.9rem;
-    cursor: pointer; z-index: 2; display: none; /* Hide initially, show via JS */ align-items: center;
-    justify-content: center; transition: background-color 0.2s ease; opacity: 0.8;
-}
-.banner-nav:hover { background-color: rgba(0, 0, 0, 0.6); opacity: 1; }
-.banner-prev { left: var(--space-md); }
-.banner-next { right: var(--space-md); }
-
-.banner-dots {
-    position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%);
-    display: none; /* Hide initially, show via JS */ gap: var(--space-sm); z-index: 2;
-}
-.banner-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0, 0, 0, 0.2);
-    cursor: pointer; padding: 0; transition: background-color 0.3s ease;
-}
-.banner-dot.active { background-color: white; }
-
-
-/* --- Product Detail Image Slider --- */
-.product-detail-image-section {
-    position: relative; /* Keep for positioning nav/dots */
-    width: 100%;
-    max-width: 450px; /* Or remove if full width on mobile */
-    margin: 0 auto var(--space-lg) auto;
-    aspect-ratio: 1 / 1;
-    overflow: hidden; /* Crucial for sliding */
-    border-radius: var(--border-radius);
-    background-color: var(--neutral-lighter);
-    border: 1px solid var(--border-color);
-    touch-action: pan-y; /* Allow vertical scroll */
-    -webkit-tap-highlight-color: transparent;
-}
-
-/* Container that actually moves */
-.product-image-slides-wrapper {
-    display: flex;
-    height: 100%;
-    position: relative;
-    /* Transition applied via JS */
-}
-
-/* Individual Slide Styling */
-.product-image-slide {
-    width: 100%;
-    flex-shrink: 0;
-    height: 100%;
-    position: relative; /* For potential content inside */
-    /* Removed old absolute positioning, opacity, visibility */
-}
-
-.product-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
-
-/* Keep Nav and Dots positioning */
-.product-image-nav {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.4); color: white; border: none;
-    border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; font-weight: bold;
-    line-height: 1; cursor: pointer; z-index: 2; display: none; /* Hide initially, show via JS */ align-items: center;
-    justify-content: center; transition: background-color 0.2s ease; opacity: 0.8;
-}
-.product-image-nav:hover, .product-image-nav:focus { background-color: rgba(0, 0, 0, 0.6); opacity: 1; outline: none; }
-.product-image-prev { left: var(--space-sm); }
-.product-image-next { right: var(--space-sm); }
-
-.product-image-dots {
-    position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%);
-    display: none; /* Hide initially, show via JS */ gap: var(--space-sm); z-index: 2;
-}
-.product-image-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.3);
-    cursor: pointer; padding: 0; transition: background-color 0.3s ease;
-}
-.product-image-dot.active { background-color: white; }
-.product-image-dot:focus { outline: 1px dotted white; outline-offset: 1px; }
 
 /* ============================ */
 /* Media Queries                */
@@ -4864,10 +4767,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.classList.contains('btn-update-qty')) {
                 e.preventDefault();
                 const button = e.target;
-                const quantityInput = button.previousElementSibling; // Find the input just before the button
-                if (!quantityInput || !quantityInput.matches('.quantity-input')) return; // Ensure it's the correct input
-
-                const productId = quantityInput.dataset.productId;
+                const productId = button.dataset.productId;
+                const quantityInput = document.getElementById(`quantity-${productId}`);
+                if (!quantityInput) return;
                 const newQuantity = parseInt(quantityInput.value, 10);
 
                 if (!quantityInput.dataset.originalValue) {
@@ -5125,6 +5027,129 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // ========================================
     // End Loading State for Non-Form Actions
+    // ========================================
+
+    // ========================================
+    // Homepage Banner Slider Logic (with Touch Events)
+    // ========================================
+    const sliderContainer = document.querySelector('[data-slider-container]');
+    if (sliderContainer) {
+        const slides = sliderContainer.querySelectorAll('[data-slide]');
+        const prevBtn = sliderContainer.querySelector('[data-slider-prev]');
+        const nextBtn = sliderContainer.querySelector('[data-slider-next]');
+        const dotsContainer = sliderContainer.querySelector('[data-slider-dots]');
+        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-slide-to]') : [];
+
+        let currentSlideIndex = 0;
+        let autoSlideInterval = null;
+        const slideIntervalTime = 5000; // 5 seconds
+
+        // Touch/Swipe variables
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let diffX = 0;
+        const swipeThreshold = 50; // Min pixels to swipe to change slide
+
+        function showSlide(index) {
+            if (!slides || slides.length === 0) return;
+            // Ensure index wraps around correctly
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
+            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
+            currentSlideIndex = newIndex;
+        }
+
+        function nextSlide() { showSlide(currentSlideIndex + 1); }
+        function prevSlide() { showSlide(currentSlideIndex - 1); }
+
+        function startAutoSlide() {
+            // Clear existing interval before starting a new one
+            clearInterval(autoSlideInterval);
+            // Only start auto-slide if there's more than one slide
+            if (slides.length > 1) {
+                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
+            }
+        }
+
+        // Touch event handlers
+        function handleTouchStart(event) {
+            if (slides.length <= 1) return; // Don't swipe if only one slide
+            isDragging = true;
+            // Use pageX for touch coordinates
+            startX = event.touches[0].pageX;
+            currentX = startX;
+            diffX = 0;
+            // Pause auto-slide on touch start
+            clearInterval(autoSlideInterval);
+            // Optional: Add a class for visual feedback during drag
+            // sliderContainer.classList.add('is-dragging');
+        }
+
+        function handleTouchMove(event) {
+            if (!isDragging || slides.length <= 1) return;
+            currentX = event.touches[0].pageX;
+            diffX = startX - currentX;
+            // Prevent default scrolling ONLY if swipe is significant horizontally
+            if (Math.abs(diffX) > 10) {
+                // event.preventDefault(); // Be careful with this, might prevent vertical scroll
+            }
+            // Optional: Could add slide translation effect here for visual feedback during drag
+        }
+
+        function handleTouchEnd() {
+            if (!isDragging || slides.length <= 1) return;
+            isDragging = false;
+            // sliderContainer.classList.remove('is-dragging');
+
+            // Check if swipe distance meets the threshold
+            if (Math.abs(diffX) > swipeThreshold) {
+                if (diffX > 0) { nextSlide(); } // Swiped left (Next)
+                else { prevSlide(); } // Swiped right (Prev)
+            }
+            // Reset touch variables
+            startX = 0; currentX = 0; diffX = 0;
+            // Restart auto-slide after touch interaction ends
+            startAutoSlide();
+        }
+
+        // Initialize slider
+        if (slides.length > 0) {
+             showSlide(0);
+             startAutoSlide();
+        } else {
+            // Hide controls if no slides
+             if (prevBtn) prevBtn.style.display = 'none';
+             if (nextBtn) nextBtn.style.display = 'none';
+             if (dotsContainer) dotsContainer.style.display = 'none';
+        }
+
+        // Add event listeners for controls
+        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
+        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
+        if (dotsContainer) {
+            dotsContainer.addEventListener('click', (e) => {
+                const targetDot = e.target.closest('[data-slide-to]');
+                if (targetDot) {
+                    const index = parseInt(targetDot.dataset.slideTo, 10);
+                    if (!isNaN(index)) { showSlide(index); startAutoSlide(); }
+                }
+            });
+        }
+
+        // Add touch listeners (use passive: true for start/end for performance if not preventing default scroll)
+        sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+        // Use passive: false for move ONLY if you intend to preventDefault scrolling
+        sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: true }); // Usually better for performance
+        sliderContainer.addEventListener('touchend', handleTouchEnd);
+        sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle cancelled touches
+
+        // Pause on hover (for desktop)
+        sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
+        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
+    }
+    // ========================================
+    // End Homepage Banner Slider Logic
     // ========================================
 
 
@@ -5418,290 +5443,92 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Generic Infinite Sliding Logic (Handles Banner & Product Images)
+    // Product Image Slider Logic (with Touch)
     // ========================================
-    /**
-     * Initializes an infinite sliding carousel.
-     * @param {string} containerSelector - CSS selector for the main slider container element.
-     * @param {object} options - Configuration options.
-     * @param {number} [options.slideIntervalTime=5000] - Autoplay interval in ms (0 to disable).
-     * @param {string} [options.slideClass='[data-slide]'] - CSS selector for individual slide elements.
-     * @param {string} [options.wrapperClass='[data-slides-wrapper]'] - CSS selector for the wrapper holding the slides.
-     * @param {string} [options.prevBtnClass='[data-slider-prev]'] - CSS selector for the previous button.
-     * @param {string} [options.nextBtnClass='[data-slider-next]'] - CSS selector for the next button.
-     * @param {string} [options.dotsContainerClass='[data-slider-dots]'] - CSS selector for the dots container.
-     * @param {string} [options.dotClass='[data-slide-to]'] - CSS selector for individual dot elements.
-     * @param {string} [options.dotDataAttribute='data-slide-to'] - Data attribute on dots containing the target index.
-     */
-    function initializeInfiniteSlider(containerSelector, options = {}) {
-        const sliderContainer = document.querySelector(containerSelector);
-        if (!sliderContainer) {
-            // console.log(`Slider container "${containerSelector}" not found.`);
-            return;
+    const imageSlider = document.querySelector('[data-product-image-slider]');
+    if (imageSlider) {
+        const slides = imageSlider.querySelectorAll('[data-product-slide]');
+        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
+        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
+        const dotsContainer = imageSlider.querySelector('.product-image-dots'); // Container for dots
+        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-product-image-dot]') : []; // Select dots within container
+        let currentImageIndex = 0;
+
+        // Touch variables
+        let isProductDragging = false;
+        let productStartX = 0;
+        let productCurrentX = 0;
+        let productDiffX = 0;
+        const productSwipeThreshold = 50;
+
+        function showProductImage(index) {
+            if (!slides || slides.length < 1) return; // Allow for single slide case now
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
+            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
+            currentImageIndex = newIndex;
         }
 
-        const config = {
-            slideIntervalTime: 5000,
-            slideClass: '[data-slide]', // Default to data-slide used in banner
-            wrapperClass: '[data-slides-wrapper]',
-            prevBtnClass: '[data-slider-prev]',
-            nextBtnClass: '[data-slider-next]',
-            dotsContainerClass: '[data-slider-dots]',
-            dotClass: '[data-slide-to]', // Use the data attribute itself as selector part
-            dotDataAttribute: 'data-slide-to',
-            ...options // Override defaults with provided options
-        };
-
-        const slidesWrapper = sliderContainer.querySelector(config.wrapperClass);
-        const originalSlides = Array.from(sliderContainer.querySelectorAll(`${config.wrapperClass} > ${config.slideClass}`)); // Select direct children matching slideClass
-
-        const prevBtn = sliderContainer.querySelector(config.prevBtnClass);
-        const nextBtn = sliderContainer.querySelector(config.nextBtnClass);
-        const dotsContainer = sliderContainer.querySelector(config.dotsContainerClass);
-        let dots = dotsContainer ? Array.from(dotsContainer.querySelectorAll(config.dotClass)) : [];
-
-        if (!slidesWrapper || originalSlides.length === 0) {
-            // console.log(`Slider "${containerSelector}" missing wrapper or slides.`);
-            // Optionally hide controls if no slides
-            if (prevBtn) prevBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
-            if (dotsContainer) dotsContainer.style.display = 'none';
-            return;
+        function handleProductTouchStart(event) {
+            if (slides.length <= 1) return;
+            isProductDragging = true;
+            productStartX = event.touches[0].pageX;
+            productCurrentX = productStartX;
+            productDiffX = 0;
         }
 
-        let totalOriginalSlides = originalSlides.length;
-        let currentIndex = 1; // Start at the first *original* slide (index 1 after cloning)
-        let totalSlidesIncludingClones = totalOriginalSlides;
-        let isTransitioning = false;
-        let autoSlideInterval = null;
-        let isDragging = false;
-        let startX = 0;
-        let currentX = 0;
-        let diffX = 0;
-        const swipeThreshold = 50; // Min pixels to swipe
-
-        // --- Setup Clones for Infinite Loop (only if more than 1 slide) ---
-        if (totalOriginalSlides > 1) {
-            const firstClone = originalSlides[0].cloneNode(true);
-            const lastClone = originalSlides[totalOriginalSlides - 1].cloneNode(true);
-
-            // Remove data attributes from clones if they cause issues (e.g., duplicate IDs)
-            firstClone.removeAttribute(config.slideClass.replace(/[\[\]]/g, '')); // Remove data-slide attribute if that's the selector
-            lastClone.removeAttribute(config.slideClass.replace(/[\[\]]/g, ''));
-            // Ensure specific dot data attributes are removed if they exist
-             const dotAttr = config.dotDataAttribute;
-             if (dotAttr) {
-                 firstClone.removeAttribute(dotAttr);
-                 lastClone.removeAttribute(dotAttr);
-                 // Also check children if necessary, although unlikely for slides
-             }
-
-            slidesWrapper.appendChild(firstClone);
-            slidesWrapper.insertBefore(lastClone, originalSlides[0]);
-            totalSlidesIncludingClones = totalOriginalSlides + 2;
-        } else {
-            // Only one slide, disable controls and interval
-            currentIndex = 0; // Only one slide at index 0
-            if (prevBtn) prevBtn.style.display = 'none';
-            if (nextBtn) nextBtn.style.display = 'none';
-            if (dotsContainer) dotsContainer.style.display = 'none';
-            config.slideIntervalTime = 0; // Disable autoslide
-        }
-
-        // --- Initial Positioning ---
-        function setInitialPosition() {
-            slidesWrapper.style.transition = 'none'; // No transition for initial set
-            slidesWrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
-            // Force reflow/repaint before re-enabling transitions
-            void slidesWrapper.offsetWidth;
-            // Set transition after initial position is set
-            slidesWrapper.style.transition = 'transform 0.5s ease-in-out';
-        }
-
-        // --- Update Dots ---
-        function updateDots(targetOriginalIndex) {
-            if (dots.length !== totalOriginalSlides) return; // Ensure dots match original slides
-            dots.forEach((dot, i) => {
-                dot.classList.toggle('active', i === targetOriginalIndex);
-            });
-        }
-
-        // --- Go To Slide Function ---
-        function goToSlide(index, withTransition = true) {
-            if (isTransitioning || totalSlidesIncludingClones <= 1) return; // Prevent multiple transitions / no slides
-            isTransitioning = true;
-
-            slidesWrapper.style.transition = withTransition ? 'transform 0.5s ease-in-out' : 'none';
-            slidesWrapper.style.transform = `translateX(-${index * 100}%)`;
-            currentIndex = index;
-
-            // Calculate the corresponding dot index (0-based for original slides)
-            let targetOriginalIndex = (currentIndex - 1 + totalOriginalSlides) % totalOriginalSlides;
-            updateDots(targetOriginalIndex);
-
-            // If not using transition (jump), reset isTransitioning immediately
-             if (!withTransition) {
-                setTimeout(() => { isTransitioning = false; }, 50); // Small delay to ensure styles apply
-             }
-        }
-
-        // --- Handle Transition End for Infinite Loop Jump ---
-        slidesWrapper.addEventListener('transitionend', () => {
-            isTransitioning = false; // Transition finished
-
-             if (totalOriginalSlides <= 1) return; // No jump needed for single slide
-
-            // Jump from last clone to original first slide
-            if (currentIndex === totalSlidesIncludingClones - 1) {
-                 goToSlide(1, false); // Jump to index 1 (first original) without transition
+        function handleProductTouchMove(event) {
+            if (!isProductDragging || slides.length <= 1) return;
+            productCurrentX = event.touches[0].pageX;
+            productDiffX = productStartX - productCurrentX;
+             // Prevent vertical scroll only if horizontal swipe is significant
+            if (Math.abs(productDiffX) > 10) {
+                // event.preventDefault(); // Can interfere with page scroll, use with caution
             }
-            // Jump from first clone to original last slide
-            else if (currentIndex === 0) {
-                 goToSlide(totalOriginalSlides, false); // Jump to index totalOriginalSlides (last original) without transition
+        }
+
+        function handleProductTouchEnd() {
+            if (!isProductDragging || slides.length <= 1) return;
+            isProductDragging = false;
+            if (Math.abs(productDiffX) > productSwipeThreshold) {
+                if (productDiffX > 0) { showProductImage(currentImageIndex + 1); } // Swipe Left -> Next
+                else { showProductImage(currentImageIndex - 1); } // Swipe Right -> Prev
             }
-        });
-
-        // --- Navigation Button Listeners ---
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => {
-                if (isTransitioning || totalSlidesIncludingClones <= 1) return;
-                goToSlide(currentIndex + 1);
-                resetAutoSlide(); // Reset timer on manual interaction
-            });
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => {
-                if (isTransitioning || totalSlidesIncludingClones <= 1) return;
-                goToSlide(currentIndex - 1);
-                resetAutoSlide();
-            });
+            productStartX = 0; productCurrentX = 0; productDiffX = 0;
         }
 
-        // --- Dot Navigation Listeners ---
-        if (dotsContainer && dots.length > 0) {
-            dots.forEach((dot) => {
-                dot.addEventListener('click', (e) => {
-                    if (isTransitioning || totalSlidesIncludingClones <= 1) return;
-                     // Use closest to ensure we get the button even if user clicks inner element like <i>
-                    const targetDotButton = e.target.closest(`[${config.dotDataAttribute}]`);
-                    if (targetDotButton) {
-                        const targetOriginalIndex = parseInt(targetDotButton.getAttribute(config.dotDataAttribute), 10);
-                        if (!isNaN(targetOriginalIndex)) {
-                            goToSlide(targetOriginalIndex + 1); // Go to actual index (+1 for clone)
-                            resetAutoSlide();
-                        }
-                    }
+        // Initialize slider and controls based on slide count
+        if (slides.length > 1) {
+            if (nextBtn) { nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1)); }
+            if (prevBtn) { prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1)); }
+            dots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    const index = parseInt(dot.dataset.productImageDot, 10);
+                    if (!isNaN(index)) { showProductImage(index); }
                 });
             });
-        }
-
-
-        // --- Auto Sliding ---
-        function startAutoSlide() {
-            if (config.slideIntervalTime <= 0 || totalSlidesIncludingClones <= 1) return; // Only if interval > 0 and more than one slide
-            clearInterval(autoSlideInterval); // Clear previous interval
-            autoSlideInterval = setInterval(() => {
-                goToSlide(currentIndex + 1);
-            }, config.slideIntervalTime);
-        }
-
-        function resetAutoSlide() {
-            clearInterval(autoSlideInterval);
-            startAutoSlide();
-        }
-
-        // Pause on hover
-        sliderContainer.addEventListener('mouseenter', () => clearInterval(autoSlideInterval));
-        sliderContainer.addEventListener('mouseleave', startAutoSlide);
-        // Also pause on focus within slider elements (accessibility)
-        sliderContainer.addEventListener('focusin', () => clearInterval(autoSlideInterval));
-        sliderContainer.addEventListener('focusout', startAutoSlide);
-
-
-        // --- Touch/Swipe Listeners ---
-        function handleTouchStart(event) {
-            if (totalSlidesIncludingClones <= 1) return;
-            isDragging = true;
-            startX = event.touches[0].pageX;
-            currentX = startX;
-            diffX = 0;
-            clearInterval(autoSlideInterval); // Pause auto slide
-            slidesWrapper.style.transition = 'none'; // Disable transition during drag
-        }
-
-        function handleTouchMove(event) {
-             if (!isDragging || totalSlidesIncludingClones <= 1) return;
-             currentX = event.touches[0].pageX;
-             diffX = startX - currentX;
-             // Apply drag effect directly to transform
-             const currentTranslate = -currentIndex * slidesWrapper.offsetWidth; // Base position
-             slidesWrapper.style.transform = `translateX(${currentTranslate - diffX}px)`;
-             // Simple check to prevent vertical scroll during horizontal swipe
-             if (Math.abs(diffX) > 10) {
-                // Note: preventDefault() here can block vertical scrolling, use carefully
-                // event.preventDefault();
-             }
-        }
-
-        function handleTouchEnd() {
-             if (!isDragging || totalSlidesIncludingClones <= 1) return;
-             isDragging = false;
-             slidesWrapper.style.transition = 'transform 0.5s ease-in-out'; // Re-enable transition
-
-             if (Math.abs(diffX) > swipeThreshold) {
-                 if (diffX > 0) { goToSlide(currentIndex + 1); } // Swipe Left -> Next
-                 else { goToSlide(currentIndex - 1); } // Swipe Right -> Prev
-             } else {
-                 // Didn't swipe enough, snap back to current slide
-                 goToSlide(currentIndex);
-             }
-             // Reset variables and restart auto-slide
-             startX = 0; currentX = 0; diffX = 0;
-             resetAutoSlide();
-         }
-
-        if (totalSlidesIncludingClones > 1) {
-            sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
-            sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: true }); // Use passive: true if not preventing default
-            sliderContainer.addEventListener('touchend', handleTouchEnd);
-            sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle cancelled touches
-        }
-
-        // --- Initialize ---
-        setInitialPosition(); // Set initial position without transition
-        updateDots(0); // Update dots for the first original slide
-        startAutoSlide(); // Start auto-slide if applicable
-
-         // --- Make Controls Visible After Setup (if applicable) ---
-         if (totalOriginalSlides > 1) {
-            if (prevBtn) prevBtn.style.display = 'flex'; // Or 'block'/'inline-flex' as needed
-            if (nextBtn) nextBtn.style.display = 'flex';
+            // Add touch listeners only if multiple slides
+            imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true });
+            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: true }); // Usually better for performance
+            imageSlider.addEventListener('touchend', handleProductTouchEnd);
+            imageSlider.addEventListener('touchcancel', handleProductTouchEnd);
+            // Show controls
+            if (nextBtn) nextBtn.style.display = 'flex'; // Use flex if that's the display type
+            if (prevBtn) prevBtn.style.display = 'flex';
             if (dotsContainer) dotsContainer.style.display = 'flex';
+        } else {
+            // Hide controls if only one slide
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (prevBtn) prevBtn.style.display = 'none';
+            if (dotsContainer) dotsContainer.style.display = 'none';
         }
 
-    } // --- End initializeInfiniteSlider ---
+        // Show the first slide initially (even if it's the only one)
+        if (slides.length > 0) { showProductImage(0); }
 
-
-    // --- Call the function for the Banner Slider ---
-    initializeInfiniteSlider('[data-slider-container]', {
-        // Options specific to banner slider if needed, otherwise defaults are used
-        // Example: slideIntervalTime: 6000
-    });
-
-    // --- Call the function for the Product Detail Slider ---
-    initializeInfiniteSlider('[data-product-image-slider]', {
-        slideClass: '[data-product-slide]', // Specify the slide selector used here
-        wrapperClass: '[data-product-slides-wrapper]',
-        prevBtnClass: '[data-product-image-nav="prev"]',
-        nextBtnClass: '[data-product-image-nav="next"]',
-        dotsContainerClass: '.product-image-dots', // Class selector for dots container
-        dotClass: '[data-product-image-dot]', // Selector for dots
-        dotDataAttribute: 'data-product-image-dot', // Attribute containing index
-        slideIntervalTime: 0 // Disable auto-slide for product images
-    });
-
+    }
     // ========================================
-    // End Generic Infinite Sliding Logic
+    // End Product Image Slider Logic
     // ========================================
 
 
@@ -7337,35 +7164,32 @@ views/products/detail.ejs:
 
    <div class="product-detail-main">
         <%# --- UPDATED: Image Display Logic --- %>
-        <div class="product-detail-image-section" data-product-image-slider> <%# Added data attribute %>
-            <%# --- ADDED WRAPPER --- %>
-            <div class="product-image-slides-wrapper" data-product-slides-wrapper>
-                <%# Slide for Primary Image %>
-                <div class="product-image-slide" data-product-slide> <%# Remove active class %>
-                    <img src="<%= product.imageUrl %>" alt="<%= product.name %> - Image 1" class="product-detail-image">
-                </div>
-                <%# Slide for Second Image (if exists) %>
-                <% if (product.imageUrl2) { %>
-                    <div class="product-image-slide" data-product-slide> <%# Remove active class %>
-                         <img src="<%= product.imageUrl2 %>" alt="<%= product.name %> - Image 2" class="product-detail-image">
+        <div class="product-detail-image-section"> <%# Wrapper section %>
+            <% if (product.imageUrl2) { %>
+                <%# Slider structure if two images exist %>
+                <div class="product-image-slider-container" data-product-image-slider>
+                    <div class="product-image-slides">
+                        <div class="product-image-slide active" data-product-slide>
+                            <img src="<%= product.imageUrl %>" alt="<%= product.name %> - Image 1" class="product-detail-image">
+                        </div>
+                        <div class="product-image-slide" data-product-slide>
+                             <img src="<%= product.imageUrl2 %>" alt="<%= product.name %> - Image 2" class="product-detail-image">
+                        </div>
                     </div>
-                <% } %>
-                 <%# JS will add clones here if imageUrl2 exists %>
-            </div>
-            <%# --- END ADDED WRAPPER --- %>
-
-            <%# Navigation Arrows (only if imageUrl2 exists) - Hidden initially by CSS %>
-            <% if (product.imageUrl2) { %>
-                <button class="product-image-nav product-image-prev" data-product-image-nav="prev" aria-label="Previous Image">‹</button>
-                <button class="product-image-nav product-image-next" data-product-image-nav="next" aria-label="Next Image">›</button>
-            <% } %>
-
-            <%# Navigation Dots (only if imageUrl2 exists) - Hidden initially by CSS %>
-            <% if (product.imageUrl2) { %>
-                 <div class="product-image-dots">
-                     <button class="product-image-dot" data-product-image-dot="0" aria-label="Go to image 1"></button> <%# Remove active class %>
-                     <button class="product-image-dot" data-product-image-dot="1" aria-label="Go to image 2"></button> <%# Remove active class %>
-                 </div>
+                    <%# Navigation Arrows only if there are slides to navigate %>
+                    <button class="product-image-nav product-image-prev" data-product-image-nav="prev" aria-label="Previous Image">‹</button>
+                    <button class="product-image-nav product-image-next" data-product-image-nav="next" aria-label="Next Image">›</button>
+                    <%# Navigation Dots only if there are slides to navigate %>
+                     <div class="product-image-dots">
+                         <button class="product-image-dot active" data-product-image-dot="0" aria-label="Go to image 1"></button>
+                         <button class="product-image-dot" data-product-image-dot="1" aria-label="Go to image 2"></button>
+                     </div>
+                </div>
+            <% } else { %>
+                <%# Original single image display if only one image %>
+                <div class="product-detail-image-single"> <%# Optional wrapper %>
+                    <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-detail-image">
+                </div>
             <% } %>
         </div>
         <%# --- END UPDATED --- %>
@@ -7508,6 +7332,71 @@ views/products/detail.ejs:
 
 </div> <%# End product-detail-container %>
 
+
+<script>
+    // --- UPDATED: Product Image Slider JS ---
+    const imageSlider = document.querySelector('[data-product-image-slider]');
+    if (imageSlider) {
+        const slides = imageSlider.querySelectorAll('[data-product-slide]');
+        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
+        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
+        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
+        let currentImageIndex = 0;
+
+        function showProductImage(index) {
+            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
+
+            // Calculate the new index correctly handling negative numbers
+            const newIndex = (index % slides.length + slides.length) % slides.length;
+
+            // Update active classes for slides and dots
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === newIndex);
+            });
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === newIndex);
+            });
+
+            currentImageIndex = newIndex;
+        }
+
+        // Add event listeners if buttons/dots exist
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const index = parseInt(dot.dataset.productImageDot, 10);
+                if (!isNaN(index)) {
+                    showProductImage(index);
+                }
+            });
+        });
+
+        // Initialize the slider to the first image
+        if (slides.length > 0) {
+             showProductImage(0);
+        }
+    }
+    // --- END UPDATED ---
+
+    // Keep existing rating bar animation script
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
+            var width = el.getAttribute('data-width');
+            if (width) {
+                setTimeout(() => {
+                     el.style.width = width + '%';
+                }, 100); // Slight delay for effect
+            }
+        });
+    });
+</script>
+
 <%- include('../partials/footer') %>
 
 views/products/index.ejs:
@@ -7545,11 +7434,9 @@ views/products/index.ejs:
 <% if (!selectedCategory && (!searchTerm || searchTerm.trim() === '')) { %>
     <% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
         <div class="banner-slider-container mb-4" data-slider-container>
-            <%# --- ADDED WRAPPER --- %>
-            <div class="banner-slides-wrapper" data-slides-wrapper>
+            <div class="banner-slides" data-slides>
                 <% homepageBanners.forEach((banner, index) => { %>
-                    <%# Slide content remains the same, REMOVE active class %>
-                    <div class="banner-slide" data-slide>
+                    <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide>
                         <% if (banner.linkUrl) { %>
                             <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
                                 <img src="<%= banner.imageUrl %>"
@@ -7565,22 +7452,19 @@ views/products/index.ejs:
                         <% } %>
                     </div>
                 <% }) %>
-                 <%# JS will add cloned slides here %>
             </div>
-            <%# --- END ADDED WRAPPER --- %>
 
-            <%# Optional: Navigation Arrows (keep outside wrapper) - Hidden initially by CSS %>
+            <%# Optional: Navigation Arrows %>
             <% if (homepageBanners.length > 1) { %>
                 <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
                 <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
             <% } %>
 
-            <%# Optional: Navigation Dots (keep outside wrapper) - Hidden initially by CSS %>
+            <%# Optional: Navigation Dots %>
              <% if (homepageBanners.length > 1) { %>
                 <div class="banner-dots" data-slider-dots>
                     <% homepageBanners.forEach((_, index) => { %>
-                         <%# Remove active class, JS will handle it %>
-                        <button class="banner-dot" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                        <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
                     <% }) %>
                 </div>
             <% } %>
@@ -7655,6 +7539,7 @@ views/products/index.ejs:
     <% } %>
 
 </div>
+
 <%- include('../partials/footer') %>
 
 views/seller/dashboard.ejs:

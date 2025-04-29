@@ -307,14 +307,7 @@ select.form-control-sm { height: auto; }
 .close-alert { /* Positioned absolutely via JS if needed */ }
 
 /* Toast Notifications (Positioning from JS, styling here) */
-.toast-container {
-    position: fixed;
-    top: var(--space-lg);
-    right: var(--space-lg);
-    z-index: 1055;
-    width: auto;
-    max-width: 350px;
-}
+.toast-container { /* Positioned fixed in JS */ z-index: 1055; }
 .toast {
   background-color: var(--neutral-white); border: 1px solid var(--border-color);
   border-radius: var(--border-radius); box-shadow: var(--box-shadow-md);
@@ -489,6 +482,19 @@ select.form-control-sm { height: auto; }
 /* --- Product Detail --- */
 .product-detail-container { background-color: var(--neutral-white); padding: var(--space-xl); border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm); }
 .product-detail-main { display: flex; flex-direction: column; gap: var(--space-xl); }
+.product-detail-image-section { position: relative; width: 100%; max-width: 450px; margin: 0 auto var(--space-lg) auto; aspect-ratio: 1 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-lighter); border: 1px solid var(--border-color); }
+.product-image-slider-container, .product-detail-image-single { width: 100%; height: 100%; }
+.product-image-slides { position: relative; width: 100%; height: 100%; }
+.product-image-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.5s ease-in-out; }
+.product-image-slide.active { opacity: 1; visibility: visible; z-index: 1; }
+.product-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.product-image-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; -webkit-tap-highlight-color: transparent; }
+.product-image-nav:hover, .product-image-nav:focus { background-color: rgba(0, 0, 0, 0.6); opacity: 1; outline: none; }
+.product-image-prev { left: var(--space-sm); } .product-image-next { right: var(--space-sm); }
+.product-image-dots { position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
+.product-image-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.3); cursor: pointer; padding: 0; transition: background-color 0.3s ease; -webkit-tap-highlight-color: transparent; }
+.product-image-dot.active { background-color: white; }
+.product-image-dot:focus { outline: 1px dotted white; outline-offset: 1px; }
 
 .product-detail-info h1 { font-size: 1.75rem; margin-bottom: var(--space-sm); }
 .product-short-description { font-size: var(--font-size-sm); color: var(--neutral-secondary); }
@@ -739,6 +745,20 @@ select.form-control-sm { height: auto; }
 .dashboards-section .btn, .orders-section .btn { margin-right: var(--space-sm); margin-bottom: var(--space-sm); font-weight: var(--font-weight-normal); }
 .logout-section .btn { min-width: 120px; }
 
+/* --- Banner Slider --- */
+.banner-slider-container { position: relative; width: 100%; aspect-ratio: 2.5 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-light); touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
+.banner-slides { position: relative; width: 100%; height: 100%; }
+.banner-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.6s ease-in-out; background-color: var(--neutral-lighter); }
+.banner-slide.active { opacity: 1; visibility: visible; z-index: 1; }
+.banner-link { display: block; width: 100%; height: 100%; }
+.banner-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+.banner-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-size: 0.9rem; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; }
+.banner-nav:hover { background-color: rgba(0, 0, 0, 0.6); opacity: 1; }
+.banner-prev { left: var(--space-md); } .banner-next { right: var(--space-md); }
+.banner-dots { position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
+.banner-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0, 0, 0, 0.2); cursor: pointer; padding: 0; transition: background-color 0.3s ease; }
+.banner-dot.active { background-color: white; }
+
 /* --- Category Icons --- */
 .category-icons-section h2 { font-size: 1.25rem; font-weight: var(--font-weight-semibold); color: var(--neutral-primary); text-align: center; margin-bottom: var(--space-lg); }
 .category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
@@ -762,123 +782,6 @@ select.form-control-sm { height: auto; }
 #no-admin-orders-found td, #no-seller-orders-found td, #no-admin-products-found td, #no-seller-products-found td, #no-admin-users-found td { text-align: center; padding: var(--space-lg); color: var(--neutral-secondary); font-style: italic; }
 tr.hidden { display: none !important; }
 
-/* ============================ */
-/* Slider Styles (NEW/UPDATED) */
-/* ============================ */
-
-/* --- Banner Slider --- */
-.banner-slider-container {
-    position: relative;
-    width: 100%;
-    aspect-ratio: 2.5 / 1; /* Adjust as needed */
-    overflow: hidden; /* Hide slides outside the container */
-    border-radius: var(--border-radius);
-    background-color: var(--neutral-light);
-    touch-action: pan-y; /* Allow vertical scroll, handle horizontal in JS */
-    -webkit-tap-highlight-color: transparent;
-    margin-bottom: var(--space-lg); /* Ensure margin exists */
-}
-
-.banner-slides-wrapper {
-    display: flex; /* Arrange slides horizontally */
-    height: 100%;
-    position: relative;
-    /* Transition applied via JS for initial load and jumps */
-}
-
-.banner-slide {
-    width: 100%; /* Each slide takes full container width */
-    flex-shrink: 0; /* Prevent slides from shrinking */
-    height: 100%;
-    position: relative; /* Needed if content needs positioning inside */
-    background-color: var(--neutral-lighter);
-    /* Removed old opacity/visibility styles */
-}
-
-.banner-link { display: block; width: 100%; height: 100%; }
-.banner-image { display: block; width: 100%; height: 100%; object-fit: cover; }
-
-/* Keep Nav and Dots positioning relative to the main container */
-.banner-nav {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.4); color: white; border: none;
-    border-radius: 50%; width: 35px; height: 35px; font-size: 0.9rem;
-    cursor: pointer; z-index: 2; display: none; /* Hide initially, show via JS */ align-items: center;
-    justify-content: center; transition: background-color 0.2s ease; opacity: 0.8;
-}
-.banner-nav:hover { background-color: rgba(0, 0, 0, 0.6); opacity: 1; }
-.banner-prev { left: var(--space-md); }
-.banner-next { right: var(--space-md); }
-
-.banner-dots {
-    position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%);
-    display: none; /* Hide initially, show via JS */ gap: var(--space-sm); z-index: 2;
-}
-.banner-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0, 0, 0, 0.2);
-    cursor: pointer; padding: 0; transition: background-color 0.3s ease;
-}
-.banner-dot.active { background-color: white; }
-
-
-/* --- Product Detail Image Slider --- */
-.product-detail-image-section {
-    position: relative; /* Keep for positioning nav/dots */
-    width: 100%;
-    max-width: 450px; /* Or remove if full width on mobile */
-    margin: 0 auto var(--space-lg) auto;
-    aspect-ratio: 1 / 1;
-    overflow: hidden; /* Crucial for sliding */
-    border-radius: var(--border-radius);
-    background-color: var(--neutral-lighter);
-    border: 1px solid var(--border-color);
-    touch-action: pan-y; /* Allow vertical scroll */
-    -webkit-tap-highlight-color: transparent;
-}
-
-/* Container that actually moves */
-.product-image-slides-wrapper {
-    display: flex;
-    height: 100%;
-    position: relative;
-    /* Transition applied via JS */
-}
-
-/* Individual Slide Styling */
-.product-image-slide {
-    width: 100%;
-    flex-shrink: 0;
-    height: 100%;
-    position: relative; /* For potential content inside */
-    /* Removed old absolute positioning, opacity, visibility */
-}
-
-.product-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
-
-/* Keep Nav and Dots positioning */
-.product-image-nav {
-    position: absolute; top: 50%; transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.4); color: white; border: none;
-    border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; font-weight: bold;
-    line-height: 1; cursor: pointer; z-index: 2; display: none; /* Hide initially, show via JS */ align-items: center;
-    justify-content: center; transition: background-color 0.2s ease; opacity: 0.8;
-}
-.product-image-nav:hover, .product-image-nav:focus { background-color: rgba(0, 0, 0, 0.6); opacity: 1; outline: none; }
-.product-image-prev { left: var(--space-sm); }
-.product-image-next { right: var(--space-sm); }
-
-.product-image-dots {
-    position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%);
-    display: none; /* Hide initially, show via JS */ gap: var(--space-sm); z-index: 2;
-}
-.product-image-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.3);
-    cursor: pointer; padding: 0; transition: background-color 0.3s ease;
-}
-.product-image-dot.active { background-color: white; }
-.product-image-dot:focus { outline: 1px dotted white; outline-offset: 1px; }
 
 /* ============================ */
 /* Media Queries                */
