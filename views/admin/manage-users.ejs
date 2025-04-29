@@ -1,11 +1,20 @@
+<%# views/admin/manage-users.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
     <h1><%= title %></h1>
 
+    <%# --- ADD FILTER INPUT --- %>
+    <div class="form-group mb-3">
+        <label for="user-filter-input" class="visually-hidden">Filter Users:</label>
+        <input type="text" id="user-filter-input" class="form-control" placeholder="Type to filter users (Name, Email, Role...)" aria-label="Filter Users">
+    </div>
+    <%# --- END FILTER INPUT --- %>
+
     <% if (users.length > 0) { %>
         <div class="table-container card">
-            <table class="data-table">
+            <%# --- ADDED ID to table --- %>
+            <table class="data-table" id="admin-user-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -18,7 +27,8 @@
                 </thead>
                 <tbody>
                     <% users.forEach(user => { %>
-                        <tr>
+                        <%# --- ADDED class="user-row" --- %>
+                        <tr class="user-row" data-user-id="<%= user._id %>">
                             <td data-label="Name"><%= user.name %></td>
                             <td data-label="Email / Phone">
                                 <%= user.email %>
@@ -46,6 +56,11 @@
                             </td>
                         </tr>
                     <% }) %>
+                    <%# --- ADD NO RESULTS ROW --- %>
+                    <tr id="no-admin-users-found" class="hidden">
+                         <td colspan="6" class="text-center text-muted p-3">No users match your filter.</td> <%# Adjusted colspan to 6 %>
+                    </tr>
+                    <%# --- END NO RESULTS ROW --- %>
                 </tbody>
             </table>
         </div>
