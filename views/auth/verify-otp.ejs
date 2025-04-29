@@ -9,15 +9,15 @@
          <input type="hidden" name="email" value="<%= email %>">
         <div class="form-group">
             <label for="otp">OTP Code:</label>
-            <input type="text" <%# Changed type to text for better compatibility %>
+            <input type="text"
                    id="otp"
                    name="otp"
                    required
-                   pattern="\d{6}" <%# Ensures exactly 6 digits %>
-                   maxlength="6"  <%# Limits input length %>
-                   inputmode="numeric" <%# Suggests numeric keyboard on mobile %>
-                   autocomplete="one-time-code" <%# Helps password managers/browsers %>
-                   title="Enter the 6-digit OTP code received"> <%# Clear hint %>
+                   pattern="\d{6}" 
+                   maxlength="6"  
+                   inputmode="numeric"
+                   autocomplete="one-time-code" 
+                   title="Enter the 6-digit OTP code received" placeholder="Enter OTP">
         </div>
         <button type="submit" class="btn btn-primary">Verify OTP</button>
     </form>
