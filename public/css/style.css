@@ -352,7 +352,6 @@ select.form-control-sm { height: auto; }
 }
 .app-logo:hover, .app-logo:focus { color: var(--neutral-white); text-decoration: none; opacity: 0.9; }
 .app-logo i { margin-right: var(--space-sm); font-size: 1.2em; }
-.app-logo .app-name { display: none; } /* Hidden on mobile */
 
 /* Search Bar */
 .search-container-dynamic { flex-grow: 0; max-width: none; order: 1; margin: 0; position: static; }
