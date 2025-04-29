@@ -32,9 +32,11 @@
 <% if (!selectedCategory && (!searchTerm || searchTerm.trim() === '')) { %>
     <% if (typeof homepageBanners !== 'undefined' && homepageBanners.length > 0) { %>
         <div class="banner-slider-container mb-4" data-slider-container>
-            <div class="banner-slides" data-slides>
+            <%# --- ADDED WRAPPER --- %>
+            <div class="banner-slides-wrapper" data-slides-wrapper>
                 <% homepageBanners.forEach((banner, index) => { %>
-                    <div class="banner-slide <%= index === 0 ? 'active' : '' %>" data-slide>
+                    <%# Slide content remains the same, REMOVE active class %>
+                    <div class="banner-slide" data-slide>
                         <% if (banner.linkUrl) { %>
                             <a href="<%= banner.linkUrl %>" rel="noopener noreferrer" class="banner-link">
                                 <img src="<%= banner.imageUrl %>"
@@ -50,19 +52,22 @@
                         <% } %>
                     </div>
                 <% }) %>
+                 <%# JS will add cloned slides here %>
             </div>
+            <%# --- END ADDED WRAPPER --- %>
 
-            <%# Optional: Navigation Arrows %>
+            <%# Optional: Navigation Arrows (keep outside wrapper) - Hidden initially by CSS %>
             <% if (homepageBanners.length > 1) { %>
                 <button class="banner-nav banner-prev" data-slider-prev aria-label="Previous Banner"><i class="fas fa-chevron-left"></i></button>
                 <button class="banner-nav banner-next" data-slider-next aria-label="Next Banner"><i class="fas fa-chevron-right"></i></button>
             <% } %>
 
-            <%# Optional: Navigation Dots %>
+            <%# Optional: Navigation Dots (keep outside wrapper) - Hidden initially by CSS %>
              <% if (homepageBanners.length > 1) { %>
                 <div class="banner-dots" data-slider-dots>
                     <% homepageBanners.forEach((_, index) => { %>
-                        <button class="banner-dot <%= index === 0 ? 'active' : '' %>" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
+                         <%# Remove active class, JS will handle it %>
+                        <button class="banner-dot" data-slide-to="<%= index %>" aria-label="Go to banner <%= index + 1 %>"></button>
                     <% }) %>
                 </div>
             <% } %>

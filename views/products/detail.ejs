@@ -34,32 +34,35 @@
 
    <div class="product-detail-main">
         <%# --- UPDATED: Image Display Logic --- %>
-        <div class="product-detail-image-section"> <%# Wrapper section %>
-            <% if (product.imageUrl2) { %>
-                <%# Slider structure if two images exist %>
-                <div class="product-image-slider-container" data-product-image-slider>
-                    <div class="product-image-slides">
-                        <div class="product-image-slide active" data-product-slide>
-                            <img src="<%= product.imageUrl %>" alt="<%= product.name %> - Image 1" class="product-detail-image">
-                        </div>
-                        <div class="product-image-slide" data-product-slide>
-                             <img src="<%= product.imageUrl2 %>" alt="<%= product.name %> - Image 2" class="product-detail-image">
-                        </div>
+        <div class="product-detail-image-section" data-product-image-slider> <%# Added data attribute %>
+            <%# --- ADDED WRAPPER --- %>
+            <div class="product-image-slides-wrapper" data-product-slides-wrapper>
+                <%# Slide for Primary Image %>
+                <div class="product-image-slide" data-product-slide> <%# Remove active class %>
+                    <img src="<%= product.imageUrl %>" alt="<%= product.name %> - Image 1" class="product-detail-image">
+                </div>
+                <%# Slide for Second Image (if exists) %>
+                <% if (product.imageUrl2) { %>
+                    <div class="product-image-slide" data-product-slide> <%# Remove active class %>
+                         <img src="<%= product.imageUrl2 %>" alt="<%= product.name %> - Image 2" class="product-detail-image">
                     </div>
-                    <%# Navigation Arrows only if there are slides to navigate %>
-                    <button class="product-image-nav product-image-prev" data-product-image-nav="prev" aria-label="Previous Image">‹</button>
-                    <button class="product-image-nav product-image-next" data-product-image-nav="next" aria-label="Next Image">›</button>
-                    <%# Navigation Dots only if there are slides to navigate %>
-                     <div class="product-image-dots">
-                         <button class="product-image-dot active" data-product-image-dot="0" aria-label="Go to image 1"></button>
-                         <button class="product-image-dot" data-product-image-dot="1" aria-label="Go to image 2"></button>
-                     </div>
-                </div>
-            <% } else { %>
-                <%# Original single image display if only one image %>
-                <div class="product-detail-image-single"> <%# Optional wrapper %>
-                    <img src="<%= product.imageUrl %>" alt="<%= product.name %>" class="product-detail-image">
-                </div>
+                <% } %>
+                 <%# JS will add clones here if imageUrl2 exists %>
+            </div>
+            <%# --- END ADDED WRAPPER --- %>
+
+            <%# Navigation Arrows (only if imageUrl2 exists) - Hidden initially by CSS %>
+            <% if (product.imageUrl2) { %>
+                <button class="product-image-nav product-image-prev" data-product-image-nav="prev" aria-label="Previous Image">‹</button>
+                <button class="product-image-nav product-image-next" data-product-image-nav="next" aria-label="Next Image">›</button>
+            <% } %>
+
+            <%# Navigation Dots (only if imageUrl2 exists) - Hidden initially by CSS %>
+            <% if (product.imageUrl2) { %>
+                 <div class="product-image-dots">
+                     <button class="product-image-dot" data-product-image-dot="0" aria-label="Go to image 1"></button> <%# Remove active class %>
+                     <button class="product-image-dot" data-product-image-dot="1" aria-label="Go to image 2"></button> <%# Remove active class %>
+                 </div>
             <% } %>
         </div>
         <%# --- END UPDATED --- %>
@@ -201,70 +204,5 @@
     </div>
 
 </div> <%# End product-detail-container %>
-
-
-<script>
-    // --- UPDATED: Product Image Slider JS ---
-    const imageSlider = document.querySelector('[data-product-image-slider]');
-    if (imageSlider) {
-        const slides = imageSlider.querySelectorAll('[data-product-slide]');
-        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
-        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
-        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
-        let currentImageIndex = 0;
-
-        function showProductImage(index) {
-            if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
-
-            // Calculate the new index correctly handling negative numbers
-            const newIndex = (index % slides.length + slides.length) % slides.length;
-
-            // Update active classes for slides and dots
-            slides.forEach((slide, i) => {
-                slide.classList.toggle('active', i === newIndex);
-            });
-            dots.forEach((dot, i) => {
-                dot.classList.toggle('active', i === newIndex);
-            });
-
-            currentImageIndex = newIndex;
-        }
-
-        // Add event listeners if buttons/dots exist
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
-        }
-
-        dots.forEach(dot => {
-            dot.addEventListener('click', () => {
-                const index = parseInt(dot.dataset.productImageDot, 10);
-                if (!isNaN(index)) {
-                    showProductImage(index);
-                }
-            });
-        });
-
-        // Initialize the slider to the first image
-        if (slides.length > 0) {
-             showProductImage(0);
-        }
-    }
-    // --- END UPDATED ---
-
-    // Keep existing rating bar animation script
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
-            var width = el.getAttribute('data-width');
-            if (width) {
-                setTimeout(() => {
-                     el.style.width = width + '%';
-                }, 100); // Slight delay for effect
-            }
-        });
-    });
-</script>
 
 <%- include('../partials/footer') %>

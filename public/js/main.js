@@ -280,9 +280,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.target.classList.contains('btn-update-qty')) {
                 e.preventDefault();
                 const button = e.target;
-                const productId = button.dataset.productId;
-                const quantityInput = document.getElementById(`quantity-${productId}`);
-                if (!quantityInput) return;
+                const quantityInput = button.previousElementSibling; // Find the input just before the button
+                if (!quantityInput || !quantityInput.matches('.quantity-input')) return; // Ensure it's the correct input
+
+                const productId = quantityInput.dataset.productId;
                 const newQuantity = parseInt(quantityInput.value, 10);
 
                 if (!quantityInput.dataset.originalValue) {
@@ -540,129 +541,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // ========================================
     // End Loading State for Non-Form Actions
-    // ========================================
-
-    // ========================================
-    // Homepage Banner Slider Logic (with Touch Events)
-    // ========================================
-    const sliderContainer = document.querySelector('[data-slider-container]');
-    if (sliderContainer) {
-        const slides = sliderContainer.querySelectorAll('[data-slide]');
-        const prevBtn = sliderContainer.querySelector('[data-slider-prev]');
-        const nextBtn = sliderContainer.querySelector('[data-slider-next]');
-        const dotsContainer = sliderContainer.querySelector('[data-slider-dots]');
-        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-slide-to]') : [];
-
-        let currentSlideIndex = 0;
-        let autoSlideInterval = null;
-        const slideIntervalTime = 5000; // 5 seconds
-
-        // Touch/Swipe variables
-        let isDragging = false;
-        let startX = 0;
-        let currentX = 0;
-        let diffX = 0;
-        const swipeThreshold = 50; // Min pixels to swipe to change slide
-
-        function showSlide(index) {
-            if (!slides || slides.length === 0) return;
-            // Ensure index wraps around correctly
-            const newIndex = (index % slides.length + slides.length) % slides.length;
-            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
-            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
-            currentSlideIndex = newIndex;
-        }
-
-        function nextSlide() { showSlide(currentSlideIndex + 1); }
-        function prevSlide() { showSlide(currentSlideIndex - 1); }
-
-        function startAutoSlide() {
-            // Clear existing interval before starting a new one
-            clearInterval(autoSlideInterval);
-            // Only start auto-slide if there's more than one slide
-            if (slides.length > 1) {
-                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
-            }
-        }
-
-        // Touch event handlers
-        function handleTouchStart(event) {
-            if (slides.length <= 1) return; // Don't swipe if only one slide
-            isDragging = true;
-            // Use pageX for touch coordinates
-            startX = event.touches[0].pageX;
-            currentX = startX;
-            diffX = 0;
-            // Pause auto-slide on touch start
-            clearInterval(autoSlideInterval);
-            // Optional: Add a class for visual feedback during drag
-            // sliderContainer.classList.add('is-dragging');
-        }
-
-        function handleTouchMove(event) {
-            if (!isDragging || slides.length <= 1) return;
-            currentX = event.touches[0].pageX;
-            diffX = startX - currentX;
-            // Prevent default scrolling ONLY if swipe is significant horizontally
-            if (Math.abs(diffX) > 10) {
-                // event.preventDefault(); // Be careful with this, might prevent vertical scroll
-            }
-            // Optional: Could add slide translation effect here for visual feedback during drag
-        }
-
-        function handleTouchEnd() {
-            if (!isDragging || slides.length <= 1) return;
-            isDragging = false;
-            // sliderContainer.classList.remove('is-dragging');
-
-            // Check if swipe distance meets the threshold
-            if (Math.abs(diffX) > swipeThreshold) {
-                if (diffX > 0) { nextSlide(); } // Swiped left (Next)
-                else { prevSlide(); } // Swiped right (Prev)
-            }
-            // Reset touch variables
-            startX = 0; currentX = 0; diffX = 0;
-            // Restart auto-slide after touch interaction ends
-            startAutoSlide();
-        }
-
-        // Initialize slider
-        if (slides.length > 0) {
-             showSlide(0);
-             startAutoSlide();
-        } else {
-            // Hide controls if no slides
-             if (prevBtn) prevBtn.style.display = 'none';
-             if (nextBtn) nextBtn.style.display = 'none';
-             if (dotsContainer) dotsContainer.style.display = 'none';
-        }
-
-        // Add event listeners for controls
-        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
-        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
-        if (dotsContainer) {
-            dotsContainer.addEventListener('click', (e) => {
-                const targetDot = e.target.closest('[data-slide-to]');
-                if (targetDot) {
-                    const index = parseInt(targetDot.dataset.slideTo, 10);
-                    if (!isNaN(index)) { showSlide(index); startAutoSlide(); }
-                }
-            });
-        }
-
-        // Add touch listeners (use passive: true for start/end for performance if not preventing default scroll)
-        sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
-        // Use passive: false for move ONLY if you intend to preventDefault scrolling
-        sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: true }); // Usually better for performance
-        sliderContainer.addEventListener('touchend', handleTouchEnd);
-        sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle cancelled touches
-
-        // Pause on hover (for desktop)
-        sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
-        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
-    }
-    // ========================================
-    // End Homepage Banner Slider Logic
     // ========================================
 
 
@@ -956,92 +834,290 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Product Image Slider Logic (with Touch)
+    // Generic Infinite Sliding Logic (Handles Banner & Product Images)
     // ========================================
-    const imageSlider = document.querySelector('[data-product-image-slider]');
-    if (imageSlider) {
-        const slides = imageSlider.querySelectorAll('[data-product-slide]');
-        const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
-        const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
-        const dotsContainer = imageSlider.querySelector('.product-image-dots'); // Container for dots
-        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-product-image-dot]') : []; // Select dots within container
-        let currentImageIndex = 0;
-
-        // Touch variables
-        let isProductDragging = false;
-        let productStartX = 0;
-        let productCurrentX = 0;
-        let productDiffX = 0;
-        const productSwipeThreshold = 50;
-
-        function showProductImage(index) {
-            if (!slides || slides.length < 1) return; // Allow for single slide case now
-            const newIndex = (index % slides.length + slides.length) % slides.length;
-            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
-            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
-            currentImageIndex = newIndex;
+    /**
+     * Initializes an infinite sliding carousel.
+     * @param {string} containerSelector - CSS selector for the main slider container element.
+     * @param {object} options - Configuration options.
+     * @param {number} [options.slideIntervalTime=5000] - Autoplay interval in ms (0 to disable).
+     * @param {string} [options.slideClass='[data-slide]'] - CSS selector for individual slide elements.
+     * @param {string} [options.wrapperClass='[data-slides-wrapper]'] - CSS selector for the wrapper holding the slides.
+     * @param {string} [options.prevBtnClass='[data-slider-prev]'] - CSS selector for the previous button.
+     * @param {string} [options.nextBtnClass='[data-slider-next]'] - CSS selector for the next button.
+     * @param {string} [options.dotsContainerClass='[data-slider-dots]'] - CSS selector for the dots container.
+     * @param {string} [options.dotClass='[data-slide-to]'] - CSS selector for individual dot elements.
+     * @param {string} [options.dotDataAttribute='data-slide-to'] - Data attribute on dots containing the target index.
+     */
+    function initializeInfiniteSlider(containerSelector, options = {}) {
+        const sliderContainer = document.querySelector(containerSelector);
+        if (!sliderContainer) {
+            // console.log(`Slider container "${containerSelector}" not found.`);
+            return;
         }
 
-        function handleProductTouchStart(event) {
-            if (slides.length <= 1) return;
-            isProductDragging = true;
-            productStartX = event.touches[0].pageX;
-            productCurrentX = productStartX;
-            productDiffX = 0;
+        const config = {
+            slideIntervalTime: 5000,
+            slideClass: '[data-slide]', // Default to data-slide used in banner
+            wrapperClass: '[data-slides-wrapper]',
+            prevBtnClass: '[data-slider-prev]',
+            nextBtnClass: '[data-slider-next]',
+            dotsContainerClass: '[data-slider-dots]',
+            dotClass: '[data-slide-to]', // Use the data attribute itself as selector part
+            dotDataAttribute: 'data-slide-to',
+            ...options // Override defaults with provided options
+        };
+
+        const slidesWrapper = sliderContainer.querySelector(config.wrapperClass);
+        const originalSlides = Array.from(sliderContainer.querySelectorAll(`${config.wrapperClass} > ${config.slideClass}`)); // Select direct children matching slideClass
+
+        const prevBtn = sliderContainer.querySelector(config.prevBtnClass);
+        const nextBtn = sliderContainer.querySelector(config.nextBtnClass);
+        const dotsContainer = sliderContainer.querySelector(config.dotsContainerClass);
+        let dots = dotsContainer ? Array.from(dotsContainer.querySelectorAll(config.dotClass)) : [];
+
+        if (!slidesWrapper || originalSlides.length === 0) {
+            // console.log(`Slider "${containerSelector}" missing wrapper or slides.`);
+            // Optionally hide controls if no slides
+            if (prevBtn) prevBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (dotsContainer) dotsContainer.style.display = 'none';
+            return;
         }
 
-        function handleProductTouchMove(event) {
-            if (!isProductDragging || slides.length <= 1) return;
-            productCurrentX = event.touches[0].pageX;
-            productDiffX = productStartX - productCurrentX;
-             // Prevent vertical scroll only if horizontal swipe is significant
-            if (Math.abs(productDiffX) > 10) {
-                // event.preventDefault(); // Can interfere with page scroll, use with caution
+        let totalOriginalSlides = originalSlides.length;
+        let currentIndex = 1; // Start at the first *original* slide (index 1 after cloning)
+        let totalSlidesIncludingClones = totalOriginalSlides;
+        let isTransitioning = false;
+        let autoSlideInterval = null;
+        let isDragging = false;
+        let startX = 0;
+        let currentX = 0;
+        let diffX = 0;
+        const swipeThreshold = 50; // Min pixels to swipe
+
+        // --- Setup Clones for Infinite Loop (only if more than 1 slide) ---
+        if (totalOriginalSlides > 1) {
+            const firstClone = originalSlides[0].cloneNode(true);
+            const lastClone = originalSlides[totalOriginalSlides - 1].cloneNode(true);
+
+            // Remove data attributes from clones if they cause issues (e.g., duplicate IDs)
+            firstClone.removeAttribute(config.slideClass.replace(/[\[\]]/g, '')); // Remove data-slide attribute if that's the selector
+            lastClone.removeAttribute(config.slideClass.replace(/[\[\]]/g, ''));
+            // Ensure specific dot data attributes are removed if they exist
+             const dotAttr = config.dotDataAttribute;
+             if (dotAttr) {
+                 firstClone.removeAttribute(dotAttr);
+                 lastClone.removeAttribute(dotAttr);
+                 // Also check children if necessary, although unlikely for slides
+             }
+
+            slidesWrapper.appendChild(firstClone);
+            slidesWrapper.insertBefore(lastClone, originalSlides[0]);
+            totalSlidesIncludingClones = totalOriginalSlides + 2;
+        } else {
+            // Only one slide, disable controls and interval
+            currentIndex = 0; // Only one slide at index 0
+            if (prevBtn) prevBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (dotsContainer) dotsContainer.style.display = 'none';
+            config.slideIntervalTime = 0; // Disable autoslide
+        }
+
+        // --- Initial Positioning ---
+        function setInitialPosition() {
+            slidesWrapper.style.transition = 'none'; // No transition for initial set
+            slidesWrapper.style.transform = `translateX(-${currentIndex * 100}%)`;
+            // Force reflow/repaint before re-enabling transitions
+            void slidesWrapper.offsetWidth;
+            // Set transition after initial position is set
+            slidesWrapper.style.transition = 'transform 0.5s ease-in-out';
+        }
+
+        // --- Update Dots ---
+        function updateDots(targetOriginalIndex) {
+            if (dots.length !== totalOriginalSlides) return; // Ensure dots match original slides
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('active', i === targetOriginalIndex);
+            });
+        }
+
+        // --- Go To Slide Function ---
+        function goToSlide(index, withTransition = true) {
+            if (isTransitioning || totalSlidesIncludingClones <= 1) return; // Prevent multiple transitions / no slides
+            isTransitioning = true;
+
+            slidesWrapper.style.transition = withTransition ? 'transform 0.5s ease-in-out' : 'none';
+            slidesWrapper.style.transform = `translateX(-${index * 100}%)`;
+            currentIndex = index;
+
+            // Calculate the corresponding dot index (0-based for original slides)
+            let targetOriginalIndex = (currentIndex - 1 + totalOriginalSlides) % totalOriginalSlides;
+            updateDots(targetOriginalIndex);
+
+            // If not using transition (jump), reset isTransitioning immediately
+             if (!withTransition) {
+                setTimeout(() => { isTransitioning = false; }, 50); // Small delay to ensure styles apply
+             }
+        }
+
+        // --- Handle Transition End for Infinite Loop Jump ---
+        slidesWrapper.addEventListener('transitionend', () => {
+            isTransitioning = false; // Transition finished
+
+             if (totalOriginalSlides <= 1) return; // No jump needed for single slide
+
+            // Jump from last clone to original first slide
+            if (currentIndex === totalSlidesIncludingClones - 1) {
+                 goToSlide(1, false); // Jump to index 1 (first original) without transition
             }
-        }
-
-        function handleProductTouchEnd() {
-            if (!isProductDragging || slides.length <= 1) return;
-            isProductDragging = false;
-            if (Math.abs(productDiffX) > productSwipeThreshold) {
-                if (productDiffX > 0) { showProductImage(currentImageIndex + 1); } // Swipe Left -> Next
-                else { showProductImage(currentImageIndex - 1); } // Swipe Right -> Prev
+            // Jump from first clone to original last slide
+            else if (currentIndex === 0) {
+                 goToSlide(totalOriginalSlides, false); // Jump to index totalOriginalSlides (last original) without transition
             }
-            productStartX = 0; productCurrentX = 0; productDiffX = 0;
+        });
+
+        // --- Navigation Button Listeners ---
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (isTransitioning || totalSlidesIncludingClones <= 1) return;
+                goToSlide(currentIndex + 1);
+                resetAutoSlide(); // Reset timer on manual interaction
+            });
+        }
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (isTransitioning || totalSlidesIncludingClones <= 1) return;
+                goToSlide(currentIndex - 1);
+                resetAutoSlide();
+            });
         }
 
-        // Initialize slider and controls based on slide count
-        if (slides.length > 1) {
-            if (nextBtn) { nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1)); }
-            if (prevBtn) { prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1)); }
-            dots.forEach(dot => {
-                dot.addEventListener('click', () => {
-                    const index = parseInt(dot.dataset.productImageDot, 10);
-                    if (!isNaN(index)) { showProductImage(index); }
+        // --- Dot Navigation Listeners ---
+        if (dotsContainer && dots.length > 0) {
+            dots.forEach((dot) => {
+                dot.addEventListener('click', (e) => {
+                    if (isTransitioning || totalSlidesIncludingClones <= 1) return;
+                     // Use closest to ensure we get the button even if user clicks inner element like <i>
+                    const targetDotButton = e.target.closest(`[${config.dotDataAttribute}]`);
+                    if (targetDotButton) {
+                        const targetOriginalIndex = parseInt(targetDotButton.getAttribute(config.dotDataAttribute), 10);
+                        if (!isNaN(targetOriginalIndex)) {
+                            goToSlide(targetOriginalIndex + 1); // Go to actual index (+1 for clone)
+                            resetAutoSlide();
+                        }
+                    }
                 });
             });
-            // Add touch listeners only if multiple slides
-            imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true });
-            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: true }); // Usually better for performance
-            imageSlider.addEventListener('touchend', handleProductTouchEnd);
-            imageSlider.addEventListener('touchcancel', handleProductTouchEnd);
-            // Show controls
-            if (nextBtn) nextBtn.style.display = 'flex'; // Use flex if that's the display type
-            if (prevBtn) prevBtn.style.display = 'flex';
-            if (dotsContainer) dotsContainer.style.display = 'flex';
-        } else {
-            // Hide controls if only one slide
-            if (nextBtn) nextBtn.style.display = 'none';
-            if (prevBtn) prevBtn.style.display = 'none';
-            if (dotsContainer) dotsContainer.style.display = 'none';
         }
 
-        // Show the first slide initially (even if it's the only one)
-        if (slides.length > 0) { showProductImage(0); }
 
-    }
+        // --- Auto Sliding ---
+        function startAutoSlide() {
+            if (config.slideIntervalTime <= 0 || totalSlidesIncludingClones <= 1) return; // Only if interval > 0 and more than one slide
+            clearInterval(autoSlideInterval); // Clear previous interval
+            autoSlideInterval = setInterval(() => {
+                goToSlide(currentIndex + 1);
+            }, config.slideIntervalTime);
+        }
+
+        function resetAutoSlide() {
+            clearInterval(autoSlideInterval);
+            startAutoSlide();
+        }
+
+        // Pause on hover
+        sliderContainer.addEventListener('mouseenter', () => clearInterval(autoSlideInterval));
+        sliderContainer.addEventListener('mouseleave', startAutoSlide);
+        // Also pause on focus within slider elements (accessibility)
+        sliderContainer.addEventListener('focusin', () => clearInterval(autoSlideInterval));
+        sliderContainer.addEventListener('focusout', startAutoSlide);
+
+
+        // --- Touch/Swipe Listeners ---
+        function handleTouchStart(event) {
+            if (totalSlidesIncludingClones <= 1) return;
+            isDragging = true;
+            startX = event.touches[0].pageX;
+            currentX = startX;
+            diffX = 0;
+            clearInterval(autoSlideInterval); // Pause auto slide
+            slidesWrapper.style.transition = 'none'; // Disable transition during drag
+        }
+
+        function handleTouchMove(event) {
+             if (!isDragging || totalSlidesIncludingClones <= 1) return;
+             currentX = event.touches[0].pageX;
+             diffX = startX - currentX;
+             // Apply drag effect directly to transform
+             const currentTranslate = -currentIndex * slidesWrapper.offsetWidth; // Base position
+             slidesWrapper.style.transform = `translateX(${currentTranslate - diffX}px)`;
+             // Simple check to prevent vertical scroll during horizontal swipe
+             if (Math.abs(diffX) > 10) {
+                // Note: preventDefault() here can block vertical scrolling, use carefully
+                // event.preventDefault();
+             }
+        }
+
+        function handleTouchEnd() {
+             if (!isDragging || totalSlidesIncludingClones <= 1) return;
+             isDragging = false;
+             slidesWrapper.style.transition = 'transform 0.5s ease-in-out'; // Re-enable transition
+
+             if (Math.abs(diffX) > swipeThreshold) {
+                 if (diffX > 0) { goToSlide(currentIndex + 1); } // Swipe Left -> Next
+                 else { goToSlide(currentIndex - 1); } // Swipe Right -> Prev
+             } else {
+                 // Didn't swipe enough, snap back to current slide
+                 goToSlide(currentIndex);
+             }
+             // Reset variables and restart auto-slide
+             startX = 0; currentX = 0; diffX = 0;
+             resetAutoSlide();
+         }
+
+        if (totalSlidesIncludingClones > 1) {
+            sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+            sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: true }); // Use passive: true if not preventing default
+            sliderContainer.addEventListener('touchend', handleTouchEnd);
+            sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle cancelled touches
+        }
+
+        // --- Initialize ---
+        setInitialPosition(); // Set initial position without transition
+        updateDots(0); // Update dots for the first original slide
+        startAutoSlide(); // Start auto-slide if applicable
+
+         // --- Make Controls Visible After Setup (if applicable) ---
+         if (totalOriginalSlides > 1) {
+            if (prevBtn) prevBtn.style.display = 'flex'; // Or 'block'/'inline-flex' as needed
+            if (nextBtn) nextBtn.style.display = 'flex';
+            if (dotsContainer) dotsContainer.style.display = 'flex';
+        }
+
+    } // --- End initializeInfiniteSlider ---
+
+
+    // --- Call the function for the Banner Slider ---
+    initializeInfiniteSlider('[data-slider-container]', {
+        // Options specific to banner slider if needed, otherwise defaults are used
+        // Example: slideIntervalTime: 6000
+    });
+
+    // --- Call the function for the Product Detail Slider ---
+    initializeInfiniteSlider('[data-product-image-slider]', {
+        slideClass: '[data-product-slide]', // Specify the slide selector used here
+        wrapperClass: '[data-product-slides-wrapper]',
+        prevBtnClass: '[data-product-image-nav="prev"]',
+        nextBtnClass: '[data-product-image-nav="next"]',
+        dotsContainerClass: '.product-image-dots', // Class selector for dots container
+        dotClass: '[data-product-image-dot]', // Selector for dots
+        dotDataAttribute: 'data-product-image-dot', // Attribute containing index
+        slideIntervalTime: 0 // Disable auto-slide for product images
+    });
+
     // ========================================
-    // End Product Image Slider Logic
+    // End Generic Infinite Sliding Logic
     // ========================================
 
 
@@ -1306,6 +1382,3 @@ function handleEmptyCartDisplay() {
         }
     }
 }
-
-// Note: Pincode helper functions (fetchPincodeData, populateLocalityDropdown, clearAutoFilledFields)
-// are defined within the DOMContentLoaded listener scope as they are directly tied to event listeners set up there.
