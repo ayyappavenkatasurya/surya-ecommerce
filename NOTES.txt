@@ -3616,7 +3616,9 @@ body {
   font-family: var(--font-family-base);
   line-height: var(--line-height-base);
   color: var(--neutral-primary);
-  background-color: var(--neutral-lighter); /* Use light grey background */
+  background: linear-gradient(to bottom, #f4f8ff, #f3feff); /* Flipkart-style gradient: Very light grey/blue to white */
+  background-repeat: no-repeat; /* Ensure gradient doesn't tile if content is short */
+  background-attachment: fixed; /* Keep gradient fixed during scroll */
   display: flex;
   flex-direction: column;
   min-height: 100vh;
