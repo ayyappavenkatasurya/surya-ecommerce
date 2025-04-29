@@ -3544,7 +3544,6 @@ module.exports = User;
 
 public/css/style.css:
 /* public/css/style.css */
-/* Microsoft Fluent-Inspired E-commerce Theme */
 
 *,
 *::before,
@@ -3555,84 +3554,70 @@ public/css/style.css:
 }
 
 :root {
-  /* Microsoft-Inspired Color Palette */
-  --primary-blue: #0078D4; /* Standard Microsoft Blue */
-  --primary-blue-hover: #005A9E;
-  --primary-blue-active: #004578;
-  --primary-blue-light: #EFF6FC; /* Light background tint */
+  /* Core Color Palette */
+  --primary-color: #007bff;
+  --primary-hover: #0056b3;
+  --secondary-color: #6c757d;
+  --secondary-hover: #5a6268;
+  --success-color: #28a745;
+  --success-hover: #218838;
+  --danger-color: #dc3545;
+  --danger-hover: #c82333;
+  --warning-color: #ffc107;
+  --warning-hover: #e0a800;
+  --info-color: #17a2b8;
+  --info-hover: #138496;
+  --light-color: #f8f9fa;
+  --dark-color: #343a40;
 
-  --neutral-primary: #323130; /* Dark Grey for primary text */
-  --neutral-secondary: #605E5C; /* Medium Grey for secondary text */
-  --neutral-tertiary: #A19F9D; /* Lighter Grey for hints, disabled */
-  --neutral-quaternary: #C8C6C4;
-  --neutral-light: #EDEBE9; /* Very light grey for backgrounds/borders */
-  --neutral-lighter: #F3F2F1; /* Lighter background */
-  --neutral-white: #FFFFFF;
+  /* Text & Links */
+  --text-color: #333;
+  --link-color: var(--primary-color);
 
-  --status-success: #107C10; /* Green */
-  --status-success-bg: #DFF6DD;
-  --status-danger: #D83B01; /* Red/Orange */
-  --status-danger-bg: #FDE7E9;
-  --status-warning: #FFB900; /* Yellow */
-  --status-warning-bg: #FFF4CE;
-  --status-info: #0078D4; /* Blue */
-  --status-info-bg: #EFF6FC;
-  --status-pending-bg: #FFF4CE; /* Reuse warning bg for pending */
-  --status-pending-text: #8C6D0F; /* Dark yellow text */
+  /* Layout & Components */
+  --card-bg: #ffffff;
+  --card-shadow: 0 2px 5px rgba(0, 0, 0, 0.12);
+  --border-color: #dee2e6;
+  --border-radius: 0.6rem; /* Smoother corners */
+  --spacing-unit: 1rem;
 
-  /* Typography */
-  --font-family-base: "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif;
-  --font-size-base: 1rem; /* 16px */
-  --font-size-sm: 0.875rem; /* 14px */
-  --font-size-lg: 1.125rem; /* 18px */
-  --font-weight-light: 300;
-  --font-weight-normal: 400;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 700;
-  --line-height-base: 1.5;
-
-  /* Borders & Shadows */
-  --border-radius: 4px;
-  --border-color: var(--neutral-light);
-  --box-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
-  --box-shadow-md: 0 4px 8px rgba(0, 0, 0, 0.1);
-
-  /* Spacing */
-  --space-unit: 8px; /* Base spacing unit */
-  --space-xs: calc(var(--space-unit) * 0.5);  /* 4px */
-  --space-sm: var(--space-unit);            /* 8px */
-  --space-md: calc(var(--space-unit) * 1.5); /* 12px */
-  --space-lg: calc(var(--space-unit) * 2);   /* 16px */
-  --space-xl: calc(var(--space-unit) * 3);   /* 24px */
-  --space-xxl: calc(var(--space-unit) * 4);  /* 32px */
+  /* Gradient Background Colors */
+  --gradient-start: #e9f1ff;
+  --gradient-mid1: #d0e0ff;
+  --gradient-mid2: #e0ebf7;
+  --gradient-end: #f0f5fd;
 }
 
 html {
-  font-size: var(--font-size-base);
+  font-size: 16px;
   scroll-behavior: smooth;
 }
 
 body {
-  font-family: var(--font-family-base);
-  line-height: var(--line-height-base);
-  color: var(--neutral-primary);
-  background: linear-gradient(to bottom, #f4f8ff, #f3feff); /* Flipkart-style gradient: Very light grey/blue to white */
-  background-repeat: no-repeat; /* Ensure gradient doesn't tile if content is short */
-  background-attachment: fixed; /* Keep gradient fixed during scroll */
+  font-family: 'Roboto', sans-serif;
+  line-height: 1.6;
+  color: var(--text-color);
+  background: linear-gradient(135deg,
+      var(--gradient-start) 0%,
+      var(--gradient-mid1) 25%,
+      var(--gradient-mid2) 55%,
+      var(--gradient-end) 100%
+    );
+  background-attachment: fixed;
+  background-size: cover;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
-  color: var(--primary-blue);
+  color: var(--link-color);
   text-decoration: none;
-  transition: color 0.15s ease-in-out;
+  transition: color 0.2s ease-in-out;
 }
+
 a:hover {
-  color: var(--primary-blue-hover);
+  color: var(--primary-hover);
   text-decoration: underline;
 }
 
@@ -3643,48 +3628,51 @@ img {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  margin-bottom: var(--space-lg);
+  margin-bottom: calc(var(--spacing-unit) * 0.75);
   line-height: 1.3;
-  font-weight: var(--font-weight-semibold);
+  font-weight: 500;
 }
-h1 { font-size: 1.75rem; } /* ~28px */
-h2 { font-size: 1.5rem; }  /* ~24px */
-h3 { font-size: 1.25rem; } /* ~20px */
-h4 { font-size: 1.125rem; }/* ~18px */
 
-p { margin-bottom: var(--space-lg); }
-ul, ol { padding-left: var(--space-xl); margin-bottom: var(--space-lg); }
+p {
+  margin-bottom: var(--spacing-unit);
+}
 
-/* --- Utility Classes --- */
-.hidden, .hide { display: none !important; }
+ul, ol {
+    margin-bottom: var(--spacing-unit);
+    padding-left: calc(var(--spacing-unit) * 1.5);
+}
+
+/* Utility Classes */
+.hidden { display: none !important; }
+.hide { display: none !important; } /* Alias */
 .text-center { text-align: center; }
-.text-danger { color: var(--status-danger) !important; }
-.text-success { color: var(--status-success) !important; }
-.text-warning { color: var(--status-warning) !important; }
-.text-info { color: var(--status-info) !important; }
-.text-muted { color: var(--neutral-secondary) !important; }
-.mb-1 { margin-bottom: var(--space-xs) !important; }
-.mb-2 { margin-bottom: var(--space-sm) !important; }
-.mb-3 { margin-bottom: var(--space-lg) !important; }
-.mb-4 { margin-bottom: var(--space-xl) !important; }
-.mt-1 { margin-top: var(--space-xs) !important; }
-.mt-2 { margin-top: var(--space-sm) !important; }
-.mt-3 { margin-top: var(--space-lg) !important; }
-.mt-4 { margin-top: var(--space-xl) !important; }
-.ms-1 { margin-left: var(--space-xs) !important; }
-.ms-2 { margin-left: var(--space-sm) !important; }
-.me-1 { margin-right: var(--space-xs) !important; }
-.me-2 { margin-right: var(--space-sm) !important; }
-.me-3 { margin-right: var(--space-lg) !important; }
-.p-1 { padding: var(--space-xs) !important; }
-.p-2 { padding: var(--space-sm) !important; }
-.p-3 { padding: var(--space-lg) !important; }
-.pt-1 { padding-top: var(--space-xs) !important; }
-.pt-2 { padding-top: var(--space-sm) !important; }
-.pt-3 { padding-top: var(--space-lg) !important; }
-.pb-1 { padding-bottom: var(--space-xs) !important; }
-.pb-2 { padding-bottom: var(--space-sm) !important; }
-.pb-3 { padding-bottom: var(--space-lg) !important; }
+.text-danger { color: var(--danger-color) !important; }
+.text-success { color: var(--success-color) !important; }
+.text-warning { color: var(--warning-color) !important; }
+.text-info { color: var(--info-color) !important; }
+.text-muted { color: var(--secondary-color) !important; }
+.mb-1 { margin-bottom: calc(var(--spacing-unit) * 0.25) !important; }
+.mb-2 { margin-bottom: calc(var(--spacing-unit) * 0.5) !important; }
+.mb-3 { margin-bottom: var(--spacing-unit) !important; }
+.mb-4 { margin-bottom: calc(var(--spacing-unit) * 1.5) !important; }
+.mt-1 { margin-top: calc(var(--spacing-unit) * 0.25) !important; }
+.mt-2 { margin-top: calc(var(--spacing-unit) * 0.5) !important; }
+.mt-3 { margin-top: var(--spacing-unit) !important; }
+.mt-4 { margin-top: calc(var(--spacing-unit) * 1.5) !important; }
+.ms-1 { margin-left: calc(var(--spacing-unit) * 0.25) !important; } /* Margin start */
+.ms-2 { margin-left: calc(var(--spacing-unit) * 0.5) !important; }
+.me-1 { margin-right: calc(var(--spacing-unit) * 0.25) !important; }
+.me-2 { margin-right: calc(var(--spacing-unit) * 0.5) !important; } /* Margin end */
+.me-3 { margin-right: var(--spacing-unit) !important; }
+.p-1 { padding: calc(var(--spacing-unit) * 0.25) !important; }
+.p-2 { padding: calc(var(--spacing-unit) * 0.5) !important; }
+.p-3 { padding: var(--spacing-unit) !important; }
+.pt-1 { padding-top: calc(var(--spacing-unit) * 0.25) !important; }
+.pt-2 { padding-top: calc(var(--spacing-unit) * 0.5) !important; }
+.pt-3 { padding-top: var(--spacing-unit) !important; }
+.pb-1 { padding-bottom: calc(var(--spacing-unit) * 0.25) !important; }
+.pb-2 { padding-bottom: calc(var(--spacing-unit) * 0.5) !important; }
+.pb-3 { padding-bottom: var(--spacing-unit) !important; }
 .d-flex { display: flex !important; }
 .d-inline-flex { display: inline-flex !important; }
 .d-block { display: block !important; }
@@ -3694,796 +3682,1834 @@ ul, ol { padding-left: var(--space-xl); margin-bottom: var(--space-lg); }
 .justify-content-center { justify-content: center !important; }
 .flex-wrap { flex-wrap: wrap !important; }
 .flex-grow-1 { flex-grow: 1 !important; }
-.gap-1 { gap: var(--space-xs) !important; }
-.gap-2 { gap: var(--space-sm) !important; }
-.gap-3 { gap: var(--space-lg) !important; }
-.small { font-size: var(--font-size-sm); }
+.gap-1 { gap: calc(var(--spacing-unit) * 0.25) !important; }
+.gap-2 { gap: calc(var(--spacing-unit) * 0.5) !important; }
+.gap-3 { gap: var(--spacing-unit) !important; }
+.small { font-size: 0.875em; }
 .fs-5 { font-size: 1.25rem !important; }
 .w-100 { width: 100% !important; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-.fw-bold { font-weight: var(--font-weight-bold) !important; }
-.fw-normal { font-weight: var(--font-weight-normal) !important; }
-.fw-semibold { font-weight: var(--font-weight-semibold) !important; }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.fw-bold { font-weight: bold !important; }
+.fw-normal { font-weight: normal !important; }
+.fw-light { font-weight: lighter !important; }
 .text-capitalize { text-transform: capitalize !important; }
 .border { border: 1px solid var(--border-color) !important; }
 .border-top { border-top: 1px solid var(--border-color) !important; }
 .border-bottom { border-bottom: 1px solid var(--border-color) !important; }
 .rounded { border-radius: var(--border-radius) !important; }
 
-/* --- Forms --- */
-.form-group { margin-bottom: var(--space-lg); }
-label:not(.form-label-inline) { display: block; margin-bottom: var(--space-sm); font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm); }
-label.form-label-inline { margin-bottom: 0; margin-right: var(--space-sm); font-weight: normal; }
 
-input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="url"], input[type="number"], input[type="search"], textarea, select {
+/* Forms */
+.inline-form {
+    display: inline-block;
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+.inline-form > * {
+    margin-bottom: 0;
+    vertical-align: middle;
+}
+.inline-form + .inline-form {
+    margin-left: calc(var(--spacing-unit) * 0.3);
+}
+
+
+.form-group {
+  margin-bottom: calc(var(--spacing-unit) * 0.8);
+}
+
+label:not(.form-label-inline) {
+  display: block;
+  margin-bottom: calc(var(--spacing-unit) * 0.3);
+  font-weight: 500;
+}
+label.form-label-inline {
+    margin-bottom: 0;
+    margin-right: calc(var(--spacing-unit) * 0.4);
+    font-weight: normal;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
   width: 100%;
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--neutral-secondary); /* Slightly darker default border */
+  padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.75);
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
-  background-color: var(--neutral-white);
-  color: var(--neutral-primary);
+  font-size: 1rem;
+  line-height: 1.5;
+  background-color: #fff;
+  color: var(--text-color);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
-.form-control { /* Ensure .form-control matches base input styles */
+.form-control {
     display: block;
     width: 100%;
-    padding: var(--space-sm) var(--space-md);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-normal);
-    line-height: var(--line-height-base);
-    color: var(--neutral-primary);
-    background-color: var(--neutral-white);
+    padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.75);
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--text-color);
+    background-color: #fff;
     background-clip: padding-box;
-    border: 1px solid var(--neutral-secondary);
+    border: 1px solid var(--border-color);
     appearance: none;
     border-radius: var(--border-radius);
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
 }
-textarea { resize: vertical; min-height: 80px; }
-input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
-input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
-input:focus, textarea:focus, select:focus, .form-control:focus {
-  border-color: var(--primary-blue);
-  outline: 0;
-  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.3); /* Subtle blue focus ring */
+
+input[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
 }
-input[readonly], .form-control[readonly] {
-  background-color: var(--neutral-light);
-  opacity: 1;
-  cursor: default;
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+input:focus,
+textarea:focus,
+select:focus,
+.form-control:focus {
+  border-color: var(--primary-color);
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
 }
 
 .form-control-sm {
-  padding: var(--space-xs) var(--space-sm);
-  font-size: var(--font-size-sm);
-  border-radius: var(--border-radius);
+  min-height: calc(1.5em + 0.5rem + 2px);
+  height: auto;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: calc(var(--border-radius) * 0.75);
 }
-select.form-control-sm { height: auto; }
+select.form-control-sm {
+  height: calc(1.8125rem + 2px);
+}
 
-.inline-form { display: inline-flex; gap: var(--space-sm); align-items: center; vertical-align: middle; margin-bottom: 0; }
-.inline-form > * { margin-bottom: 0; }
-
-/* --- Buttons --- */
+/* Buttons */
 .btn {
   display: inline-block;
-  font-weight: var(--font-weight-semibold);
-  color: var(--neutral-white);
+  font-weight: 400;
+  color: #fff;
   text-align: center;
   vertical-align: middle;
   cursor: pointer;
   user-select: none;
-  background-color: var(--primary-blue);
-  border: 1px solid var(--primary-blue);
-  padding: var(--space-sm) var(--space-lg);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
+  background-color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit);
+  font-size: 1rem;
+  line-height: 1.5;
   border-radius: var(--border-radius);
-  transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
-  text-transform: none; /* No capitalize */
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  text-transform: capitalize;
 }
+
 .btn:hover {
-  color: var(--neutral-white);
+  color: #fff;
   text-decoration: none;
-  background-color: var(--primary-blue-hover);
-  border-color: var(--primary-blue-hover);
+  background-color: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
-.btn:active {
-  background-color: var(--primary-blue-active);
-  border-color: var(--primary-blue-active);
-}
+
 .btn:focus {
   outline: 0;
-  box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.5);
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.5);
 }
-.btn:disabled, .btn.loading {
-  background-color: var(--neutral-light);
-  border-color: var(--neutral-light);
-  color: var(--neutral-tertiary);
+
+.btn:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
   pointer-events: none;
-  opacity: 1;
+}
+.btn.loading {
+    opacity: 0.75;
+    cursor: wait;
+    pointer-events: none;
 }
 
-.btn-primary { background-color: var(--primary-blue); border-color: var(--primary-blue); color: var(--neutral-white); }
-.btn-primary:hover { background-color: var(--primary-blue-hover); border-color: var(--primary-blue-hover); }
-.btn-secondary { background-color: var(--neutral-secondary); border-color: var(--neutral-secondary); color: var(--neutral-white); }
-.btn-secondary:hover { background-color: var(--neutral-primary); border-color: var(--neutral-primary); }
-.btn-success { background-color: var(--status-success); border-color: var(--status-success); color: var(--neutral-white); }
-.btn-success:hover { background-color: #0b6a0b; border-color: #0b6a0b; }
-.btn-danger { background-color: var(--status-danger); border-color: var(--status-danger); color: var(--neutral-white); }
-.btn-danger:hover { background-color: #a82c00; border-color: #a82c00; }
-.btn-warning { background-color: var(--status-warning); border-color: var(--status-warning); color: var(--neutral-primary); }
-.btn-warning:hover { background-color: #f0ac00; border-color: #f0ac00; }
-.btn-info { background-color: var(--status-info); border-color: var(--status-info); color: var(--neutral-white); }
-.btn-info:hover { background-color: var(--primary-blue-hover); border-color: var(--primary-blue-hover); }
 
-.btn-outline-secondary { color: var(--neutral-secondary); border-color: var(--neutral-secondary); background-color: transparent; }
-.btn-outline-secondary:hover { color: var(--neutral-white); background-color: var(--neutral-secondary); }
-.btn-outline-primary { color: var(--primary-blue); border-color: var(--primary-blue); background-color: transparent; }
-.btn-outline-primary:hover { color: var(--neutral-white); background-color: var(--primary-blue); }
+.btn-primary { background-color: var(--primary-color); border-color: var(--primary-color); color: #fff;}
+.btn-primary:hover { background-color: var(--primary-hover); border-color: var(--primary-hover); }
+.btn-secondary { background-color: var(--secondary-color); border-color: var(--secondary-color); color: #fff; }
+.btn-secondary:hover { background-color: var(--secondary-hover); border-color: var(--secondary-hover); }
+.btn-success { background-color: var(--success-color); border-color: var(--success-color); color: #fff;}
+.btn-success:hover { background-color: var(--success-hover); border-color: var(--success-hover); }
+.btn-danger { background-color: var(--danger-color); border-color: var(--danger-color); color: #fff;}
+.btn-danger:hover { background-color: var(--danger-hover); border-color: var(--danger-hover); }
+.btn-warning { background-color: var(--warning-color); border-color: var(--warning-color); color: #212529;}
+.btn-warning:hover { background-color: var(--warning-hover); border-color: var(--warning-hover); }
+.btn-info { background-color: var(--info-color); border-color: var(--info-color); color: #fff;}
+.btn-info:hover { background-color: var(--info-hover); border-color: var(--info-hover); }
+.btn-light { background-color: var(--light-color); border-color: var(--light-color); color: #212529;}
+.btn-light:hover { background-color: #e2e6ea; border-color: #dae0e5; }
+.btn-dark { background-color: var(--dark-color); border-color: var(--dark-color); color: #fff;}
+.btn-dark:hover { background-color: #23272b; border-color: #1d2124; }
+
+.btn-outline-secondary { color: var(--secondary-color); border-color: var(--secondary-color); background-color: transparent;}
+.btn-outline-secondary:hover { color: #fff; background-color: var(--secondary-color); }
+.btn-outline-primary { color: var(--primary-color); border-color: var(--primary-color); background-color: transparent;}
+.btn-outline-primary:hover { color: #fff; background-color: var(--primary-color); }
 
 .btn-text {
-    background-color: transparent; border-color: transparent; color: var(--primary-blue);
-    padding: var(--space-xs) var(--space-sm); font-weight: var(--font-weight-normal);
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--link-color);
+    padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.4);
+    border-radius: var(--border-radius);
+    vertical-align: middle;
 }
-.btn-text:hover, .btn-text:focus { background-color: var(--neutral-light); color: var(--primary-blue-hover); text-decoration: none; outline: none; box-shadow: none; }
-.btn-text.btn-danger { color: var(--status-danger); }
-.btn-text.btn-danger:hover, .btn-text.btn-danger:focus { color: #a82c00; background-color: var(--status-danger-bg); }
+.btn-text:hover,
+.btn-text:focus {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: var(--primary-hover);
+    text-decoration: none;
+    outline: none;
+    box-shadow: none;
+}
+.btn-text.btn-danger { color: var(--danger-color); }
+.btn-text.btn-danger:hover,
+.btn-text.btn-danger:focus { color: var(--danger-hover); background-color: rgba(220, 53, 69, 0.1); }
 
-.btn-sm { padding: var(--space-xs) var(--space-md); font-size: var(--font-size-sm); }
-.btn-lg { padding: var(--space-md) var(--space-xl); font-size: var(--font-size-lg); }
-.btn-block { display: block; width: 100%; }
+.btn-sm {
+  padding: calc(var(--spacing-unit) * 0.25) calc(var(--spacing-unit) * 0.5);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: calc(var(--border-radius) * 0.8);
+}
+.btn-lg {
+    padding: calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 1.25);
+    font-size: 1.1rem;
+}
 
-.btn .fa-spinner { margin-right: var(--space-sm); animation: fa-spin 1s infinite linear; }
-@keyframes fa-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.btn-block {
+    display: block;
+    width: 100%;
+}
 
-/* --- Alerts & Toasts --- */
+.btn .fa-spinner {
+    margin-right: calc(var(--spacing-unit) * 0.25);
+    animation: fa-spin 1s infinite linear;
+}
+@keyframes fa-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Alerts */
 .alert {
-  padding: var(--space-md) var(--space-lg); margin-bottom: var(--space-lg);
-  border: 1px solid transparent; border-radius: var(--border-radius);
-  position: relative; font-size: var(--font-size-sm);
+  padding: calc(var(--spacing-unit) * 0.8) var(--spacing-unit);
+  margin-bottom: var(--spacing-unit);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius);
+  position: relative;
 }
-.alert-success { color: #0b6a0b; background-color: var(--status-success-bg); border-color: #a7d7a7; }
-.alert-danger { color: #a82c00; background-color: var(--status-danger-bg); border-color: #f7c9c9; }
-.alert-warning { color: #8C6D0F; background-color: var(--status-warning-bg); border-color: #ffe9a6; }
-.alert-info { color: #005A9E; background-color: var(--status-info-bg); border-color: #a9d6f5; }
-.alert-link { font-weight: var(--font-weight-semibold); color: inherit; text-decoration: underline; }
-.close-alert { /* Positioned absolutely via JS if needed */ }
+.alert-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }
+.alert-danger { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }
+.alert-warning { color: #856404; background-color: #fff3cd; border-color: #ffeeba; }
+.alert-info { color: #0c5460; background-color: #d1ecf1; border-color: #bee5eb; }
+.alert-link { font-weight: bold; color: inherit; text-decoration: underline; }
 
-/* Toast Notifications (Positioning from JS, styling here) */
-.toast-container { /* Positioned fixed in JS */ z-index: 1055; }
+.close-alert {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  font-size: 1.2rem;
+  line-height: 1;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+.close-alert:hover { opacity: 1; }
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1055;
+  width: auto;
+  max-width: 350px;
+  pointer-events: none;
+}
+
 .toast {
-  background-color: var(--neutral-white); border: 1px solid var(--border-color);
-  border-radius: var(--border-radius); box-shadow: var(--box-shadow-md);
-  margin-bottom: var(--space-lg); padding: var(--space-md);
-  position: relative; opacity: 0; transform: translateX(110%);
+  background-color: var(--card-bg);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--border-radius);
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  margin-bottom: var(--spacing-unit);
+  padding: calc(var(--spacing-unit) * 0.75);
+  padding-right: calc(var(--spacing-unit) * 2.5);
+  position: relative;
+  opacity: 0;
+  transform: translateX(110%);
   transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
-  width: 100%; pointer-events: auto; min-height: 50px;
-  display: flex; align-items: center; overflow: hidden;
+  width: 100%;
+  pointer-events: auto;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
 }
-.toast.show { opacity: 1; transform: translateX(0); }
-.toast.hide { opacity: 0; transition: opacity 0.3s ease-in, transform 0.3s ease-in; }
-.toast-body { flex-grow: 1; font-size: var(--font-size-sm); line-height: 1.4; padding-right: var(--space-xl); }
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.toast.hide {
+    opacity: 0;
+    transition: opacity 0.3s ease-in, transform 0.3s ease-in;
+}
+
+.toast-body {
+  flex-grow: 1;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .toast-close-btn {
-  position: absolute; top: 50%; right: var(--space-md); transform: translateY(-50%);
-  background: transparent; border: none; font-size: 1.4rem; line-height: 1;
-  font-weight: bold; color: inherit; opacity: 0.6; cursor: pointer; padding: 0.1rem 0.4rem;
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  font-weight: bold;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
 }
-.toast-close-btn:hover { opacity: 1; text-decoration: none; }
-.toast-success { background-color: var(--status-success-bg); color: #0b6a0b; border-left: 4px solid var(--status-success); }
-.toast-danger { background-color: var(--status-danger-bg); color: #a82c00; border-left: 4px solid var(--status-danger); }
-.toast-warning { background-color: var(--status-warning-bg); color: #8C6D0F; border-left: 4px solid var(--status-warning); }
-.toast-info { background-color: var(--status-info-bg); color: #005A9E; border-left: 4px solid var(--status-info); }
-.toast-success .toast-close-btn, .toast-danger .toast-close-btn, .toast-warning .toast-close-btn, .toast-info .toast-close-btn { color: inherit; }
+.toast-close-btn:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+.toast-success { background-color: #d4edda; color: #155724; border-left: 5px solid var(--success-color); }
+.toast-success .toast-close-btn { color: #155724; }
+.toast-danger { background-color: #f8d7da; color: #721c24; border-left: 5px solid var(--danger-color); }
+.toast-danger .toast-close-btn { color: #721c24; }
+.toast-warning { background-color: #fff3cd; color: #856404; border-left: 5px solid var(--warning-color); }
+.toast-warning .toast-close-btn { color: #856404; }
+.toast-info { background-color: #d1ecf1; color: #0c5460; border-left: 5px solid var(--info-color); }
+.toast-info .toast-close-btn { color: #0c5460; }
 
 
-/* --- Header / Navbar --- */
+/* ============================ */
+/* Header Styles                */
+/* ============================ */
+
 .app-header {
-  background-color: var(--primary-blue);
-  color: var(--neutral-white);
-  padding: var(--space-sm) var(--space-lg);
-  position: sticky; top: 0; left: 0; width: 100%; z-index: 1000;
+  background-color: var(--primary-color);
+  color: var(--light-color);
+  padding: calc(var(--spacing-unit) * 0.4) var(--spacing-unit);
+  position: sticky;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
-.navbar {
-  display: flex; justify-content: space-between; align-items: center;
-  max-width: 1200px; margin: 0 auto; gap: var(--space-md); min-height: 40px;
-}
-.nav-left { display: flex; align-items: center; flex-shrink: 0; margin-right: auto; }
-.app-logo {
-  display: flex; align-items: center; color: var(--neutral-white);
-  font-size: 1.1rem; font-weight: var(--font-weight-semibold); text-decoration: none; margin-right: var(--space-lg);
-}
-.app-logo:hover, .app-logo:focus { color: var(--neutral-white); text-decoration: none; opacity: 0.9; }
-.app-logo i { margin-right: var(--space-sm); font-size: 1.2em; }
 
-/* Search Bar */
-.search-container-dynamic { flex-grow: 0; max-width: none; order: 1; margin: 0; position: static; }
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  gap: calc(var(--spacing-unit) * 0.5);
+  min-height: 40px;
+}
+
+/* Left Side (Logo) */
+.nav-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: auto;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  color: var(--light-color);
+  font-size: 1.1rem;
+  font-weight: 500;
+  text-decoration: none;
+  margin-right: calc(var(--spacing-unit) * 0.5);
+}
+.app-logo:hover,
+.app-logo:focus {
+  color: var(--warning-color);
+  text-decoration: none;
+}
+.app-logo i {
+  margin-right: calc(var(--spacing-unit) * 0.3);
+  font-size: 1.2em;
+}
+
+/* Center Section (Search Container) */
+.search-container-dynamic {
+  flex-grow: 0;
+  max-width: none;
+  order: 1;
+  margin: 0;
+  position: static;
+}
+
+/* --- Search Bar Black & White Styling (Shared) --- */
 .search-form-dynamic {
-  display: flex; align-items: center; width: 100%; height: 36px; /* Smaller height */
-  background-color: var(--neutral-white); border: 1px solid transparent; /* No border initially */
-  border-radius: var(--border-radius); transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  overflow: hidden; color: var(--neutral-primary);
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 38px;
+  background-color: #ffffff;
+  border: 1px solid #ccc;
+  border-radius: var(--border-radius);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  color: var(--dark-color);
 }
 #search-input-dynamic {
-  flex-grow: 1; padding: 0 var(--space-md); border: none; background-color: transparent;
-  color: var(--neutral-primary); font-size: var(--font-size-sm); height: 100%; outline: none;
+  flex-grow: 1;
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  border: none;
+  background-color: transparent;
+  color: var(--dark-color);
+  font-size: 0.9rem;
+  height: 100%;
+  outline: none;
 }
-#search-input-dynamic::placeholder { color: var(--neutral-tertiary); opacity: 1; }
+#search-input-dynamic::placeholder {
+  color: #6c757d;
+  opacity: 1;
+}
 .search-submit-btn-dynamic {
-  background: transparent; border: none; color: var(--neutral-secondary); padding: 0 var(--space-md);
-  cursor: pointer; font-size: 1rem; height: 100%; display: flex; align-items: center;
-  flex-shrink: 0; transition: color 0.15s ease-in-out;
+  background: transparent;
+  border: none;
+  color: var(--dark-color);
+  padding: 0 calc(var(--spacing-unit) * 0.75);
+  cursor: pointer;
+  font-size: 1rem;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: background-color 0.15s ease-in-out;
 }
-.search-submit-btn-dynamic:hover { color: var(--primary-blue); }
-/* Focus state for the entire search form */
-.search-form-dynamic:focus-within { border-color: var(--primary-blue); box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.3); }
+.search-submit-btn-dynamic:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+/* --- End Shared Search Bar Styling --- */
 
-/* Search Suggestions */
+/* Suggestions Dropdown (Shared) */
 .suggestions-dropdown {
-  display: none; position: absolute; left: 0; right: 0;
-  background-color: var(--neutral-white); border: 1px solid var(--border-color); border-top: none;
-  border-radius: 0 0 var(--border-radius) var(--border-radius);
-  box-shadow: var(--box-shadow-md); max-height: 400px; overflow-y: auto; z-index: 1010;
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-top: none;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-height: 400px;
+    overflow-y: auto;
+    z-index: 1010;
 }
 .suggestions-dropdown.active { display: block; }
 .suggestion-item {
-  display: flex; align-items: center; padding: var(--space-sm) var(--space-md);
-  cursor: pointer; color: var(--neutral-primary); text-decoration: none;
-  border-bottom: 1px solid var(--neutral-lighter); gap: var(--space-md);
+    display: flex;
+    align-items: center;
+    padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.75);
+    cursor: pointer;
+    color: var(--text-color);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-color);
+    gap: calc(var(--spacing-unit) * 0.5);
 }
 .suggestion-item:last-child { border-bottom: none; }
-.suggestion-item:hover, .suggestion-item:focus { background-color: var(--neutral-lighter); text-decoration: none; color: var(--neutral-primary); }
-.suggestion-item img { width: 32px; height: 32px; object-fit: cover; border-radius: var(--border-radius); flex-shrink: 0; }
-.suggestion-item span { font-size: var(--font-size-sm); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.suggestion-item i { font-style: normal; color: var(--neutral-secondary); }
-
-/* Nav Right Items */
-.nav-right { display: flex; align-items: center; flex-shrink: 0; gap: var(--space-xs); }
-.nav-link { /* Mobile first: Icon only */
-  color: var(--neutral-white); padding: var(--space-sm); border-radius: var(--border-radius);
-  display: flex; flex-direction: column; align-items: center;
-  font-size: 0.65rem; /* Smaller text for mobile icon label */
-  text-decoration: none; background: none; border: none; cursor: pointer;
-  transition: background-color 0.2s ease; line-height: 1.1; width: 50px; /* Fixed width for alignment */
+.suggestion-item:hover,
+.suggestion-item:focus {
+    background-color: var(--light-color);
+    text-decoration: none;
+    color: var(--text-color);
 }
-.nav-link span { display: block; margin-top: 2px; } /* Show text below icon on mobile */
-.nav-link i { font-size: 1.1rem; margin-bottom: 2px; }
-.nav-link:hover, .nav-link.active, .nav-link:focus {
-  background-color: rgba(255, 255, 255, 0.1); color: var(--neutral-white); text-decoration: none; outline: none;
+.suggestion-item img {
+    width: 35px;
+    height: 35px;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) * 0.75);
+    flex-shrink: 0;
+}
+.suggestion-item span {
+    font-size: 0.9rem;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.suggestion-item i {
+    font-style: normal;
+    color: var(--secondary-color);
+}
+
+
+/* Right Side (Nav Links, Profile, Login) */
+.nav-right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: calc(var(--spacing-unit) * 0.4);
+}
+
+/* General Nav Link Styling (Mobile Base) */
+.nav-link {
+  color: var(--light-color);
+  padding: calc(var(--spacing-unit) * 0.5) calc(var(--spacing-unit) * 0.6);
+  border-radius: var(--border-radius);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 0.7rem;
+  text-decoration: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  line-height: 1.2;
+}
+.nav-link span { display: none; }
+.nav-link i { font-size: 1.2rem; margin-bottom: 2px; }
+
+.nav-link:hover,
+.nav-link.active,
+.nav-link:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  text-decoration: none;
+  outline: none;
 }
 
 /* Cart Badge */
 .nav-link-cart { position: relative; }
 .cart-badge {
-  position: absolute; top: 2px; right: 2px; background-color: var(--status-danger);
-  color: white; border-radius: 50%; padding: 1px 5px; font-size: 0.7rem;
-  font-weight: var(--font-weight-bold); line-height: 1; pointer-events: none; border: 1px solid white;
+  position: absolute;
+  top: 0px;
+  right: 0px;
+  background-color: var(--danger-color);
+  color: white;
+  border-radius: 50%;
+  padding: 1px 5px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  line-height: 1;
+  pointer-events: none;
 }
 .cart-badge.hide { display: none; }
 
 /* Login/Register Button */
 .btn-login-register {
-    font-size: var(--font-size-sm); padding: var(--space-sm) var(--space-md);
-    background-color: var(--neutral-white); color: var(--primary-blue);
-    border: 1px solid var(--primary-blue); font-weight: var(--font-weight-semibold);
+    font-size: 0.85rem;
+    padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.8);
+    background-color: rgba(255, 255, 255, 0.9);
+    color: var(--primary-color);
+    border: none;
+    font-weight: 500;
 }
-.btn-login-register:hover, .btn-login-register:focus { background-color: #f0f0f0; color: var(--primary-blue-hover); border-color: var(--primary-blue-hover);}
-.btn-login-register i { margin-right: var(--space-sm); }
+.btn-login-register:hover,
+.btn-login-register:focus {
+    background-color: #fff;
+    color: var(--primary-hover);
+}
+.btn-login-register i {
+    margin-right: calc(var(--spacing-unit) * 0.3);
+}
+
 
 /* Profile Avatar */
 .profile-avatar-link {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 32px; height: 32px; border-radius: 50%;
-    background-color: var(--neutral-lighter); color: var(--primary-blue);
-    font-weight: var(--font-weight-semibold); font-size: var(--font-size-sm);
-    text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
-    border: 1px solid transparent; margin-left: var(--space-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: var(--light-color);
+    color: var(--primary-color);
+    font-weight: 500;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: 1px solid transparent;
+    margin-left: calc(var(--spacing-unit) * 0.2);
 }
-.profile-avatar-link:hover, .profile-avatar-link:focus, .profile-avatar-link.active {
-    text-decoration: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4); outline: none;
+.profile-avatar-link:hover,
+.profile-avatar-link:focus,
+.profile-avatar-link.active {
+    text-decoration: none;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+    outline: none;
 }
 .profile-avatar-initials { line-height: 1; }
 
-/* Mobile Search Toggle */
-.search-toggle-btn { display: flex; order: 0; }
+/* Mobile Search Toggle Button */
+.search-toggle-btn {
+    display: flex;
+    order: 0;
+}
 
-/* --- Main Container & Footer --- */
-.container { width: 100%; padding: var(--space-lg); margin: 0 auto; flex-grow: 1; max-width: 1200px; }
+/* Container and Footer */
+.container {
+  width: 100%;
+  padding: var(--spacing-unit);
+  margin: 0 auto;
+  flex-grow: 1;
+}
+
 .app-footer {
-  display: none; /* Hidden by default, shown on desktop */
-  padding: var(--space-lg); text-align: center; font-size: var(--font-size-sm);
-  color: var(--neutral-secondary); background-color: var(--neutral-lighter);
-  border-top: 1px solid var(--border-color); margin-top: auto;
+  display: none;
+  padding: var(--spacing-unit);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--secondary-color);
+  background-color: rgba(248, 249, 250, 0.9);
+  border-top: 1px solid var(--border-color);
+  margin-top: auto;
 }
 
-/* --- Product Grid --- */
+
+/* Product Index */
 .product-index-container h1 { font-size: 1.5rem; }
-.product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-lg); }
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: calc(var(--spacing-unit) * 0.75);
+}
+
 .product-card {
-  background-color: var(--neutral-white); border: 1px solid var(--border-color);
-  border-radius: var(--border-radius); overflow: hidden; display: flex; flex-direction: column;
-  box-shadow: var(--box-shadow-sm); transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
-.product-card:hover { transform: translateY(-2px); box-shadow: var(--box-shadow-md); }
-.product-link { color: inherit; text-decoration: none; flex-grow: 1; display: flex; flex-direction: column; }
-.product-link:hover { color: inherit; text-decoration: none; }
-.product-image { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; }
-.product-info { padding: var(--space-md); flex-grow: 1; }
+.product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.product-link {
+  color: inherit;
+  text-decoration: none;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+.product-link:hover{
+  color: inherit;
+  text-decoration: none;
+}
+
+.product-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.product-info {
+  padding: calc(var(--spacing-unit) * 0.6);
+  flex-grow: 1;
+}
+
 .product-name {
-  font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-xs);
-  line-height: 1.3; height: 2.6em; overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  font-size: 0.95rem;
+  font-weight: 500;
+  margin-bottom: calc(var(--spacing-unit) * 0.25);
+  line-height: 1.3;
+  height: 2.6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
-.product-price { font-weight: var(--font-weight-semibold); color: var(--neutral-primary); margin-bottom: var(--space-xs); font-size: 1rem; }
-.product-stock, .product-rating { font-size: 0.8rem; color: var(--neutral-secondary); margin-bottom: var(--space-xs); }
+
+.product-price {
+  font-weight: 500;
+  color: var(--success-color);
+  margin-bottom: calc(var(--spacing-unit) * 0.2);
+  font-size: 1rem;
+}
+
+.product-stock,
+.product-rating {
+  font-size: 0.8rem;
+  color: var(--secondary-color);
+  margin-bottom: calc(var(--spacing-unit) * 0.2);
+}
 .product-rating .fa-star, .product-rating .fa-star-half-alt { color: #f8d347; }
-.product-rating .fa-star-regular { color: var(--neutral-quaternary); }
-.add-to-cart-form { padding: 0 var(--space-md) var(--space-md); }
-.btn-add-to-cart { width: 100%; padding: var(--space-sm); font-size: var(--font-size-sm); }
-.btn-add-to-cart i { margin-right: var(--space-sm); }
+.product-rating .fa-star-regular { color: #e4e5e9; }
 
-/* --- Product Detail --- */
-.product-detail-container { background-color: var(--neutral-white); padding: var(--space-xl); border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm); }
-.product-detail-main { display: flex; flex-direction: column; gap: var(--space-xl); }
-.product-detail-image-section { position: relative; width: 100%; max-width: 450px; margin: 0 auto var(--space-lg) auto; aspect-ratio: 1 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-lighter); border: 1px solid var(--border-color); }
-.product-image-slider-container, .product-detail-image-single { width: 100%; height: 100%; }
-.product-image-slides { position: relative; width: 100%; height: 100%; }
-.product-image-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.5s ease-in-out; }
-.product-image-slide.active { opacity: 1; visibility: visible; z-index: 1; }
-.product-detail-image { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
-.product-image-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; font-weight: bold; line-height: 1; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; -webkit-tap-highlight-color: transparent; }
-.product-image-nav:hover, .product-image-nav:focus { background-color: rgba(0, 0, 0, 0.6); opacity: 1; outline: none; }
-.product-image-prev { left: var(--space-sm); } .product-image-next { right: var(--space-sm); }
-.product-image-dots { position: absolute; bottom: var(--space-sm); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
-.product-image-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0, 0, 0, 0.3); cursor: pointer; padding: 0; transition: background-color 0.3s ease; -webkit-tap-highlight-color: transparent; }
-.product-image-dot.active { background-color: white; }
-.product-image-dot:focus { outline: 1px dotted white; outline-offset: 1px; }
+.add-to-cart-form { padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6); }
+.btn-add-to-cart {
+  width: 100%;
+  padding: calc(var(--spacing-unit) * 0.5);
+  font-size: 0.9rem;
+}
+.btn-add-to-cart i { margin-right: calc(var(--spacing-unit) * 0.25); }
 
-.product-detail-info h1 { font-size: 1.75rem; margin-bottom: var(--space-sm); }
-.product-short-description { font-size: var(--font-size-sm); color: var(--neutral-secondary); }
-.detail-price { font-size: 1.5rem; font-weight: var(--font-weight-semibold); color: var(--neutral-primary); margin-bottom: var(--space-xs); }
-.detail-stock { font-size: var(--font-size-sm); color: var(--neutral-secondary); margin-bottom: var(--space-sm); }
-.detail-stock .text-danger { color: var(--status-danger) !important; }
-.share-section { margin: var(--space-md) 0; }
-.share-section .btn { font-weight: var(--font-weight-normal); }
-.fallback-share-links { margin-top: var(--space-sm); }
-.fallback-share-links small { font-size: 0.8rem; margin-right: var(--space-sm); }
-.fallback-share-links a { margin: 0 var(--space-xs); font-size: 1.5rem; color: var(--neutral-secondary); }
-.fallback-share-links a:hover { color: var(--primary-blue); }
-.detail-rating { margin-bottom: var(--space-lg); font-size: var(--font-size-sm); color: var(--neutral-secondary); }
-.detail-rating i { color: #f8d347; } .detail-rating .fa-star-regular { color: var(--neutral-quaternary); }
-.product-actions { margin: var(--space-xl) 0; display: flex; flex-direction: column; gap: var(--space-md); }
-.quantity-selector { display: flex; align-items: center; margin-bottom: var(--space-md); max-width: 150px; }
-.quantity-selector label { font-size: var(--font-size-sm); margin: 0 var(--space-sm) 0 0; }
-.quantity-selector input { text-align: center; font-size: 1rem; padding: var(--space-xs); width: 60px; }
-.product-actions .btn { width: 100%; padding: var(--space-md); font-size: 1rem; }
-.product-specifications { margin-top: var(--space-xl); }
-.product-specifications h3 { font-size: 1.25rem; border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-sm); margin-bottom: var(--space-md); }
-.product-specifications pre { white-space: pre-wrap; font-size: var(--font-size-sm); background-color: var(--neutral-lighter); padding: var(--space-md); border-radius: var(--border-radius); max-height: 250px; overflow-y: auto; font-family: Consolas, monospace; }
+/* Product Detail */
+.product-detail-container {
+  background-color: var(--card-bg);
+  padding: var(--spacing-unit);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+}
+.product-detail-main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-unit);
+}
+.product-detail-image { /* This styles the actual img tag */
+    display: block; /* Remove extra space below image */
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* Cover the area, might crop */
+    /* object-fit: contain; */ /* Uncomment if you prefer to see the whole image */
+    object-position: center center; /* Center the image */
+    border-radius: inherit; /* Inherit border-radius from container */
+}
+.product-detail-info h1 {
+    font-size: 1.6rem;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+}
+.detail-price {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: var(--success-color);
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+}
+.detail-stock {
+    font-size: 0.9rem;
+    color: var(--secondary-color);
+    margin-bottom: calc(var(--spacing-unit) * 0.3);
+}
+.detail-rating {
+    margin-bottom: calc(var(--spacing-unit) * 0.75);
+    color: var(--secondary-color);
+}
+.detail-rating i { color: #f8d347; }
+.detail-rating .fa-star-regular { color: #e4e5e9; }
+
+.product-actions {
+    margin: calc(var(--spacing-unit) * 1.2) 0;
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--spacing-unit) * 0.5);
+}
+.quantity-selector {
+    display: flex;
+    align-items: center;
+    margin-bottom: calc(var(--spacing-unit) * 0.5);
+    max-width: 150px;
+}
+.quantity-selector label {
+    margin: 0 calc(var(--spacing-unit) * 0.4) 0 0;
+    font-size: 0.9rem;
+}
+.quantity-selector input {
+    text-align: center;
+    font-size: 1rem;
+    padding: calc(var(--spacing-unit) * 0.4);
+}
+.product-actions .btn {
+    width: 100%;
+    padding: calc(var(--spacing-unit) * 0.6) var(--spacing-unit);
+    font-size: 1rem;
+}
+
+.share-section { margin: calc(var(--spacing-unit) * 1.2) 0; }
+.fallback-share-links { margin-top: 0.5rem; }
+.fallback-share-links a { margin: 0 0.3rem; font-size: 1.5rem; }
+
+.product-specifications { margin-top: calc(var(--spacing-unit) * 1.5); }
+.product-specifications h3 { font-size: 1.1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3rem; margin-bottom: 0.5rem;}
+.product-specifications pre {
+    white-space: pre-wrap;
+    font-size: 0.9rem;
+    background-color: #f8f8f8;
+    padding: calc(var(--spacing-unit) * 0.5);
+    border-radius: var(--border-radius);
+    max-height: 200px;
+    overflow-y: auto;
+}
 
 /* Rating Section */
-.product-rating-section { margin-top: var(--space-xl); border-top: 1px solid var(--border-color); padding-top: var(--space-xl); }
-.product-rating-section h3 { font-size: 1.25rem; margin-bottom: var(--space-md); }
-.rating-stars { display: inline-flex; flex-direction: row-reverse; justify-content: flex-end; margin-bottom: var(--space-lg); }
+.product-rating-section {
+    margin-top: var(--spacing-unit);
+    border-top: 1px solid var(--border-color);
+    padding-top: var(--spacing-unit);
+}
+.product-rating-section h3 {
+    margin-bottom: calc(var(--spacing-unit) * 0.6);
+    font-size: 1.2em;
+}
+
+.rating-stars { display: inline-flex; flex-direction: row-reverse; justify-content: flex-end; margin-bottom: calc(var(--spacing-unit) * 0.8); }
 .rating-stars input[type="radio"] { display: none; }
-.rating-stars label { display: inline-block; cursor: pointer; font-size: 1.8rem; color: var(--neutral-light); padding: 0 0.1em; margin: 0; transition: color 0.2s ease-in-out; }
+.rating-stars label { display: inline-block; cursor: pointer; font-size: 1.8rem; color: lightgray; padding: 0 0.1em; margin: 0; transition: color 0.2s ease-in-out; }
 .rating-stars label:hover, .rating-stars label:hover ~ label { color: #f8d347; }
 .rating-stars input[type="radio"]:checked ~ label { color: #f8d347; }
-.rating-stats-container { margin-top: var(--space-xxl); padding-top: var(--space-xl); border-top: 1px solid var(--border-color); }
-.rating-stats-container h3 { margin-bottom: var(--space-lg); font-size: 1.25rem; color: var(--neutral-primary); }
-.rating-summary { display: flex; align-items: center; margin-bottom: var(--space-xl); gap: var(--space-lg); }
+
+.rating-stats-container { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
+.rating-stats-container h3 { margin-bottom: 15px; font-size: 1.4em; color: #333; }
+.rating-summary { display: flex; align-items: center; margin-bottom: 20px; gap: 15px; }
 .rating-average { display: flex; align-items: center; }
-.rating-average-value { font-size: 2.5em; font-weight: var(--font-weight-semibold); margin-right: var(--space-xs); color: var(--neutral-primary); }
-.rating-average .fa-star { font-size: 1.2em; color: var(--neutral-secondary); margin-bottom: 8px; }
-.rating-total { font-size: 1rem; color: var(--neutral-secondary); }
+.rating-average-value { font-size: 2.5em; font-weight: 500; margin-right: 5px; color: #222; }
+.rating-average .fa-star { font-size: 1.2em; color: #666; margin-bottom: 8px; }
+.rating-total { font-size: 0.95em; color: #555; }
 .rating-bars { max-width: 400px; margin: 0 auto; }
-.rating-bar-row { display: flex; align-items: center; margin-bottom: var(--space-sm); gap: var(--space-md); }
-.rating-bar-label { width: 45px; font-size: var(--font-size-sm); color: var(--neutral-primary); text-align: right; flex-shrink: 0; }
-.rating-bar-label .fa-star { color: #f8d347; font-size: 0.9em; }
-.rating-bar-progress { flex-grow: 1; height: 8px; background-color: var(--neutral-light); border-radius: 4px; overflow: hidden; }
-.progress-bar { background-color: var(--primary-blue); color: #fff; display: flex; flex-direction: column; justify-content: center; overflow: hidden; text-align: center; white-space: nowrap; transition: width .6s ease; }
-.rating-bar-fill { height: 100%; background-color: var(--status-success); border-radius: 4px; transition: width 0.3s ease-in-out; }
-/* Adjust bar colors if needed */
-.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: var(--status-success); } /* 5 stars */
-.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #54a854; } /* 4 stars */
-.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: var(--status-warning); } /* 3 stars */
-.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #ff8c00; } /* 2 stars */
-.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: var(--status-danger); } /* 1 star */
-.rating-bar-count { width: 40px; font-size: var(--font-size-sm); color: var(--neutral-secondary); text-align: right; flex-shrink: 0; }
+.rating-bar-row { display: flex; align-items: center; margin-bottom: 8px; gap: 10px; }
+.rating-bar-label { width: 45px; font-size: 0.9em; color: #444; text-align: right; flex-shrink: 0; }
+.rating-bar-label .fa-star { color: #f8c107; font-size: 0.9em; }
+.rating-bar-progress { flex-grow: 1; height: 8px; background-color: #e0e0e0; border-radius: 4px; overflow: hidden; }
+.progress { background-color: #e9ecef; border-radius: 4px; display: flex; height: 1rem; overflow: hidden; font-size: .75rem;}
+.progress-bar { background-color: var(--primary-color); color: #fff; display: flex; flex-direction: column; justify-content: center; overflow: hidden; text-align: center; white-space: nowrap; transition: width .6s ease;}
+.rating-bar-fill { height: 100%; background-color: #28a745; border-radius: 4px; transition: width 0.3s ease-in-out; }
+.rating-bar-row:nth-child(1) .rating-bar-fill { background-color: #28a745; } /* 5 stars */
+.rating-bar-row:nth-child(2) .rating-bar-fill { background-color: #84c54c; } /* 4 stars */
+.rating-bar-row:nth-child(3) .rating-bar-fill { background-color: #ffc107; } /* 3 stars */
+.rating-bar-row:nth-child(4) .rating-bar-fill { background-color: #fd7e14; } /* 2 stars */
+.rating-bar-row:nth-child(5) .rating-bar-fill { background-color: #dc3545; } /* 1 star */
+.rating-bar-count { width: 40px; font-size: 0.9em; color: #555; text-align: right; flex-shrink: 0; }
 
-/* --- Auth Pages --- */
+
+/* Auth */
 .auth-container {
-  max-width: 400px; margin: var(--space-xxl) auto; padding: var(--space-xl);
-  background-color: var(--neutral-white); border: 1px solid var(--border-color);
-  border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm);
+  max-width: 450px;
+  margin: var(--spacing-unit) auto;
+  padding: var(--spacing-unit);
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
 }
-.auth-container h1 { font-size: 1.5rem; text-align: center; margin-bottom: var(--space-xl); }
-.auth-form .btn { width: 100%; margin-top: var(--space-lg); padding: var(--space-md); font-size: 1rem; }
-.auth-links { margin-top: var(--space-xl); font-size: var(--font-size-sm); text-align: center; }
-.auth-links p { margin-bottom: var(--space-sm); }
-.auth-container p:not(.auth-links p) { text-align: center; margin-bottom: var(--space-lg); font-size: var(--font-size-sm); color: var(--neutral-secondary); }
-.auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--space-lg); }
-#otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; font-family: Consolas, monospace; }
+.auth-container h1 { font-size: 1.6rem; text-align: center; margin-bottom: var(--spacing-unit); }
+.auth-form .btn { width: 100%; margin-top: calc(var(--spacing-unit) * 0.5); padding: calc(var(--spacing-unit) * 0.7); }
+.auth-links { margin-top: var(--spacing-unit); font-size: 0.9rem; text-align: center; }
+.auth-links p { margin-bottom: calc(var(--spacing-unit) * 0.4); }
+.auth-container p { text-align: center; margin-bottom: var(--spacing-unit);}
+.auth-container form ~ .auth-links { border-top: 1px solid var(--border-color); padding-top: var(--spacing-unit); }
+#otp { text-align: center; font-size: 1.2rem; letter-spacing: 4px; }
 
-/* --- Cart --- */
-.cart-container h1 { font-size: 1.5rem; margin-bottom: var(--space-lg); }
-.cart-items { margin-bottom: var(--space-xl); }
+
+/* Cart */
+.cart-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
+.cart-items { margin-bottom: var(--spacing-unit); }
+
 .cart-item {
-  display: grid; grid-template-columns: 80px 1fr auto;
-  grid-template-areas: "image details remove" "image quantity subtotal";
-  gap: var(--space-md); background-color: var(--neutral-white);
-  padding: var(--space-lg); border-bottom: 1px solid var(--border-color);
-  border-radius: var(--border-radius); margin-bottom: var(--space-lg); box-shadow: var(--box-shadow-sm);
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  grid-template-areas:
+    "image details remove"
+    "image quantity subtotal";
+  gap: calc(var(--spacing-unit) * 0.75);
+  background-color: var(--card-bg);
+  padding: calc(var(--spacing-unit) * 0.75);
+  border-bottom: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  margin-bottom: var(--spacing-unit);
+  box-shadow: var(--card-shadow);
 }
+
 .cart-item-image { grid-area: image; align-self: center;}
-.cart-item-image img { width: 80px; height: 80px; object-fit: cover; border-radius: var(--border-radius); }
+.cart-item-image img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) * 0.75);
+}
 .cart-item-details { grid-area: details; }
-.cart-item-quantity { grid-area: quantity; display: flex; align-items: center; gap: var(--space-sm); }
-.cart-item-subtotal { grid-area: subtotal; text-align: right; font-weight: var(--font-weight-semibold); align-self: center; }
+.cart-item-quantity { grid-area: quantity; display: flex; align-items: center; gap: 0.3rem; }
+.cart-item-subtotal { grid-area: subtotal; text-align: right; font-weight: 500; align-self: center; }
 .cart-item-remove { grid-area: remove; text-align: right; align-self: start;}
-.cart-item-name { font-size: 1rem; font-weight: var(--font-weight-semibold); margin-bottom: var(--space-xs); }
-.cart-item-price { font-size: var(--font-size-sm); color: var(--neutral-secondary); margin-bottom: var(--space-xs); }
-.cart-item-stock { font-size: 0.8rem; color: var(--neutral-tertiary); }
-.cart-item-quantity label { display: none; }
-.cart-item-quantity input { width: 55px; padding: var(--space-xs) var(--space-sm); text-align: center; font-size: var(--font-size-sm); }
-.cart-item-quantity .btn-update-qty { font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-md); }
-.cart-item-subtotal { font-size: 1rem; white-space: nowrap; }
-.cart-item-remove .btn { padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-sm); }
+.cart-item-name { font-size: 1rem; font-weight: 500; margin-bottom: calc(var(--spacing-unit) * 0.2); }
+.cart-item-price { font-size: 0.9rem; color: var(--secondary-color); margin-bottom: calc(var(--spacing-unit) * 0.2); }
+.cart-item-stock { font-size: 0.8rem; color: #6c757d; }
+.cart-item-quantity label { font-size: 0.9rem; margin-bottom: 0; display: none; }
+.cart-item-quantity input { width: 50px; padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.4); text-align: center; font-size: 0.9rem; }
+.cart-item-quantity .btn-update-qty { font-size: 0.8rem; padding: calc(var(--spacing-unit) * 0.3) calc(var(--spacing-unit) * 0.6); }
+.cart-item-subtotal { font-size: 0.9rem; white-space: nowrap; }
+.cart-item-subtotal .item-subtotal-value { font-weight: 500; }
+.cart-item-remove .btn { padding: 0.2rem 0.4rem; font-size: 0.8rem; ; }
 
 .cart-summary {
-  margin-top: var(--space-xl); padding: var(--space-lg); background-color: var(--neutral-lighter);
-  border-top: 2px solid var(--primary-blue); border-radius: var(--border-radius); text-align: right;
+  margin-top: calc(var(--spacing-unit) * 1.5);
+  padding: var(--spacing-unit);
+  background-color: #f8f9fa;
+  border-top: 2px solid var(--primary-color);
+  border-radius: var(--border-radius);
+  text-align: right;
 }
-.cart-summary h2 { font-size: 1.3rem; margin-bottom: var(--space-lg); }
-#cart-total-value { font-weight: var(--font-weight-semibold); }
-.btn-checkout { width: 100%; padding: var(--space-md); font-size: 1.1rem; }
+.cart-summary h2 { font-size: 1.3rem; margin-bottom: calc(var(--spacing-unit) * 0.75); }
+.btn-checkout { width: 100%; padding: calc(var(--spacing-unit) * 0.7); font-size: 1.1rem; }
 
-/* --- Checkout --- */
-.checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--space-lg);}
-.checkout-grid { display: flex; flex-direction: column; gap: var(--space-xl); }
-.checkout-address, .checkout-summary { background-color: var(--neutral-white); padding: var(--space-lg); border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--box-shadow-sm); }
-.checkout-address h2, .checkout-summary h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-md); margin-bottom: var(--space-lg); }
-.saved-address { font-size: var(--font-size-sm); margin-bottom: var(--space-lg); }
-.saved-address p { margin-bottom: var(--space-xs); line-height: 1.4; }
-.saved-address strong { font-weight: var(--font-weight-semibold); }
-#edit-address-btn { margin-top: var(--space-md); }
+
+/* Checkout */
+.checkout-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit);}
+.checkout-grid { display: flex; flex-direction: column; gap: var(--spacing-unit); }
+
+.checkout-address, .checkout-summary {
+    background-color: var(--card-bg);
+    padding: var(--spacing-unit);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    box-shadow: var(--card-shadow);
+}
+.checkout-address h2, .checkout-summary h2 { font-size: 1.2rem; border-bottom: 1px solid var(--border-color); padding-bottom: calc(var(--spacing-unit) * 0.4); margin-bottom: var(--spacing-unit); }
+.saved-address { font-size: 0.95rem; margin-bottom: var(--spacing-unit); }
+.saved-address p { margin-bottom: calc(var(--spacing-unit) * 0.2); line-height: 1.4; }
+#edit-address-btn { margin-top: calc(var(--spacing-unit) * 0.5); }
 .address-form h3 { font-size: 1.1rem; }
-.checkout-items { max-height: 200px; overflow-y: auto; margin-bottom: var(--space-lg); padding-right: var(--space-sm); }
-.checkout-item { display: flex; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); font-size: var(--font-size-sm); }
-.checkout-item-image img { width: 40px; height: 40px; object-fit: cover; border-radius: var(--border-radius); }
-.checkout-item-info { flex-grow: 1; }
-.checkout-item-price { font-weight: var(--font-weight-semibold); white-space: nowrap;}
-.checkout-totals { font-size: var(--font-size-sm); }
-.checkout-totals p { display: flex; justify-content: space-between; margin-bottom: var(--space-xs); }
-.checkout-totals hr { margin: var(--space-md) 0; border-color: var(--border-color); opacity: 0.5;}
-.checkout-totals strong { font-weight: var(--font-weight-bold); }
-.checkout-payment h3 { font-size: 1.1rem; margin: var(--space-lg) 0 var(--space-md) 0; }
-.payment-option { padding: var(--space-md); border: 1px solid var(--border-color); border-radius: var(--border-radius); background-color: var(--neutral-lighter); opacity: 0.8; margin-bottom: var(--space-sm); cursor: not-allowed; }
-.payment-option.selected { border-color: var(--primary-blue); opacity: 1; background-color: var(--primary-blue-light); }
-.payment-option label { font-weight: normal; display: flex; align-items: center; cursor: inherit; margin-bottom: 0; }
-.payment-option input[type="radio"] { margin-right: var(--space-sm); }
-.payment-option i { margin-right: var(--space-xs); color: var(--status-success);}
-.place-order-form { margin-top: var(--space-lg); }
-.btn-place-order { width: 100%; font-size: 1.1rem; padding: var(--space-md); }
 
-/* --- My Orders --- */
-.my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--space-lg); }
-.order-list { display: flex; flex-direction: column; gap: var(--space-lg); }
-.order-card { background-color: var(--neutral-white); border-radius: var(--border-radius); border: 1px solid var(--border-color); box-shadow: var(--box-shadow-sm); overflow: hidden; }
-.order-header {
-  background-color: var(--neutral-lighter); padding: var(--space-md);
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
-  font-size: var(--font-size-sm); color: var(--neutral-secondary); border-bottom: 1px solid var(--border-color);
+.checkout-items { max-height: 200px; overflow-y: auto; margin-bottom: var(--spacing-unit); padding-right: calc(var(--spacing-unit) * 0.5); }
+.checkout-item { display: flex; align-items: center; gap: calc(var(--spacing-unit) * 0.5); margin-bottom: calc(var(--spacing-unit) * 0.5); font-size: 0.9rem; }
+.checkout-item-image img {
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) * 0.75);
 }
-.order-header > div { margin-right: var(--space-lg); margin-bottom: var(--space-xs); white-space: nowrap; }
-.order-header strong { color: var(--neutral-primary); }
-.order-body { padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
-.order-items-images { display: flex; flex-wrap: wrap; gap: var(--space-sm); padding-left: 0; list-style: none; }
-.order-item-thumbnail { width: 40px; height: 40px; object-fit: cover; border-radius: var(--border-radius); border: 1px solid var(--border-color); vertical-align: middle; background-color: var(--neutral-lighter); }
-.order-item-thumbnail:hover { opacity: 0.85; }
-.order-item-thumbnail-placeholder { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: var(--border-radius); border: 1px dashed var(--neutral-secondary); background-color: var(--neutral-light); color: var(--neutral-secondary); font-size: 0.6rem; font-weight: bold; text-align: center; text-decoration: none; vertical-align: middle; line-height: 1; padding: 2px; }
-.order-items-list small { display: block; margin-bottom: var(--space-xs); }
-.order-details { font-size: var(--font-size-sm); line-height: 1.5;}
-.order-details p { margin-bottom: var(--space-xs); }
-.order-actions { padding: var(--space-md); text-align: right; border-top: 1px solid var(--border-color); background-color: var(--neutral-lighter); }
+.checkout-item-info { flex-grow: 1; }
+.checkout-item-price { font-weight: 500; white-space: nowrap;}
+
+.checkout-totals { font-size: 0.95rem; }
+.checkout-totals p { display: flex; justify-content: space-between; margin-bottom: calc(var(--spacing-unit) * 0.3); }
+.checkout-totals hr { margin: calc(var(--spacing-unit) * 0.5) 0; border-color: var(--border-color); opacity: 0.5;}
+.checkout-totals strong { font-weight: bold; }
+
+.checkout-payment h3 { font-size: 1.1rem; margin: calc(var(--spacing-unit) * 1) 0 calc(var(--spacing-unit) * 0.5) 0; }
+.payment-option {
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: #f0f0f0;
+    opacity: 0.8;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+}
+.payment-option.selected { border-color: var(--primary-color); opacity: 1; background-color: #e7f3ff; }
+.payment-option label { font-weight: normal; display: flex; align-items: center; cursor: pointer; margin-bottom: 0; }
+.payment-option input[type="radio"] { margin-right: 0.5rem; }
+.payment-option i { margin-right: 0.3rem; color: var(--success-color);}
+
+.place-order-form { margin-top: var(--spacing-unit); }
+.btn-place-order { width: 100%; font-size: 1.1rem; padding: calc(var(--spacing-unit) * 0.7); }
+
+
+/* My Orders */
+.my-orders-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); }
+.order-list { display: flex; flex-direction: column; gap: var(--spacing-unit); }
+.order-card {
+  background-color: var(--card-bg);
+  border-radius: var(--border-radius);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+}
+
+.order-header {
+  background-color: #f8f9fa;
+  padding: calc(var(--spacing-unit) * 0.6);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--secondary-color);
+  border-bottom: 1px solid var(--border-color);
+}
+.order-header > div { margin-right: calc(var(--spacing-unit) * 0.8); margin-bottom: calc(var(--spacing-unit) * 0.2); white-space: nowrap; }
+.order-header strong { color: var(--text-color); }
+.order-status { display: inline-block; } /* Used within header */
+
+.order-body { padding: calc(var(--spacing-unit) * 0.75); display: flex; flex-direction: column; gap: calc(var(--spacing-unit) * 0.75); }
+
+/* Order Item Images (Shared) */
+.order-items-images { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 0; list-style: none; }
+.order-item-thumbnail {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: calc(var(--border-radius) * 0.75);
+    border: 1px solid var(--border-color);
+    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    vertical-align: middle;
+    background-color: #f8f9fa;
+}
+.order-item-thumbnail:hover { opacity: 0.85; transform: scale(1.05); z-index: 10; }
+.order-item-thumbnail-placeholder {
+    display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+    border-radius: calc(var(--border-radius) * 0.75);
+    border: 1px dashed var(--secondary-color); background-color: var(--light-color); color: var(--secondary-color); font-size: 0.6rem; font-weight: bold; text-align: center; text-decoration: none; transition: background-color 0.2s ease-in-out; vertical-align: middle; line-height: 1; padding: 2px;
+}
+.order-item-thumbnail-placeholder:hover { background-color: #e2e6ea; text-decoration: none; }
+
+.order-details { font-size: 0.9rem; line-height: 1.5;}
+.order-details p { margin-bottom: calc(var(--spacing-unit) * 0.3); }
+.order-actions { padding: 0 calc(var(--spacing-unit) * 0.75) calc(var(--spacing-unit) * 0.75); text-align: right; }
+
 
 /* Status Badge */
 .status-badge {
-    font-weight: var(--font-weight-semibold); padding: var(--space-xs) var(--space-sm); border-radius: var(--border-radius);
-    color: var(--neutral-primary); background-color: var(--neutral-light); font-size: 0.8rem;
-    display: inline-block; vertical-align: middle; text-transform: capitalize;
+    font-weight: bold;
+    padding: 0.2em 0.5em;
+    border-radius: var(--border-radius);
+    color: #333;
+    background-color: var(--secondary-color);
+    font-size: 0.85em;
+    display: inline-block;
+    vertical-align: middle;
+    text-transform: capitalize;
 }
-.status-pending, .status-badge.status-pending { background-color: var(--status-pending-bg); color: var(--status-pending-text); }
-.status-delivered, .status-badge.status-delivered { background-color: var(--status-success-bg); color: var(--status-success); }
-.status-cancelled, .status-badge.status-cancelled { background-color: var(--status-danger-bg); color: var(--status-danger); }
-.status-approved, .status-badge.status-approved { background-color: var(--status-success-bg); color: var(--status-success); }
-.status-rejected, .status-badge.status-rejected { background-color: var(--status-danger-bg); color: var(--status-danger); }
+.status-pending, .status-badge.status-pending { background-color: #fff3cd; color: #856404; }
+.status-out-for-delivery, .status-badge.status-out-for-delivery { background-color: #d1ecf1; color: #0c5460; }
+.status-delivered, .status-badge.status-delivered { background-color: #d4edda; color: #155724; }
+.status-cancelled, .status-badge.status-cancelled { background-color: #f8d7da; color: #721c24; }
+.status-approved, .status-badge.status-approved { background-color: #d4edda; color: #155724; }
+.status-rejected, .status-badge.status-rejected { background-color: #f8d7da; color: #721c24; }
+
 .order-card.status-cancelled, .data-table tr.status-cancelled { opacity: 0.9; }
 .data-table tr.status-rejected { opacity: 0.85; }
+.data-table tr.status-pending { /* Optional: style pending rows */ }
 
-/* --- Admin/Seller Pages --- */
-.admin-manage-container, .admin-dashboard-container { padding: var(--space-xl); }
-.admin-manage-container h1, .admin-dashboard-container h1 { font-size: 1.5rem; margin-bottom: var(--space-lg); border-bottom: 1px solid var(--border-color); padding-bottom: var(--space-md); }
+/* Admin/Seller Pages */
+.admin-manage-container, .admin-dashboard-container { padding: var(--spacing-unit); }
+.admin-manage-container h1, .admin-dashboard-container h1 { font-size: 1.5rem; margin-bottom: var(--spacing-unit); border-bottom: 1px solid var(--border-color); padding-bottom: calc(var(--spacing-unit) * 0.5); }
+
 
 /* Responsive Tables */
-.table-container { overflow-x: auto; margin-bottom: var(--space-lg); }
+.table-container { overflow-x: auto; margin-bottom: var(--spacing-unit); }
+
 .data-table {
-  width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--font-size-sm);
-  background-color: var(--neutral-white); border: 1px solid var(--border-color);
-  border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm); overflow: hidden;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
 }
-.data-table thead { display: none; background-color: var(--neutral-lighter); font-weight: var(--font-weight-semibold); color: var(--neutral-primary); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
-.data-table th { padding: var(--space-md); text-align: left; border-bottom: 1px solid var(--border-color); }
-/* Mobile Table Rows */
-.data-table tbody tr:not([id^="no-"]) { /* Exclude 'no results' row */
-  display: block; margin-bottom: var(--space-lg); border: 1px solid var(--border-color);
-  border-radius: var(--border-radius); padding: var(--space-md); background-color: var(--neutral-white);
-  box-shadow: var(--box-shadow-sm);
+
+.data-table thead {
+  display: none;
+  background-color: #f8f9fa;
+  font-weight: 500;
+  color: var(--dark-color);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.data-table th { padding: calc(var(--spacing-unit) * 0.7) calc(var(--spacing-unit) * 0.6); text-align: left; border-bottom: 1px solid var(--border-color); }
+
+/* Mobile Table Rows (Card-like) */
+.data-table tbody tr {
+  display: block;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  padding: calc(var(--spacing-unit) * 0.8);
+  background-color: var(--card-bg);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.2s ease-in-out;
 }
 .data-table tbody tr:last-child { margin-bottom: 0; }
-.data-table td { display: block; text-align: right; padding: var(--space-sm) 0; position: relative; border-bottom: 1px dashed var(--neutral-light); }
+.data-table tbody tr:hover { box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1); }
+
+.data-table td { display: block; text-align: right; padding: calc(var(--spacing-unit) * 0.4) 0; position: relative; border-bottom: 1px dashed #eee; }
 .data-table td:last-child { border-bottom: none; }
-.data-table td::before { content: attr(data-label); position: absolute; left: 0; font-weight: var(--font-weight-semibold); text-align: left; padding-right: var(--space-md); color: var(--neutral-secondary); width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85em; }
-.table-img { max-width: 40px; border-radius: var(--border-radius); display: inline-block; margin-left: 50%; vertical-align: middle; }
-.data-table td:has(img) { text-align: right; padding: var(--space-xs) 0; }
-.data-table td.actions-cell { padding-top: var(--space-md); }
+.data-table td::before { content: attr(data-label); position: absolute; left: 0; font-weight: 500; text-align: left; padding-right: 10px; color: var(--secondary-color); width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.85em; }
+
+.table-img {
+    max-width: 50px;
+    border-radius: calc(var(--border-radius) * 0.75);
+    display: inline-block;
+    margin-left: 45%;
+    vertical-align: middle;
+}
+.data-table td:has(img) { text-align: right; padding: 5px 0; }
+
+/* Mobile Actions Cell */
+.data-table td.actions-cell { padding-top: calc(var(--spacing-unit) * 0.6); }
 .data-table td.actions-cell::before { display: none; }
-.actions-cell .action-group { border-top: 1px solid var(--neutral-light); padding-top: var(--space-md); margin-top: var(--space-md); text-align: left; }
+.actions-cell .action-group { border-top: 1px solid #eee; padding-top: calc(var(--spacing-unit) * 0.6); margin-top: calc(var(--spacing-unit) * 0.6); text-align: left; }
 .actions-cell .action-group:first-child { border-top: none; margin-top: 0; padding-top: 0; }
-.actions-cell .action-group-title { font-size: 0.8em; font-weight: bold; color: var(--neutral-secondary); margin-bottom: var(--space-sm); display: block; text-align: left; }
-.actions-cell form, .actions-cell .btn { margin: var(--space-xs) 0; display: block; width: 100%; }
-.actions-cell .inline-form { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.actions-cell .action-group-title { font-size: 0.8em; font-weight: bold; color: var(--secondary-color); margin-bottom: calc(var(--spacing-unit) * 0.4); display: block; text-align: left; }
+.actions-cell form, .actions-cell .btn { margin: calc(var(--spacing-unit) * 0.25) 0; display: block; width: 100%; }
+.actions-cell .inline-form { display: flex; flex-wrap: wrap; gap: calc(var(--spacing-unit) * 0.4); align-items: center; }
 .actions-cell .inline-form input, .actions-cell .inline-form button { width: auto; flex-grow: 1; }
 .actions-cell .inline-form button { flex-grow: 0; flex-shrink: 0; }
-.actions-cell select.form-control-sm { margin-bottom: var(--space-xs); font-size: var(--font-size-sm); padding: var(--space-xs) var(--space-sm); height: auto; width: 100%; }
-.actions-cell .no-actions-text { display: block; text-align: left; margin-top: var(--space-sm); color: var(--neutral-tertiary); font-style: italic; font-size: 0.85em; }
+.actions-cell select.form-control-sm { margin-bottom: 5px; font-size: 0.9rem; padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6); height: auto; width: 100%; }
+.actions-cell .no-actions-text { display: block; text-align: left; margin-top: calc(var(--spacing-unit) * 0.5); color: var(--secondary-color); font-style: italic; }
+
 /* Mobile Order Table Specifics */
-.order-table td[data-label="Items"] .order-items-summary { font-size: 0.85em; line-height: 1.5; margin-bottom: var(--space-sm); text-align: left; margin-left: 50%; }
-.order-table td[data-label="Items"] .order-items-summary strong { color: var(--neutral-primary); }
-.order-table .order-items-images { margin-top: var(--space-xs); justify-content: flex-end; margin-left: 50%; }
-.order-table td[data-label="Total"].order-total strong { font-size: 1.1em; color: var(--neutral-primary); }
-.order-table td[data-label="Status"] .status-badge { float: right; margin-bottom: var(--space-xs); }
-.order-table td[data-label="Status"] small { clear: both; display: block; text-align: right; margin-top: var(--space-xs); font-size: 0.8em; }
+.order-table td[data-label="Items"] .order-items-summary { font-size: 0.85em; line-height: 1.5; margin-bottom: calc(var(--spacing-unit) * 0.5); text-align: left; margin-left: 45%; }
+.order-table td[data-label="Items"] .order-items-summary strong { color: var(--dark-color); }
+.order-table .order-items-images { margin-top: calc(var(--spacing-unit) * 0.4); justify-content: flex-end; margin-left: 45%; }
+.order-table td[data-label="Total"].order-total strong { font-size: 1.1em; color: var(--success-color); }
+.order-table td[data-label="Status"] .status-badge { float: right; margin-bottom: 5px; }
+.order-table td[data-label="Status"] small { clear: both; display: block; text-align: right; margin-top: calc(var(--spacing-unit) * 0.3); }
+
 /* Mobile Delivery OTP */
-.delivery-otp-display { margin-top: var(--space-sm); padding: var(--space-sm); background-color: var(--status-info-bg); border: 1px solid #a9d6f5; border-radius: var(--border-radius); font-size: 0.85rem; text-align: left; clear: both; margin-left: 50%; }
-.delivery-otp-display p { margin-bottom: var(--space-xs) !important; }
-.delivery-otp-code { font-weight: var(--font-weight-bold); color: var(--primary-blue); font-size: 1.1em; margin: 0 var(--space-xs); letter-spacing: 1px; background-color: var(--neutral-white); padding: 1px 4px; border-radius: var(--border-radius); border: 1px solid var(--primary-blue); }
-.delivery-otp-display small { display: block; margin-top: var(--space-xs); color: var(--neutral-secondary); }
-.verify-otp-form { display: flex; align-items: center; gap: var(--space-xs); width: 100%; }
-.verify-otp-form input[name="otp"] { flex-grow: 1; max-width: 150px; padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-sm); text-align: center; border-radius: var(--border-radius); }
-.verify-otp-form button { flex-shrink: 0; width: auto; padding: var(--space-xs) var(--space-sm); font-size: var(--font-size-sm); line-height: 1.4; }
+.delivery-otp-display {
+    margin-top: 10px;
+    padding: 8px 12px;
+    background-color: #e6ffed;
+    border: 1px solid #b7e4c7;
+    border-radius: var(--border-radius);
+    font-size: 0.9rem;
+    text-align: left;
+    clear: both;
+    margin-left: 45%;
+}
+.delivery-otp-display p { margin-bottom: 3px !important; }
+.delivery-otp-code {
+    font-weight: bold;
+    color: #2b9348;
+    font-size: 1.1em;
+    margin: 0 3px;
+    letter-spacing: 1px;
+    background-color: #fff;
+    padding: 1px 4px;
+    border-radius: calc(var(--border-radius) * 0.5);
+}
+.delivery-otp-display small { display: block; margin-top: 3px; color: #555; }
+.verify-otp-form { display: flex; align-items: center; gap: 5px; width: 100%; }
+.verify-otp-form input[name="otp"] { flex-grow: 1; max-width: 150px; padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6); font-size: 0.9rem; text-align: center; border-radius: var(--border-radius); }
+.verify-otp-form button { flex-shrink: 0; width: auto; padding: calc(var(--spacing-unit)*0.4) calc(var(--spacing-unit)*0.6); font-size: 0.9rem; line-height: 1.4; }
 
 /* Admin Actions Grid */
-.admin-actions-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: var(--space-lg); margin-top: var(--space-lg); }
-.admin-action-card { background-color: var(--neutral-white); padding: var(--space-lg); border-radius: var(--border-radius); border: 1px solid var(--border-color); text-align: center; box-shadow: var(--box-shadow-sm); transition: transform 0.15s ease, box-shadow 0.15s ease; color: var(--neutral-primary); text-decoration: none; }
-.admin-action-card:hover { transform: translateY(-2px); box-shadow: var(--box-shadow-md); text-decoration: none; }
-.admin-action-card i { font-size: 2rem; color: var(--primary-blue); margin-bottom: var(--space-md); }
-.admin-action-card h3 { font-size: 1.1rem; margin-bottom: var(--space-xs); color: var(--neutral-primary); }
-.admin-action-card p { font-size: var(--font-size-sm); color: var(--neutral-secondary); margin-bottom: var(--space-sm); }
+.admin-actions-grid { display: grid; grid-template-columns: repeat(1, 1fr); gap: var(--spacing-unit); margin-top: var(--spacing-unit); }
+.admin-action-card {
+    background-color: var(--card-bg);
+    padding: var(--spacing-unit);
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-color);
+    text-align: center;
+    box-shadow: var(--card-shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+    color: var(--text-color);
+    text-decoration: none;
+}
+.admin-action-card:hover { transform: translateY(-3px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-decoration: none; }
+.admin-action-card i { font-size: 2rem; color: var(--primary-color); margin-bottom: 0.5rem; }
+.admin-action-card h3 { font-size: 1.1rem; margin-bottom: 0.3rem; color: var(--text-color); }
+.admin-action-card p { font-size: 0.85rem; color: var(--secondary-color); margin-bottom: 0.5rem; }
 
-/* --- Error Page --- */
-.error-container { text-align: center; padding-top: var(--space-xxl); }
-.error-container h1 { color: var(--status-danger); margin-bottom: var(--space-sm); }
-.error-container .lead { font-size: 1.1rem; color: var(--neutral-secondary); }
-.error-container details { text-align: left; margin-top: var(--space-xl); background: var(--neutral-lighter); padding: var(--space-md); border-radius: var(--border-radius); border: 1px solid var(--border-color); }
-.error-container details summary { cursor: pointer; font-weight: var(--font-weight-semibold); }
-.error-container details pre { white-space: pre-wrap; font-size: 0.8em; margin-top: var(--space-sm); color: var(--neutral-secondary); font-family: Consolas, monospace; }
 
-/* --- Profile Page --- */
-.profile-container { max-width: 800px; margin: var(--space-xl) auto; padding: var(--space-xl); background-color: var(--neutral-white); border: 1px solid var(--border-color); border-radius: var(--border-radius); box-shadow: var(--box-shadow-sm); }
-.profile-header { display: flex; flex-direction: column; align-items: center; text-align: center; }
-.profile-header h1 { font-size: 1.75rem; margin-bottom: var(--space-xs); }
-.profile-header .d-flex { /* Container for name + edit */ flex-wrap: wrap; justify-content: center; }
-.profile-header #saved-name-display { font-size: 1.1rem; }
-.profile-container > p.text-muted { text-align: center; font-size: var(--font-size-sm); margin-bottom: var(--space-xl); }
-.profile-section { margin-top: var(--space-xl); padding-top: var(--space-xl); border-top: 1px solid var(--border-color); }
-.profile-section:first-of-type { border-top: none; padding-top: 0; margin-top: var(--space-lg); }
-.profile-section h2 { font-size: 1.25rem; margin-bottom: var(--space-lg); color: var(--neutral-primary); font-weight: var(--font-weight-semibold); }
-#saved-address-display p { margin-bottom: var(--space-xs); line-height: 1.5; font-size: var(--font-size-sm); }
-#saved-address-display strong { font-weight: var(--font-weight-semibold); }
-#edit-address-btn, #add-address-btn { margin-top: var(--space-md); font-weight: var(--font-weight-normal); }
+/* Error Page */
+.error-container { text-align: center; padding-top: 2rem; }
+.error-container h1 { color: var(--danger-color); margin-bottom: 0.5rem; }
+.error-container .lead { font-size: 1.1rem; }
+.error-container details {
+    text-align: left;
+    margin-top: 1rem;
+    background: #f1f1f1;
+    padding: 0.5rem;
+    border-radius: var(--border-radius);
+}
+.error-container details summary { cursor: pointer; font-weight: bold; }
+.error-container details pre { white-space: pre-wrap; font-size: 0.8em; margin-top: 0.5rem; }
+
+
+/* Profile Page */
+.profile-container {
+    max-width: 800px;
+    margin: var(--spacing-unit) auto;
+    padding: calc(var(--spacing-unit) * 1.5);
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    box-shadow: var(--card-shadow);
+}
+.profile-container h1 { font-size: 1.8rem; text-align: center; margin-bottom: calc(var(--spacing-unit) * 0.5); }
+.profile-container > p.text-muted { text-align: center; font-size: 1.1rem; }
+.profile-section { margin-top: calc(var(--spacing-unit) * 1.5); padding-top: calc(var(--spacing-unit) * 1); border-top: 1px solid var(--border-color); }
+.profile-section:first-of-type { border-top: none; padding-top: 0; margin-top: calc(var(--spacing-unit) * 0.8); }
+.profile-section h2 { font-size: 1.4rem; margin-bottom: calc(var(--spacing-unit) * 0.8); color: var(--primary-color); }
+#saved-address-display p { margin-bottom: calc(var(--spacing-unit) * 0.3); line-height: 1.5; font-size: 1rem; }
+#saved-address-display strong { font-weight: 500; }
+#edit-address-btn, #add-address-btn { margin-top: calc(var(--spacing-unit) * 0.5); }
 .address-form { max-width: 500px; }
-.address-form h3 { font-size: 1.1rem; margin-bottom: var(--space-lg); font-weight: var(--font-weight-semibold); }
-#cancel-edit-btn { margin-left: var(--space-sm); font-weight: var(--font-weight-normal); }
-.dashboards-section .btn, .orders-section .btn { margin-right: var(--space-sm); margin-bottom: var(--space-sm); font-weight: var(--font-weight-normal); }
+.address-form h3 { font-size: 1.2rem; margin-bottom: var(--spacing-unit); font-weight: 500; }
+#cancel-edit-btn { margin-left: calc(var(--spacing-unit) * 0.5); }
+.dashboards-section .btn,
+.orders-section .btn {
+    margin-right: 10px; margin-bottom: 10px;
+}
 .logout-section .btn { min-width: 120px; }
 
-/* --- Banner Slider --- */
-.banner-slider-container { position: relative; width: 100%; aspect-ratio: 2.5 / 1; overflow: hidden; border-radius: var(--border-radius); background-color: var(--neutral-light); touch-action: pan-y; -webkit-tap-highlight-color: transparent; }
-.banner-slides { position: relative; width: 100%; height: 100%; }
-.banner-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; visibility: hidden; transition: opacity 0.6s ease-in-out; background-color: var(--neutral-lighter); }
-.banner-slide.active { opacity: 1; visibility: visible; z-index: 1; }
-.banner-link { display: block; width: 100%; height: 100%; }
-.banner-image { display: block; width: 100%; height: 100%; object-fit: cover; }
-.banner-nav { position: absolute; top: 50%; transform: translateY(-50%); background-color: rgba(0, 0, 0, 0.4); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-size: 0.9rem; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s ease; opacity: 0.8; }
-.banner-nav:hover { background-color: rgba(0, 0, 0, 0.6); opacity: 1; }
-.banner-prev { left: var(--space-md); } .banner-next { right: var(--space-md); }
-.banner-dots { position: absolute; bottom: var(--space-md); left: 50%; transform: translateX(-50%); display: flex; gap: var(--space-sm); z-index: 2; }
-.banner-dot { width: 8px; height: 8px; border-radius: 50%; background-color: rgba(255, 255, 255, 0.5); border: 1px solid rgba(0, 0, 0, 0.2); cursor: pointer; padding: 0; transition: background-color 0.3s ease; }
+
+/* Banner Slider Styles */
+.banner-slider-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2.5 / 1;
+  overflow: hidden;
+  border-radius: var(--border-radius);
+  background-color: #e0e0e0;
+  touch-action: pan-y; /* Enable vertical scroll, handle horizontal swipe in JS */
+  -webkit-tap-highlight-color: transparent; /* Optional: Remove tap highlight on mobile */
+}
+
+.banner-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.banner-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.6s ease-in-out;
+  background-color: #eee;
+}
+
+.banner-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1;
+}
+
+.banner-link {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.banner-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Navigation Arrows */
+.banner-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 35px;
+  height: 35px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  opacity: 0.8;
+}
+
+.banner-nav:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+}
+
+.banner-prev { left: 10px; }
+.banner-next { right: 10px; }
+
+/* Navigation Dots */
+.banner-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+.banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.3s ease;
+}
+
 .banner-dot.active { background-color: white; }
 
-/* --- Category Icons --- */
-.category-icons-section h2 { font-size: 1.25rem; font-weight: var(--font-weight-semibold); color: var(--neutral-primary); text-align: center; margin-bottom: var(--space-lg); }
-.category-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-md); }
-.category-item { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--space-sm); border-radius: var(--border-radius); transition: background-color 0.2s ease-in-out; color: var(--neutral-primary); text-decoration: none; cursor: pointer; }
-.category-item:hover { background-color: var(--neutral-light); text-decoration: none; }
-.category-item.active { background-color: var(--primary-blue-light); }
-.category-item.active .category-name { color: var(--primary-blue); font-weight: var(--font-weight-semibold); }
-.category-icon-wrapper { width: 50px; height: 50px; margin-bottom: var(--space-sm); background-color: var(--neutral-white); border-radius: var(--border-radius); display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid var(--border-color); box-shadow: var(--box-shadow-sm); }
-.category-icon { max-width: 60%; max-height: 60%; object-fit: contain; display: block; }
-.category-name { font-size: 0.75rem; font-weight: var(--font-weight-normal); line-height: 1.3; color: var(--neutral-secondary); }
 
-/* --- Pincode Lookup Styles --- */
-.auto-filled-fields-container { background-color: var(--neutral-lighter); border-left: 3px solid var(--primary-blue); padding: var(--space-sm) var(--space-md); border-radius: 0 var(--border-radius) var(--border-radius) 0; margin-top: calc(var(--space-unit) * -0.5); margin-bottom: var(--space-lg); }
-.auto-filled-fields-container .form-group { margin-bottom: var(--space-sm); }
-.auto-filled-fields-container .form-group:last-child { margin-bottom: 0; }
-.auto-filled-field[readonly] { background-color: var(--neutral-light); opacity: 1; cursor: default; border: 1px solid var(--neutral-quaternary); font-weight: var(--font-weight-semibold); color: var(--neutral-secondary); }
-.pincode-status { display: block; margin-top: var(--space-xs); font-size: 0.8em; min-height: 1.2em; transition: color 0.2s ease-in-out; }
+/* ============================ */
+/* Category Icons Section       */
+/* ============================ */
 
-/* --- Table Filtering / No Results --- */
-.admin-manage-container .form-group.mb-3 { margin-bottom: var(--space-lg) !important; }
-#no-admin-orders-found td, #no-seller-orders-found td, #no-admin-products-found td, #no-seller-products-found td, #no-admin-users-found td { text-align: center; padding: var(--space-lg); color: var(--neutral-secondary); font-style: italic; }
-tr.hidden { display: none !important; }
+.category-icons-section {
+    /* padding: calc(var(--spacing-unit) * 0.8) 0; */
+}
+
+.category-icons-section h2 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--dark-color);
+  text-align: center;
+  margin-bottom: calc(var(--spacing-unit) * 1);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: calc(var(--spacing-unit) * 0.6);
+}
+
+.category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: calc(var(--spacing-unit) * 0.4);
+  border-radius: calc(var(--border-radius) * 0.8);
+  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out;
+  color: var(--text-color);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.category-item:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.category-item.active {
+  background-color: rgba(0, 123, 255, 0.1);
+  transform: translateY(-1px);
+}
+.category-item.active .category-name {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+
+.category-icon-wrapper {
+  width: 55px;
+  height: 55px;
+  margin-bottom: calc(var(--spacing-unit) * 0.4);
+  background-color: rgb(255, 255, 255);
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: box-shadow 0.2s ease;
+}
+.category-item:hover .category-icon-wrapper {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+
+.category-icon {
+  max-width: 65%;
+  max-height: 65%;
+  object-fit: contain;
+  display: block;
+}
+
+.category-name {
+  font-size: 0.7rem;
+  font-weight: 400;
+  line-height: 1.3;
+  color: rgb(66, 66, 66);
+}
+
+/* ============================ */
+/* **** NEW: Pincode Lookup Styles **** */
+/* ============================ */
+
+/* Style for the container holding auto-filled fields */
+.auto-filled-fields-container {
+    background-color: #f8f9fa; /* Light grey background */
+    border-left: 3px solid var(--primary-color); /* Accent border */
+    padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.8);
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+    margin-top: calc(var(--spacing-unit) * -0.5); /* Pull slightly closer to pincode */
+    margin-bottom: var(--spacing-unit);
+}
+
+.auto-filled-fields-container .form-group {
+    margin-bottom: calc(var(--spacing-unit) * 0.5); /* Reduce margin inside */
+}
+
+.auto-filled-fields-container .form-group:last-child {
+    margin-bottom: 0;
+}
+
+/* Style for the read-only auto-filled fields */
+.auto-filled-field[readonly] {
+    background-color: #e9ecef; /* Standard readonly background */
+    opacity: 1; /* Ensure full opacity */
+    cursor: not-allowed;
+    border: 1px solid #ced4da; /* Slightly lighter border */
+    font-weight: 500; /* Make text slightly bolder */
+    color: #495057; /* Standard text color */
+}
+
+/* Pincode status message styling */
+.pincode-status {
+    display: block; /* Ensure it takes its own line */
+    margin-top: 4px;
+    font-size: 0.8em;
+    min-height: 1.2em; /* Reserve space */
+    transition: color 0.2s ease-in-out; /* Smooth color transition */
+}
+.pincode-status.text-success { color: var(--success-color) !important; }
+.pincode-status.text-danger { color: var(--danger-color) !important; }
+.pincode-status.text-muted { color: var(--secondary-color) !important; }
 
 
 /* ============================ */
 /* Media Queries                */
 /* ============================ */
 
+/* --- Mobile Specific Search Bar --- */
+@media (max-width: 767px) {
+  .search-container-dynamic {
+      position: static;
+      order: 1;
+  }
+  .search-form-dynamic {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: var(--spacing-unit);
+      right: var(--spacing-unit);
+      width: calc(100% - (2 * var(--spacing-unit)));
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px) scaleY(0.95);
+      transform-origin: top center;
+      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+      z-index: 1005;
+      border-radius: var(--border-radius);
+      height: 42px;
+  }
+  .search-container-dynamic.active .search-form-dynamic {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scaleY(1);
+      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0s;
+  }
+  .suggestions-dropdown {
+      top: calc(100% + 8px + 42px + 4px);
+      left: var(--spacing-unit);
+      right: var(--spacing-unit);
+      width: calc(100% - (2 * var(--spacing-unit)));
+      z-index: 1010;
+      border-top: 1px solid var(--border-color);
+  }
+   .search-container-dynamic.active .suggestions-dropdown.active {
+      display: block;
+   }
+}
+
 /* Small devices (landscape phones, 576px and up) */
 @media (min-width: 576px) {
-    .category-grid { grid-template-columns: repeat(5, 1fr); gap: var(--space-lg); }
-    .category-icon-wrapper { width: 55px; height: 55px; }
-    .category-name { font-size: 0.8rem; }
+    .category-grid {
+        grid-template-columns: repeat(5, 1fr);
+        gap: calc(var(--spacing-unit) * 0.75);
+    }
+    .category-icon-wrapper { width: 60px; height: 60px; border-radius: 18px; }
+    .category-name { font-size: 0.75rem; }
     .admin-actions-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Medium devices (tablets, 768px and up) */
 @media (min-width: 768px) {
-    .container { /* Max width set via variable */ }
-    .app-footer { display: block; }
-    .product-grid { grid-template-columns: repeat(3, 1fr); }
-    .product-name { height: auto; white-space: normal; display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
-    .product-detail-main { flex-direction: row; align-items: flex-start; }
-    .product-detail-info { flex: 1 1 60%; }
-    .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; }
-    .product-actions { flex-direction: row; align-items: center; }
-    .product-actions .btn { width: auto; }
-    .quantity-selector { max-width: 120px; margin-bottom: 0; }
-    .auth-container { margin: var(--space-xxl) auto; }
-    .cart-item { grid-template-columns: 100px 1fr 100px 150px 80px; grid-template-areas: "image details price quantity remove"; align-items: center; padding: var(--space-lg); }
-    .cart-item-details { grid-area: details; }
-    .cart-item-price { display: block; grid-area: price; text-align: right; font-weight: var(--font-weight-semibold); font-size: 1rem; color: var(--neutral-primary); margin-bottom: 0; }
-    .cart-item-quantity { grid-area: quantity; justify-content: center; }
-    .cart-item-subtotal { display: none; }
-    .cart-item-remove { grid-area: remove; align-self: center; text-align: center; }
-    .checkout-grid { flex-direction: row; gap: var(--space-xl); align-items: flex-start; }
-    .checkout-address { flex: 1 1 55%; }
-    .checkout-summary { flex: 1 1 45%; }
+  .container { max-width: 720px; }
+  .app-footer { display: block; }
+  .product-grid { grid-template-columns: repeat(3, 1fr); }
+  .product-name { height: auto; white-space: normal; display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
+  .product-detail-main { flex-direction: row; align-items: flex-start; }
+  .product-detail-info { flex: 1 1 60%; }
+  /* .product-detail-image { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } */ /* Moved to image section */
+  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } /* Apply flex to the section */
+  .product-actions { flex-direction: row; align-items: center; }
+  .product-actions .btn { width: auto; }
+  .quantity-selector { max-width: 120px; margin-bottom: 0; }
+  .auth-container { margin: calc(var(--spacing-unit) * 2) auto; }
+  .cart-item { grid-template-columns: 100px 1fr 100px 150px 80px; grid-template-areas: "image details price quantity remove"; align-items: center; padding: var(--spacing-unit); }
+  .cart-item-details { grid-area: details; }
+  .cart-item-price { display: block; grid-area: price; text-align: right; font-weight: 500; font-size: 1rem; color: var(--text-color); margin-bottom: 0; }
+  .cart-item-quantity { grid-area: quantity; justify-content: center; }
+  .cart-item-subtotal { display: none; }
+  .cart-item-remove { grid-area: remove; align-self: center; text-align: center; }
+  .checkout-grid { flex-direction: row; gap: calc(var(--spacing-unit) * 1.5); align-items: flex-start; }
+  .checkout-address { flex: 1 1 55%; }
+  .checkout-summary { flex: 1 1 45%; }
 
-    /* Restore Table Layout */
-    .data-table thead { display: table-header-group; }
-    .data-table tbody tr:not([id^="no-"]) { display: table-row; margin-bottom: 0; border: none; padding: 0; box-shadow: none; background-color: transparent; border-bottom: 1px solid var(--border-color); border-radius: 0; }
-    .data-table tbody tr:last-child { border-bottom: none; }
-    .data-table tbody tr:hover { background-color: var(--neutral-lighter); }
-    .data-table td { display: table-cell; text-align: left; padding: var(--space-md); vertical-align: middle; border-bottom: none; position: static; margin-left: 0 !important; }
-    .data-table td::before { content: none; }
-    .table-img { max-width: 50px; margin-left: 0; }
-    .data-table td:has(img) { text-align: left; width: 70px; }
-    .data-table th[data-label*="Price"], .data-table td[data-label*="Price"], .data-table th[data-label*="Stock"], .data-table td[data-label*="Stock"], .data-table th[data-label*="Total"], .data-table td[data-label*="Total"], .data-table td.order-total { text-align: right; width: 100px; }
-    .data-table th[data-label="Status"], .data-table td[data-label="Status"], .data-table td.order-status-cell { text-align: center; width: 130px; }
-    .data-table td[data-label="Status"] .status-badge, .order-status-cell .status-badge { float: none; display: inline-block; }
-    .order-status-cell small { text-align: center; }
-    .data-table th.actions-cell, .data-table td.actions-cell { text-align: right !important; width: 220px; white-space: normal; }
-    .actions-cell .action-group { border: none; padding: 0; margin: 0 0 var(--space-sm) 0; display: block; text-align: right; }
-    .actions-cell .action-group:last-child { margin-bottom: 0; }
-    .actions-cell .action-group-title { display: none; }
-    .actions-cell form, .actions-cell .btn { display: inline-block; width: auto; margin: 0 0 0 var(--space-sm); vertical-align: middle; }
-    .actions-cell .inline-form { display: inline-flex; width: auto; margin-left: 0; }
-    .actions-cell .inline-form + .inline-form { margin-left: var(--space-sm); }
-    .actions-cell .verify-otp-form input { max-width: 100px; }
-    .actions-cell select.form-control-sm { width: auto; display: inline-block; margin-right: var(--space-xs);}
-    .actions-cell .no-actions-text { display: inline-block; text-align: right; width: 100%;}
-    .w-md-auto { width: auto !important; }
-    .order-table td[data-label="Items"] .order-items-summary { margin-left: 0; text-align: left; }
-    .order-table .order-items-images { justify-content: flex-start; margin-left: 0; }
-    .delivery-otp-display { margin-left: 0; margin-top: var(--space-xs); padding: var(--space-xs) var(--space-sm); font-size: 0.8rem; display: inline-block; width: auto; text-align: center; }
-    .delivery-otp-display p { margin-bottom: 0 !important; }
-    .delivery-otp-display small { display: none; }
+  /* --- Restore Table Layout --- */
+  .data-table thead { display: table-header-group; }
+  .data-table tbody tr { display: table-row; margin-bottom: 0; border: none; padding: 0; box-shadow: none; background-color: transparent; border-bottom: 1px solid var(--border-color); border-radius: 0; }
+  .data-table tbody tr:last-child { border-bottom: none; }
+  .data-table tbody tr:hover { background-color: #f1f5f9; }
+  .data-table td { display: table-cell; text-align: left; padding: calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6); vertical-align: middle; border-bottom: none; position: static; margin-left: 0 !important; }
+  .data-table td::before { content: none; }
+  .table-img { max-width: 60px; margin-left: 0; }
+  .data-table td:has(img) { text-align: left; width: 80px; }
+  .data-table th[data-label*="Price"], .data-table td[data-label*="Price"],
+  .data-table th[data-label*="Stock"], .data-table td[data-label*="Stock"],
+  .data-table th[data-label*="Total"], .data-table td[data-label*="Total"],
+  .data-table td.order-total { text-align: right; width: 100px; }
+  .data-table th[data-label="Status"], .data-table td[data-label="Status"],
+  .data-table td.order-status-cell { text-align: center; width: 150px; }
+  .data-table td[data-label="Status"] .status-badge, .order-status-cell .status-badge { float: none; display: inline-block; }
+  .order-status-cell small { text-align: center; }
+  .data-table th.actions-cell, .data-table td.actions-cell { text-align: right !important; width: 250px; white-space: normal; }
+  .actions-cell .action-group { border: none; padding: 0; margin: 0 0 calc(var(--spacing-unit) * 0.5) 0; display: block; text-align: right; }
+  .actions-cell .action-group:last-child { margin-bottom: 0; }
+  .actions-cell .action-group-title { display: none; }
+  .actions-cell form, .actions-cell .btn { display: inline-block; width: auto; margin: 0 0 0 calc(var(--spacing-unit) * 0.3); vertical-align: middle; }
+  .actions-cell .inline-form { display: inline-flex; width: auto; margin-left: 0; }
+  .actions-cell .inline-form + .inline-form { margin-left: calc(var(--spacing-unit) * 0.3); }
+  .actions-cell .verify-otp-form input { max-width: 100px; }
+  .actions-cell select.form-control-sm { width: auto; display: inline-block; margin-right: 5px;}
+  .actions-cell .no-actions-text { display: inline-block; text-align: right; width: 100%;}
+  .w-md-auto { width: auto !important; }
+  .order-table td[data-label="Items"] .order-items-summary { margin-left: 0; text-align: left; }
+  .order-table .order-items-images { justify-content: flex-start; margin-left: 0; }
+  .delivery-otp-display { margin-left: 0; margin-top: 5px; padding: 5px 8px; font-size: 0.85rem; display: inline-block; width: auto; text-align: center; }
+  .delivery-otp-display p { margin-bottom: 0 !important; }
+  .delivery-otp-display small { display: none; }
+  /* --- End Table Restore --- */
 
-    /* Header/Navbar Tablet+ */
-    .app-header { padding: var(--space-sm) var(--space-lg); }
-    .navbar { gap: var(--space-lg); }
-    .app-logo .app-name { display: inline; }
-    .app-logo { font-size: 1.25rem; }
-    .search-toggle-btn { display: none; }
-    .search-container-dynamic { display: flex; flex-grow: 1; justify-content: center; order: 0; margin: 0 var(--space-lg); max-width: 500px; position: relative; }
-    .nav-left { margin-right: 0; }
-    .search-form-dynamic { position: relative; top: auto; left: auto; right: auto; width: 100%; box-shadow: none; opacity: 1; visibility: visible; transform: none; height: 36px; }
-    .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; width: 100%; }
+  /* --- Header/Navbar for Tablet+ --- */
+  .app-header { padding: calc(var(--spacing-unit) * 0.5) var(--spacing-unit); }
+  .navbar { gap: var(--spacing-unit); }
+  .app-logo .app-name { display: inline; }
+  .app-logo { font-size: 1.2rem; }
+  .search-toggle-btn { display: none; }
 
-    /* Nav links Tablet+ */
-    .nav-link { flex-direction: row; font-size: var(--font-size-sm); align-items: center; padding: var(--space-sm) var(--space-md); width: auto; }
-    .nav-link span { display: inline; margin-left: var(--space-sm); }
-    .nav-link i { font-size: 1rem; margin-bottom: 0; margin-right: 0; }
-    .nav-right { gap: var(--space-md); }
-    .profile-avatar-link { width: 36px; height: 36px; }
-    .btn-login-register { font-size: var(--font-size-sm); }
+  .search-container-dynamic {
+      display: flex;
+      flex-grow: 1;
+      justify-content: center;
+      order: 0;
+      margin: 0 calc(var(--spacing-unit) * 0.5);
+      max-width: 500px;
+      position: relative;
+  }
+  .nav-left { margin-right: 0; }
 
-    /* Category Grid Tablet */
-    .category-grid { grid-template-columns: repeat(6, 1fr); gap: var(--space-lg); }
-    .category-icon-wrapper { width: 60px; height: 60px; }
-    .category-name { font-size: var(--font-size-sm); }
-    .category-icons-section { padding: var(--space-lg) 0; }
-    .category-icons-section h2 { font-size: 1.4rem; }
+  .search-form-dynamic {
+      position: relative;
+      top: auto; left: auto; right: auto; width: 100%;
+      box-shadow: none;
+      opacity: 1; visibility: visible; transform: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      height: 38px;
+  }
+  /* --- End Header/Navbar Tablet+ --- */
 
-    /* Banner Slider Tablet */
-    .banner-slider-container { aspect-ratio: 24 / 7; }
-    .banner-nav { width: 40px; height: 40px; font-size: 1rem; }
-    .banner-dots { bottom: var(--space-lg); }
-    .banner-dot { width: 10px; height: 10px; }
 
-    /* Rating Stats Layout */
-    .rating-stats-container { display: flex; align-items: flex-start; gap: var(--space-xl); }
-    .rating-summary { flex-direction: column; align-items: center; margin-bottom: 0; flex-basis: 150px; flex-shrink: 0; }
-    .rating-average-value { font-size: 3em; }
-    .rating-total { font-size: 1em; }
-    .rating-bars { max-width: none; flex-grow: 1; margin: 0; }
+  /* Category Grid Tablet */
+  .category-grid { grid-template-columns: repeat(6, 1fr); gap: calc(var(--spacing-unit) * 0.8); }
+  .category-icon-wrapper { width: 65px; height: 65px; border-radius: 20px; }
+  .category-name { font-size: 0.8rem; }
+  .category-icons-section { padding: calc(var(--spacing-unit) * 1.2); }
+  .category-icons-section h2 { font-size: 1.4rem; }
 
-    .profile-container { padding: var(--space-xl); }
-}
+  /* Banner Slider Tablet */
+  .banner-slider-container {
+      aspect-ratio: 24 / 7;
+      /* touch-action is inherited */
+  }
+  .banner-nav { width: 40px; height: 40px; font-size: 1rem; }
+  .banner-dots { bottom: 15px; }
+  .banner-dot { width: 10px; height: 10px; }
+
+  /* Rating Stats Layout */
+  .rating-stats-container { display: flex; align-items: flex-start; gap: calc(var(--spacing-unit) * 2); }
+  .rating-summary { flex-direction: column; align-items: center; margin-bottom: 0; flex-basis: 150px; flex-shrink: 0; }
+  .rating-average-value { font-size: 3em; }
+  .rating-total { font-size: 1em; }
+  .rating-bars { max-width: none; flex-grow: 1; margin: 0; }
+
+  .profile-container { padding: calc(var(--spacing-unit) * 2); }
+
+  /* Nav links Tablet+ */
+  .nav-link { flex-direction: row; font-size: 0.9rem; align-items: center; padding: calc(var(--spacing-unit) * 0.4) calc(var(--spacing-unit) * 0.8); }
+  .nav-link span { display: inline; margin-left: calc(var(--spacing-unit) * 0.3); }
+  .nav-link i { font-size: 1rem; margin-bottom: 0; margin-right: 0; }
+  .nav-right { gap: calc(var(--spacing-unit) * 0.75); }
+  .profile-avatar-link { width: 38px; height: 38px; }
+  .btn-login-register { font-size: 0.9rem; }
+  .suggestions-dropdown { position: absolute; top: 100%; left: 0; right: 0; width: 100%; }
+
+
+} /* End @media (min-width: 768px) */
+
 
 /* Large devices (desktops, 992px and up) */
 @media (min-width: 992px) {
-    .container { max-width: 960px; }
-    .product-grid { grid-template-columns: repeat(4, 1fr); gap: var(--space-xl); }
-    .admin-actions-grid { grid-template-columns: repeat(3, 1fr); gap: var(--space-xl); }
-    .navbar { /* Max width inherited */ }
-    .category-grid { grid-template-columns: repeat(8, 1fr); gap: var(--space-lg); }
-    .category-icon-wrapper { width: 65px; height: 65px; }
-    .category-icons-section { padding: var(--space-xl) 0; }
-    .banner-slider-container { aspect-ratio: 24 / 6; }
-}
+  .container { max-width: 960px; }
+  .product-grid { grid-template-columns: repeat(4, 1fr); }
+  .product-grid, .admin-actions-grid { gap: calc(var(--spacing-unit) * 1); }
+  .admin-actions-grid { grid-template-columns: repeat(3, 1fr); }
+  .navbar { max-width: 960px; }
+
+  /* Category Grid Desktop */
+  .category-grid { grid-template-columns: repeat(8, 1fr); gap: var(--spacing-unit); }
+  .category-icon-wrapper { width: 70px; height: 70px; border-radius: 22px; }
+  .category-name { font-size: 0.85rem; }
+  .category-icons-section { padding: calc(var(--spacing-unit) * 1.5); }
+
+  .banner-slider-container { aspect-ratio: 24 / 6; }
+
+} /* End @media (min-width: 992px) */
+
 
 /* Extra large devices (large desktops, 1200px and up) */
 @media (min-width: 1200px) {
     .container { max-width: 1140px; }
+    .navbar { max-width: 1140px; }
     .admin-actions-grid { grid-template-columns: repeat(4, 1fr); }
+    /* Optional: Increase product grid columns */
     /* .product-grid { grid-template-columns: repeat(5, 1fr); } */
+    /* Category Grid Large Desktop */
     /* .category-grid { grid-template-columns: repeat(10, 1fr); } */
-    .category-icon-wrapper { width: 70px; height: 70px; }
+    .category-icon-wrapper { width: 75px; height: 75px; border-radius: 25px; }
+} /* End @media (min-width: 1200px) */
+
+/* Add this rule or adjust existing margins */
+.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
+  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
 }
 
-/* Mobile Search Bar Specific Overlay/Positioning */
-@media (max-width: 767px) {
-  .search-container-dynamic { position: static; order: 1; } /* Keep in flow */
-  .search-form-dynamic {
-      position: absolute; top: calc(100% + var(--space-sm)); /* Below header */
-      left: var(--space-lg); right: var(--space-lg);
-      width: calc(100% - (2 * var(--space-lg)));
-      background-color: var(--neutral-white); border: 1px solid var(--border-color);
-      box-shadow: var(--box-shadow-md);
-      opacity: 0; visibility: hidden;
-      transform: translateY(-10px) scaleY(0.95); transform-origin: top center;
-      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
-      z-index: 1005; border-radius: var(--border-radius); height: 40px;
+/* Style for the "no results" row */
+#no-admin-orders-found td,
+#no-seller-orders-found td {
+    text-align: center;
+    padding: var(--spacing-unit);
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* Ensure hidden rows are truly hidden */
+tr.hidden {
+    display: none !important;
+}
+
+/* ============================ */
+/* **** Product Image Slider Styles **** */
+/* ============================ */
+
+/* Container for the image section (either single or slider) */
+.product-detail-image-section {
+  position: relative;
+  width: 100%; /* Full width on mobile */
+  max-width: 450px; /* Limit width on larger screens if needed */
+  margin: 0 auto var(--spacing-unit) auto; /* Center and add bottom margin on mobile */
+  aspect-ratio: 1 / 1; /* Maintain square aspect ratio */
+  overflow: hidden;
+  border-radius: calc(var(--border-radius) + 2px);
+  background-color: #f8f9fa; /* Placeholder background */
+  border: 1px solid var(--border-color); /* Add a subtle border */
+}
+/* Desktop Layout Alignment (aligns with existing product detail layout) */
+@media (min-width: 768px) {
+  .product-detail-image-section {
+      flex: 1 1 40%; /* Take 40% of the flex space */
+      width: auto; /* Override mobile width */
+      max-width: none; /* Remove max-width limit */
+      margin: 0; /* Remove mobile margin */
   }
-  .search-container-dynamic.active .search-form-dynamic {
-      opacity: 1; visibility: visible; transform: translateY(0) scaleY(1);
-      transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0s;
-  }
-  .suggestions-dropdown {
-      top: calc(100% + var(--space-sm) + 40px + var(--space-xs)); /* Below search form */
-      left: var(--space-lg); right: var(--space-lg);
-      width: calc(100% - (2 * var(--space-lg)));
-      z-index: 1010; border-top: 1px solid var(--border-color);
-  }
-   .search-container-dynamic.active .suggestions-dropdown.active { display: block; }
-   .nav-link span { display: block; } /* Ensure text is visible below icon */
+}
+
+/* Slider specific container */
+.product-image-slider-container {
+  position: relative; /* Needed for absolute positioning of children */
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* Hide slides outside the container */
+  touch-action: pan-y; /* <<<--- ADD FOR PRODUCT SLIDER */
+  -webkit-tap-highlight-color: transparent; /* <<<--- ADD FOR PRODUCT SLIDER */
+}
+
+.product-image-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Individual slide styling */
+.product-image-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0; /* Hidden by default */
+  visibility: hidden;
+  transition: opacity 0.5s ease-in-out; /* Smooth fade transition */
+  background-color: #eee; /* Fallback background if image is slow */
+}
+
+/* Active slide is visible */
+.product-image-slide.active {
+  opacity: 1;
+  visibility: visible;
+  z-index: 1; /* Ensure active slide is on top */
+}
+
+/* The actual image element (shared by slider and single image) */
+/* .product-detail-image styles are already defined above */
+
+/* Slider Navigation Arrows */
+.product-image-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.4);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 30px; /* Adjust size as needed */
+  height: 30px;
+  font-size: 1rem; /* Adjust icon size */
+  font-weight: bold;
+  line-height: 1; /* Center icon vertically */
+  cursor: pointer;
+  z-index: 2; /* Above the slides */
+  display: flex; /* Use flexbox to center icon */
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+  opacity: 0.8; /* Slightly transparent */
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-nav:hover,
+.product-image-nav:focus {
+  background-color: rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  outline: none; /* Remove default focus outline */
+}
+.product-image-prev { left: 8px; }
+.product-image-next { right: 8px; }
+
+/* Slider Navigation Dots */
+.product-image-dots {
+  position: absolute;
+  bottom: 8px; /* Position dots at the bottom */
+  left: 50%;
+  transform: translateX(-50%); /* Center the dots horizontally */
+  display: flex;
+  gap: 6px; /* Space between dots */
+  z-index: 2; /* Above the slides */
+}
+.product-image-dot {
+  width: 7px; /* Size of the dots */
+  height: 7px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.6); /* Semi-transparent white */
+  border: 1px solid rgba(0, 0, 0, 0.3); /* Subtle border */
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 0.3s ease;
+  -webkit-tap-highlight-color: transparent; /* Prevent blue highlight on mobile tap */
+}
+.product-image-dot.active {
+  background-color: white; /* Active dot is solid white */
+}
+.product-image-dot:focus {
+   outline: 1px dotted white; /* Simple focus style for accessibility */
+   outline-offset: 1px;
+}
+
+
+/* Optional: Container for the single image case (if you added it in the EJS) */
+.product-detail-image-single {
+  width: 100%;
+  height: 100%;
+}
+
+/* --- End Product Image Slider Styles --- */
+
+/* Add this rule or adjust existing margins */
+.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
+  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
+}
+
+/* Style for the "no results" row */
+#no-admin-orders-found td,
+#no-seller-orders-found td,
+#no-admin-products-found td,  /* <<< ADDED for admin products */
+#no-seller-products-found td { /* <<< ADDED for seller products */
+    text-align: center;
+    padding: var(--spacing-unit);
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* Ensure hidden rows are truly hidden */
+tr.hidden {
+    display: none !important;
 }
 
 public/js/main.js:
@@ -4505,7 +5531,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const originalText = submitButton.innerHTML;
                 submitButton.dataset.originalText = originalText; // Store original HTML
                 submitButton.disabled = true;
-                submitButton.classList.add('loading'); // Optional: Add class for specific styling
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
                 // Reset button if user navigates back without form submitting (browser specific)
@@ -4516,7 +5541,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             submitButton.innerHTML = submitButton.dataset.originalText;
                         }
                         submitButton.disabled = false;
-                        submitButton.classList.remove('loading');
                     }
                 });
             }
@@ -4533,9 +5557,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const headers = Array.from(headerElements).map(th => th.textContent.trim());
             const rows = table.querySelectorAll('tbody tr');
             rows.forEach(row => {
-                // Skip 'no results' row if it exists in tbody
-                if(row.id && row.id.startsWith('no-')) return;
-
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, index) => {
                     // Add data-label only if it doesn't exist and header exists
@@ -4548,9 +5569,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
      if (document.querySelector('.data-table')) {
          responsiveTables();
-         // Re-run if content is dynamically added (e.g., via AJAX, though not currently used for tables)
-         // const observer = new MutationObserver(responsiveTables);
-         // observer.observe(document.body, { childList: true, subtree: true });
      }
 
     // --- Share Button Logic ---
@@ -4602,7 +5620,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (addAddressBtn) addAddressBtn.classList.add('hidden'); // Hide Add button when form is visible
             if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden'); // Always show Cancel when form is open
 
-            // Trigger pincode check for edit if pincode exists
+            // Trigger pincode check for edit
             const pincodeInput = addressForm.querySelector('#profile-pincode');
             const localitySelect = addressForm.querySelector('#profile-locality');
             // Get the potentially pre-filled value from the EJS render
@@ -4612,7 +5630,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchPincodeData(pincodeInput.value, 'profile', savedLocality); // Pass saved locality
             } else if (localitySelect) {
                 // Ensure locality is reset if pincode isn't valid when opening form
-                clearAutoFilledFields('profile'); // Use helper to clear derived fields
+                localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
+                localitySelect.disabled = true;
             }
         };
 
@@ -4625,11 +5644,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!savedAddressDiv.querySelector('strong') && addAddressBtn) {
                  addAddressBtn.classList.remove('hidden');
             }
-            // Clear status messages and derived fields when hiding
-            clearAutoFilledFields('profile');
-            const pincodeInput = addressForm.querySelector('#profile-pincode');
-            const statusElement = pincodeInput?.nextElementSibling;
+            // Clear status messages when hiding
+            const statusElement = addressForm.querySelector('.pincode-status');
             if (statusElement) statusElement.textContent = '';
+             // Also clear locality dropdown and other derived fields
+            clearAutoFilledFields('profile'); // This will reset locality too
         };
 
         if (editAddressBtn) {
@@ -4637,13 +5656,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (addAddressBtn) {
              addAddressBtn.addEventListener('click', () => {
-                 if(addressForm) {
-                     addressForm.reset(); // Clear form fields when adding new
-                     clearAutoFilledFields('profile'); // Clear auto-filled fields too
-                     // Manually clear pincode status as reset() doesn't trigger input event
-                     const statusElement = addressForm.querySelector('.pincode-status');
-                     if (statusElement) statusElement.textContent = '';
-                 }
+                 if(addressForm) addressForm.reset(); // Clear form fields when adding new
+                 clearAutoFilledFields('profile'); // Clear auto-filled fields too
                  showAddressForm();
              });
         }
@@ -4670,11 +5684,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const displayUserNameStrong = document.getElementById('display-user-name');
 
         const showNameForm = () => {
-            if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn) return;
             nameForm.classList.remove('hidden');
             savedNameDisplaySpan.classList.add('hidden');
             editNameBtn.classList.add('hidden');
-            nameInput.value = displayUserNameStrong.textContent.trim(); // Use trim
+            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
             nameInput.focus();
         };
 
@@ -4683,7 +5697,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nameForm.classList.add('hidden');
             savedNameDisplaySpan.classList.remove('hidden');
             editNameBtn.classList.remove('hidden');
-            // No need to reset input value here, keep original name display
+            nameInput.value = displayUserNameStrong.textContent;
         };
 
         if (editNameBtn) {
@@ -4711,10 +5725,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 checkoutAddressForm.classList.remove('hidden');
                 checkoutSavedAddressDiv.classList.add('hidden');
                 if(placeOrderBtn) placeOrderBtn.disabled = true;
-                checkoutAddressForm.querySelector('h3').textContent = 'Edit Shipping Address'; // Update title
+                checkoutAddressForm.querySelector('h3').textContent = 'Edit Address';
                 if (checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden');
 
-                // Trigger pincode check for edit if pincode exists
+                // Trigger pincode check for edit
                 const pincodeInput = checkoutAddressForm.querySelector('#checkout-pincode');
                 const localitySelect = checkoutAddressForm.querySelector('#checkout-locality');
                 const savedLocality = localitySelect ? localitySelect.dataset.savedValue : null;
@@ -4722,7 +5736,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (pincodeInput && pincodeInput.value.length === 6 && /^\d{6}$/.test(pincodeInput.value)) {
                     fetchPincodeData(pincodeInput.value, 'checkout', savedLocality); // Pass saved locality
                 } else if (localitySelect){
-                    clearAutoFilledFields('checkout'); // Clear derived fields
+                    localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
+                    localitySelect.disabled = true;
                 }
             });
         }
@@ -4735,15 +5750,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     checkoutSavedAddressDiv.classList.remove('hidden');
                     if(placeOrderBtn) placeOrderBtn.disabled = false;
                 } else {
-                    // If there was no initial address, hiding the form means they can't checkout
                     if(placeOrderBtn) placeOrderBtn.disabled = true;
                 }
                 checkoutCancelBtn.classList.add('hidden');
-                // Clear status messages and derived fields when hiding
-                clearAutoFilledFields('checkout');
-                const pincodeInput = checkoutAddressForm.querySelector('#checkout-pincode');
-                const statusElement = pincodeInput?.nextElementSibling;
+                // Clear status messages when hiding
+                const statusElement = checkoutAddressForm.querySelector('.pincode-status');
                 if (statusElement) statusElement.textContent = '';
+                clearAutoFilledFields('checkout'); // Reset locality too
             });
         }
 
@@ -4762,37 +5775,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- Cart Update AJAX Logic ---
-    const cartItemsContainer = document.querySelector('.cart-items');
-    if (cartItemsContainer) {
-        cartItemsContainer.addEventListener('click', (e) => {
-            // Delegate event for update buttons
-            if (e.target.classList.contains('btn-update-qty')) {
-                e.preventDefault();
-                const button = e.target;
-                const productId = button.dataset.productId;
-                const quantityInput = document.getElementById(`quantity-${productId}`);
-                if (!quantityInput) return;
-                const newQuantity = parseInt(quantityInput.value, 10);
+    const updateQtyButtons = document.querySelectorAll('.btn-update-qty');
+    updateQtyButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            e.preventDefault();
+            const productId = button.dataset.productId;
+            const quantityInput = document.getElementById(`quantity-${productId}`);
+            if (!quantityInput) return;
+            const newQuantity = parseInt(quantityInput.value, 10);
 
-                if (!quantityInput.dataset.originalValue) {
-                    quantityInput.dataset.originalValue = quantityInput.value;
-                }
-
-                if (isNaN(newQuantity) || newQuantity < 0) {
-                    showToast('Invalid quantity entered.', 'danger');
-                    quantityInput.value = quantityInput.dataset.originalValue || '1'; // Fallback to 1 if original is missing
-                    return;
-                }
-                const maxStock = parseInt(quantityInput.max, 10);
-                if (!isNaN(maxStock) && newQuantity > maxStock) {
-                    showToast(`Only ${maxStock} items available in stock.`, 'warning');
-                    quantityInput.value = maxStock;
-                    return;
-                }
-                updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
+            if (!quantityInput.dataset.originalValue) {
+                quantityInput.dataset.originalValue = quantityInput.value;
             }
+
+            if (isNaN(newQuantity) || newQuantity < 0) {
+                 showToast('Invalid quantity entered.', 'danger');
+                 quantityInput.value = quantityInput.dataset.originalValue;
+                return;
+             }
+            const maxStock = parseInt(quantityInput.max, 10);
+            if (!isNaN(maxStock) && newQuantity > maxStock) {
+                showToast(`Only ${maxStock} items available in stock.`, 'warning');
+                quantityInput.value = maxStock;
+                 return;
+             }
+            updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
         });
-    }
+    });
 
 
     // ========================================
@@ -4807,10 +5816,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (searchToggleBtn && searchContainer) {
         searchToggleBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent body click listener from closing it immediately
+            e.stopPropagation();
             searchContainer.classList.toggle('active');
             if (searchContainer.classList.contains('active')) {
-                // Use requestAnimationFrame for smoother focus transition after style changes
                 requestAnimationFrame(() => { if(searchInput) searchInput.focus(); });
             } else {
                 if(suggestionsDropdown) suggestionsDropdown.classList.remove('active');
@@ -4818,17 +5826,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (searchInput && suggestionsDropdown && searchForm) {
+    if (searchInput && suggestionsDropdown) {
         searchInput.addEventListener('input', () => {
             const query = searchInput.value.trim();
             clearTimeout(suggestionFetchTimeout);
 
             if (query.length >= 2) {
-                suggestionsDropdown.innerHTML = '<div class="suggestion-item text-muted"><i>Loading...</i></div>';
+                suggestionsDropdown.innerHTML = '<div class="suggestion-item"><i>Loading...</i></div>';
                 suggestionsDropdown.classList.add('active');
                 suggestionFetchTimeout = setTimeout(() => {
                     fetchSuggestions(query);
-                }, 300); // Debounce API calls
+                }, 300);
             } else {
                 suggestionsDropdown.innerHTML = '';
                 suggestionsDropdown.classList.remove('active');
@@ -4837,20 +5845,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         searchInput.addEventListener('focus', () => {
              const query = searchInput.value.trim();
-              // Show suggestions on focus only if there's a query and suggestions are already rendered
               const hasActualSuggestions = suggestionsDropdown.querySelector('a.suggestion-item');
               if (query.length >= 2 && hasActualSuggestions) {
                  suggestionsDropdown.classList.add('active');
              }
         });
-
-         // Optional: Prevent form submission if user clicks a suggestion link quickly
-         searchForm.addEventListener('submit', (e) => {
-             // If suggestions are visible, maybe delay submit slightly or check click target
-             if (suggestionsDropdown.classList.contains('active')) {
-                // Potentially add logic here if needed, but default browser behavior usually handles it
-             }
-         });
     }
 
      async function fetchSuggestions(query) {
@@ -4867,21 +5866,19 @@ document.addEventListener('DOMContentLoaded', () => {
          } catch (error) {
              console.error('Error fetching suggestions:', error);
              suggestionsDropdown.innerHTML = `<div class="suggestion-item text-danger"><i>Error: ${error.message || 'Failed to fetch'}</i></div>`;
-             if (!suggestionsDropdown.classList.contains('active')) {
-                 suggestionsDropdown.classList.add('active'); // Ensure dropdown is visible for error
-             }
+             suggestionsDropdown.classList.add('active');
          }
      }
 
      function displaySuggestions(suggestions) {
           if (!suggestionsDropdown) return;
-         suggestionsDropdown.innerHTML = ''; // Clear previous results/loading
+         suggestionsDropdown.innerHTML = '';
          if (suggestions.length > 0) {
              suggestions.forEach(product => {
                  const item = document.createElement('a');
                  item.classList.add('suggestion-item');
                  item.href = `/products/${product._id}`;
-                 // Basic sanitization for display (more robust needed for complex HTML injection)
+                 // Basic sanitization for display
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
@@ -4890,20 +5887,15 @@ document.addEventListener('DOMContentLoaded', () => {
                  `;
                  suggestionsDropdown.appendChild(item);
              });
-             if (!suggestionsDropdown.classList.contains('active')) {
-                suggestionsDropdown.classList.add('active'); // Ensure dropdown visible
-             }
+             suggestionsDropdown.classList.add('active');
          } else {
               suggestionsDropdown.innerHTML = '<div class="suggestion-item text-muted"><i>No matching products found.</i></div>';
-              if (!suggestionsDropdown.classList.contains('active')) {
-                suggestionsDropdown.classList.add('active'); // Ensure dropdown visible
-             }
+              suggestionsDropdown.classList.add('active');
          }
      }
 
      // Global click listener to close search/suggestions
      document.addEventListener('click', (e) => {
-         // Close if click is outside the search container AND outside the toggle button
          if (searchContainer && suggestionsDropdown && searchToggleBtn && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
              searchContainer.classList.remove('active');
              suggestionsDropdown.classList.remove('active');
@@ -4917,8 +5909,13 @@ document.addEventListener('DOMContentLoaded', () => {
              if (!link) {
                  // Prevent closing if clicking inside the dropdown but not on a link
                  e.stopPropagation();
+             } else {
+                 // Allow link navigation and close dropdown/search
+                 suggestionsDropdown.classList.remove('active');
+                 if (searchContainer && window.innerWidth < 768) { // Only hide container on mobile
+                    searchContainer.classList.remove('active');
+                 }
              }
-             // Browser default action will navigate if 'link' is clicked
          });
      }
     // ========================================
@@ -4927,7 +5924,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Toast Notification Logic (Initial Setup)
+    // Toast Notification Logic
     // ========================================
     const toastContainer = document.querySelector('.toast-container');
     if (toastContainer) {
@@ -4935,7 +5932,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         toastElements.forEach((toastElement) => {
             const closeButton = toastElement.querySelector('.toast-close-btn');
-            const autoHideDelay = 5000; // 5 seconds
+            const autoHideDelay = 5000;
             let hideTimeoutId;
 
             const dismissToast = () => {
@@ -4943,23 +5940,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (toastElement.classList.contains('hide') || !toastElement.parentNode) return;
                 toastElement.classList.remove('show');
                 toastElement.classList.add('hide');
-                // Use transitionend event for reliable removal after animation
                 toastElement.addEventListener('transitionend', (event) => {
-                    // Check event target and property to avoid multiple removals if transitions apply to child elements
-                    if (event.target === toastElement && (event.propertyName === 'opacity' || event.propertyName === 'transform')) {
-                        if (toastElement.classList.contains('hide') && toastElement.parentNode) {
-                           try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
-                        }
+                    if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
+                         try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
                     }
                 }, { once: true });
             };
 
-            // Show toast initially with a slight delay for animation
+            // Show toast initially
             setTimeout(() => {
-                if (toastElement.parentNode) { // Check if still in DOM
+                if (toastElement.parentNode) {
                    toastElement.classList.add('show');
                 }
-            }, 10); // Short delay
+            }, 10);
 
              // Auto hide
              hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
@@ -4969,26 +5962,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeButton.addEventListener('click', dismissToast);
             }
 
-             // Pause on hover, resume on leave
+             // Pause on hover
              toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
-             toastElement.addEventListener('mouseleave', () => {
-                 clearTimeout(hideTimeoutId); // Clear any previous timeout
-                 hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2); // Resume timeout (can adjust duration)
-            });
+             toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 
         });
     }
     // ========================================
-    // End Toast Notification Logic (Initial Setup)
+    // End Toast Notification Logic
     // ========================================
 
     // --- Rating Stats Bar Animation ---
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
-        const width = el.getAttribute('data-width');
+        var width = el.getAttribute('data-width');
         if (width) {
-            // Use requestAnimationFrame for smoother animation start
             requestAnimationFrame(() => {
-                 if(el.parentNode) { // Check if element is still in DOM
+                 if(el.parentNode) {
                     el.style.width = width + '%';
                  }
             });
@@ -5004,22 +5993,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const loadingCheckoutText = proceedCheckoutBtn.dataset.loadingText || '<i class="fas fa-spinner fa-spin"></i> Loading...';
 
         proceedCheckoutBtn.addEventListener('click', function(event) {
-            // Prevent multiple clicks while loading
             if (proceedCheckoutBtn.classList.contains('loading')) {
                 event.preventDefault();
                 return;
             }
-            // Add loading state
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
-            proceedCheckoutBtn.style.pointerEvents = 'none'; // Disable clicks via CSS
-            proceedCheckoutBtn.setAttribute('aria-disabled', 'true'); // Accessibility
+            proceedCheckoutBtn.style.pointerEvents = 'none';
+            proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
         });
 
-        // Handle browser back button potentially showing stale loading state
         window.addEventListener('pageshow', function(pageEvent) {
             if (pageEvent.persisted && proceedCheckoutBtn.classList.contains('loading')) {
-                // Restore button if the page was loaded from bfcache and button is still loading
                 proceedCheckoutBtn.classList.remove('loading');
                 proceedCheckoutBtn.innerHTML = originalCheckoutText;
                 proceedCheckoutBtn.style.pointerEvents = 'auto';
@@ -5044,18 +6029,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let currentSlideIndex = 0;
         let autoSlideInterval = null;
-        const slideIntervalTime = 5000; // 5 seconds
+        const slideIntervalTime = 5000;
 
-        // Touch/Swipe variables
         let isDragging = false;
         let startX = 0;
         let currentX = 0;
         let diffX = 0;
-        const swipeThreshold = 50; // Min pixels to swipe to change slide
+        const swipeThreshold = 50;
 
         function showSlide(index) {
             if (!slides || slides.length === 0) return;
-            // Ensure index wraps around correctly
             const newIndex = (index % slides.length + slides.length) % slides.length;
             slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
             dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
@@ -5066,67 +6049,39 @@ document.addEventListener('DOMContentLoaded', () => {
         function prevSlide() { showSlide(currentSlideIndex - 1); }
 
         function startAutoSlide() {
-            // Clear existing interval before starting a new one
             clearInterval(autoSlideInterval);
-            // Only start auto-slide if there's more than one slide
             if (slides.length > 1) {
                 autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
             }
         }
 
-        // Touch event handlers
         function handleTouchStart(event) {
-            if (slides.length <= 1) return; // Don't swipe if only one slide
+            if (slides.length <= 1) return;
             isDragging = true;
-            // Use pageX for touch coordinates
             startX = event.touches[0].pageX;
             currentX = startX;
             diffX = 0;
-            // Pause auto-slide on touch start
             clearInterval(autoSlideInterval);
-            // Optional: Add a class for visual feedback during drag
-            // sliderContainer.classList.add('is-dragging');
         }
 
         function handleTouchMove(event) {
             if (!isDragging || slides.length <= 1) return;
             currentX = event.touches[0].pageX;
             diffX = startX - currentX;
-            // Prevent default scrolling ONLY if swipe is significant horizontally
-            if (Math.abs(diffX) > 10) {
-                // event.preventDefault(); // Be careful with this, might prevent vertical scroll
-            }
-            // Optional: Could add slide translation effect here for visual feedback during drag
+            if (Math.abs(diffX) > 10) { event.preventDefault(); }
         }
 
         function handleTouchEnd() {
             if (!isDragging || slides.length <= 1) return;
             isDragging = false;
-            // sliderContainer.classList.remove('is-dragging');
-
-            // Check if swipe distance meets the threshold
             if (Math.abs(diffX) > swipeThreshold) {
-                if (diffX > 0) { nextSlide(); } // Swiped left (Next)
-                else { prevSlide(); } // Swiped right (Prev)
+                if (diffX > 0) { nextSlide(); } else { prevSlide(); }
             }
-            // Reset touch variables
             startX = 0; currentX = 0; diffX = 0;
-            // Restart auto-slide after touch interaction ends
             startAutoSlide();
         }
 
-        // Initialize slider
-        if (slides.length > 0) {
-             showSlide(0);
-             startAutoSlide();
-        } else {
-            // Hide controls if no slides
-             if (prevBtn) prevBtn.style.display = 'none';
-             if (nextBtn) nextBtn.style.display = 'none';
-             if (dotsContainer) dotsContainer.style.display = 'none';
-        }
-
-        // Add event listeners for controls
+        if (slides.length > 0) { showSlide(0); startAutoSlide(); }
         if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
         if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
         if (dotsContainer) {
@@ -5139,14 +6094,10 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
-        // Add touch listeners (use passive: true for start/end for performance if not preventing default scroll)
         sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
-        // Use passive: false for move ONLY if you intend to preventDefault scrolling
-        sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: true }); // Usually better for performance
+        sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
         sliderContainer.addEventListener('touchend', handleTouchEnd);
-        sliderContainer.addEventListener('touchcancel', handleTouchEnd); // Handle cancelled touches
-
-        // Pause on hover (for desktop)
+        sliderContainer.addEventListener('touchcancel', handleTouchEnd);
         sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
         sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
     }
@@ -5168,60 +6119,80 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Get Locality Select Element and status element
+        // Get Locality Select Element
         const localitySelect = document.getElementById(`${targetPrefix}-locality`);
-        const pincodeStatusElement = input.nextElementSibling?.classList.contains('pincode-status') ? input.nextElementSibling : null; // Safer check
-
         if (!localitySelect) {
             console.warn(`Locality select not found for prefix ${targetPrefix}`);
-            return; // Skip this input if locality select is missing
+            return;
         }
 
         input.addEventListener('input', () => {
             clearTimeout(pincodeTimeout);
             const pincode = input.value.trim();
+            const statusElement = input.nextElementSibling;
 
-            // Basic validation and clearing/resetting fields
-            clearAutoFilledFields(targetPrefix); // Always clear derived fields on input change
-            if (pincodeStatusElement) { // Reset status on input
-                pincodeStatusElement.textContent = '';
-                pincodeStatusElement.className = 'pincode-status text-muted';
+            // Basic validation and clearing
+            if (pincode.length < 6) {
+                clearAutoFilledFields(targetPrefix); // Clears locality too
+                if (statusElement) {
+                    statusElement.textContent = '';
+                    statusElement.className = 'pincode-status text-muted'; // Reset class
+                }
+                if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
+                    if (statusElement) {
+                        statusElement.textContent = 'Digits only';
+                        statusElement.className = 'pincode-status text-danger';
+                    }
+                }
+                return;
             }
 
-            if (pincode.length === 0) {
-                 return; // Do nothing more if empty
-            }
-
-            if (!/^\d*$/.test(pincode)) { // Check for non-digits
-                 if (pincodeStatusElement) {
-                    pincodeStatusElement.textContent = 'Digits only';
-                    pincodeStatusElement.className = 'pincode-status text-danger';
-                 }
-                 return;
-            }
-
-            if (pincode.length === 6) { // Only trigger lookup when exactly 6 digits
-                if (pincodeStatusElement) {
-                    pincodeStatusElement.textContent = 'Looking up...';
-                    pincodeStatusElement.className = 'pincode-status text-muted';
+            if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+                if (statusElement) {
+                    statusElement.textContent = 'Looking up...';
+                    statusElement.className = 'pincode-status text-muted';
                 }
                 localitySelect.disabled = true;
                 localitySelect.innerHTML = '<option value="" selected disabled>Looking up Pincode...</option>';
 
                 pincodeTimeout = setTimeout(() => {
-                    fetchPincodeData(pincode, targetPrefix, null); // Pass null for savedLocalityValue on input trigger
-                }, 500); // Debounce API call
-            } else if (pincode.length > 6) {
-                 if (pincodeStatusElement) {
-                     pincodeStatusElement.textContent = 'Max 6 digits';
-                     pincodeStatusElement.className = 'pincode-status text-danger';
-                 }
+                    // Pass null for savedLocalityValue when triggered by input event
+                    fetchPincodeData(pincode, targetPrefix, null);
+                }, 500);
+            } else if (pincode.length === 6) {
+                clearAutoFilledFields(targetPrefix);
+                if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode (digits only)';
+                    statusElement.className = 'pincode-status text-danger';
+                }
             }
-            // No status message needed if < 6 digits and valid
         });
 
-        // Optional: Re-validate or fetch on blur if needed, but input event is usually sufficient
-        // input.addEventListener('blur', () => { ... });
+        input.addEventListener('blur', () => {
+            clearTimeout(pincodeTimeout);
+            const pincode = input.value.trim();
+            const targetPrefix = input.dataset.targetPrefix;
+            const statusElement = input.nextElementSibling;
+            const localitySelect = document.getElementById(`${targetPrefix}-locality`);
+
+            if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
+                if (statusElement && !statusElement.classList.contains('text-success') && statusElement.textContent !== 'Fetching...') {
+                     statusElement.textContent = 'Looking up...';
+                     statusElement.className = 'pincode-status text-muted';
+                     // Pass null for savedLocalityValue on blur fetch
+                     fetchPincodeData(pincode, targetPrefix, null);
+                }
+            } else if (pincode.length > 0) {
+                 clearAutoFilledFields(targetPrefix);
+                 if (statusElement) {
+                    statusElement.textContent = 'Invalid Pincode';
+                    statusElement.className = 'pincode-status text-danger';
+                 }
+            } else {
+                  clearAutoFilledFields(targetPrefix);
+                  if (statusElement) statusElement.textContent = '';
+            }
+        });
 
         // Initial check on page load for pre-filled pincodes
         const initialPincode = input.value.trim();
@@ -5229,16 +6200,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const savedLocality = localitySelect.dataset.savedValue || null;
 
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
-            if (pincodeStatusElement) {
-                pincodeStatusElement.textContent = 'Verifying...';
-                 pincodeStatusElement.className = 'pincode-status text-muted';
+            const initialStatusElement = input.nextElementSibling;
+            if (initialStatusElement) {
+                initialStatusElement.textContent = 'Verifying...';
+                 initialStatusElement.className = 'pincode-status text-muted';
             }
             localitySelect.disabled = true;
             localitySelect.innerHTML = '<option value="" selected disabled>Verifying Pincode...</option>';
-            // Fetch data on load for pre-filled valid pincode
             fetchPincodeData(initialPincode, targetPrefix, savedLocality); // Pass saved locality
         } else {
-             // Ensure dropdown is disabled if pincode is initially invalid/empty
              localitySelect.disabled = true;
              localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
         }
@@ -5246,7 +6216,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }); // end pincodeInputs.forEach
 
     async function fetchPincodeData(pincode, prefix, savedLocalityValue = null) {
-        // Find all related elements using the prefix
         const stateInput = document.getElementById(`${prefix}-state`);
         const districtInput = document.getElementById(`${prefix}-district`);
         const mandalInput = document.getElementById(`${prefix}-mandal`);
@@ -5255,18 +6224,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
         const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
         const pincodeInput = document.getElementById(`${prefix}-pincode`);
-        const pincodeStatusElement = pincodeInput?.nextElementSibling?.classList.contains('pincode-status') ? pincodeInput.nextElementSibling : null;
+        const pincodeStatusElement = pincodeInput?.nextElementSibling;
         const localitySelect = document.getElementById(`${prefix}-locality`);
 
-        // Basic check if all necessary elements exist
         if (!stateInput || !districtInput || !mandalInput || !containerDiv || !pincodeStatusElement || !localitySelect || !stateHiddenInput || !districtHiddenInput || !mandalHiddenInput) {
             console.error("Pincode related elements not found for prefix:", prefix);
-            if (pincodeStatusElement) { pincodeStatusElement.textContent = 'Page Setup Error'; pincodeStatusElement.className = 'pincode-status text-danger'; }
-            if (localitySelect) { localitySelect.innerHTML = '<option value="" selected disabled>Page Setup Error</option>'; localitySelect.disabled = true; }
+            if (pincodeStatusElement) { pincodeStatusElement.textContent = 'Setup Error'; pincodeStatusElement.className = 'pincode-status text-danger'; }
+            if (localitySelect) { localitySelect.innerHTML = '<option value="" selected disabled>Setup Error</option>'; localitySelect.disabled = true; }
             return;
         }
 
-        // Update status only if not already success (prevents flicker on load)
         if (!pincodeStatusElement.classList.contains('text-success')) {
             pincodeStatusElement.textContent = 'Fetching...';
             pincodeStatusElement.className = 'pincode-status text-muted';
@@ -5281,28 +6248,24 @@ document.addEventListener('DOMContentLoaded', () => {
              }
 
             const location = data.location;
-
-            // Update visible readonly fields
             stateInput.value = location.stateName || '';
             districtInput.value = location.districtName || '';
             mandalInput.value = location.mandalName || '';
-
-             // Update hidden fields for form submission
             stateHiddenInput.value = location.stateName || '';
             districtHiddenInput.value = location.districtName || '';
             mandalHiddenInput.value = location.mandalName || '';
 
-            // Populate Locality Dropdown using the helper
+            // Populate Locality Dropdown
             populateLocalityDropdown(localitySelect, location.localities, savedLocalityValue);
 
-            containerDiv.style.display = 'block'; // Show the container
+            containerDiv.style.display = 'block';
             const firstLocality = location.localities && location.localities.length > 0 ? location.localities[0] : 'Area';
-            pincodeStatusElement.textContent = `✓ Location Found`; // Simpler success message
+            pincodeStatusElement.textContent = `✓ Location found (${firstLocality})`;
             pincodeStatusElement.className = 'pincode-status text-success';
 
         } catch (error) {
              console.error('Pincode lookup error:', error);
-             clearAutoFilledFields(prefix); // Clear derived fields on error
+             clearAutoFilledFields(prefix);
              pincodeStatusElement.textContent = `Error: ${error.message}`;
              pincodeStatusElement.className = 'pincode-status text-danger';
              localitySelect.innerHTML = '<option value="" selected disabled>Pincode Error</option>';
@@ -5312,38 +6275,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function populateLocalityDropdown(selectElement, localities, valueToSelect = null) {
         if (!selectElement) return;
-        selectElement.innerHTML = ''; // Clear existing options
+        selectElement.innerHTML = ''; // Clear existing
 
         if (localities && localities.length > 0) {
-            // Add the default "Select..." option
             const defaultOption = document.createElement('option');
             defaultOption.value = "";
             defaultOption.textContent = "Select Locality / Post Office...";
             defaultOption.disabled = true;
-            // Select default option initially only if no specific value needs selecting
-            defaultOption.selected = !valueToSelect;
+            defaultOption.selected = !valueToSelect; // Select if no value needs pre-selection
             selectElement.appendChild(defaultOption);
 
             let valueMatched = false;
             localities.forEach(locality => {
                 const option = document.createElement('option');
-                option.value = locality; // Use locality name as value
-                option.textContent = locality; // Display locality name
+                option.value = locality;
+                option.textContent = locality;
                 if (valueToSelect && locality === valueToSelect) {
-                    option.selected = true; // Pre-select if value matches
+                    option.selected = true;
                     valueMatched = true;
                 }
                 selectElement.appendChild(option);
             });
-
-            // If a specific value was provided and matched, unselect the default option
              if (valueMatched) {
                  defaultOption.selected = false;
              }
 
-            selectElement.disabled = false; // Enable the dropdown
+            selectElement.disabled = false;
         } else {
-            // Handle case where API returns success but no localities
             selectElement.innerHTML = '<option value="" selected disabled>No Localities Found</option>';
             selectElement.disabled = true;
         }
@@ -5365,82 +6323,110 @@ document.addEventListener('DOMContentLoaded', () => {
         if (stateHiddenInput) stateHiddenInput.value = '';
         if (districtHiddenInput) districtHiddenInput.value = '';
         if (mandalHiddenInput) mandalHiddenInput.value = '';
-        if (containerDiv) containerDiv.style.display = 'none'; // Hide the container
+        if (containerDiv) containerDiv.style.display = 'none';
 
-        // Reset the locality dropdown
         if (localitySelect) {
             localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
             localitySelect.disabled = true;
-            localitySelect.value = ''; // Ensure value is cleared
+            localitySelect.value = '';
             localitySelect.dataset.savedValue = ''; // Clear saved value tracker
         }
-        // Pincode status is usually cleared by the input event handler itself
+         // Pincode status cleared by input event handler
     }
     // ========================================
     // End Pincode Lookup Logic
     // ========================================
 
+
     // ========================================
-    // Generic Live Table Filtering Logic
+    // Live Order Filtering Logic
     // ========================================
-    /**
-     * Sets up live filtering for a table based on text input.
-     * @param {string} inputId ID of the filter input element.
-     * @param {string} tableId ID of the table element.
-     * @param {string} noResultsId ID of the 'no results' <tr> element.
-     * @param {string} rowSelectorClass CSS class used to identify data rows in the tbody.
-     */
-    function setupGenericTableFilter(inputId, tableId, noResultsId, rowSelectorClass) {
-        const filterInput = document.getElementById(inputId);
-        const table = document.getElementById(tableId);
-        const noResultsRow = document.getElementById(noResultsId);
+    const orderFilterInput = document.getElementById('order-filter-input');
+    const adminOrderTable = document.getElementById('admin-order-table');
+    const sellerOrderTable = document.getElementById('seller-order-table');
 
-        if (!filterInput || !table || !noResultsRow) {
-            // console.warn(`Filter setup skipped for ${inputId}. Missing elements.`); // Optional warning
-            return; // Exit if any required element is missing
-        }
+    let targetOrderTableBody = null;
+    let noOrderResultsRow = null;
 
-        const tableBody = table.querySelector('tbody');
-        if (!tableBody) {
-            // console.warn(`Filter setup skipped for ${tableId}. Missing tbody.`); // Optional warning
-            return; // Exit if table structure is unexpected
-        }
+    if (adminOrderTable) {
+        targetOrderTableBody = adminOrderTable.querySelector('tbody');
+        noOrderResultsRow = document.getElementById('no-admin-orders-found');
+    } else if (sellerOrderTable) {
+        targetOrderTableBody = sellerOrderTable.querySelector('tbody');
+        noOrderResultsRow = document.getElementById('no-seller-orders-found');
+    }
 
-        filterInput.addEventListener('input', () => {
-            const filterValue = filterInput.value.trim().toLowerCase();
-            const rows = tableBody.querySelectorAll(`tr.${rowSelectorClass}`); // Select only data rows
+    if (orderFilterInput && targetOrderTableBody && noOrderResultsRow) {
+        orderFilterInput.addEventListener('input', () => {
+            const filterValue = orderFilterInput.value.trim().toLowerCase();
+            const rows = targetOrderTableBody.querySelectorAll('tr.order-row');
             let matchFound = false;
 
             rows.forEach(row => {
                 const rowText = row.textContent.toLowerCase();
                 if (filterValue === '' || rowText.includes(filterValue)) {
-                    row.style.display = ''; // Show row (reverts to default display)
+                    row.style.display = '';
                     matchFound = true;
                 } else {
-                    row.style.display = 'none'; // Hide row
+                    row.style.display = 'none';
                 }
             });
 
-            // Toggle the 'no results' row visibility
-            if (!matchFound && rows.length > 0) { // Only show 'no results' if there were rows to filter
-                noResultsRow.classList.remove('hidden');
-                noResultsRow.style.display = ''; // Use default display (usually table-row)
+            if (!matchFound && rows.length > 0) {
+                noOrderResultsRow.classList.remove('hidden');
+                noOrderResultsRow.style.display = '';
             } else {
-                noResultsRow.classList.add('hidden');
-                noResultsRow.style.display = 'none'; // Hide 'no results' row
+                noOrderResultsRow.classList.add('hidden');
+                noOrderResultsRow.style.display = 'none';
             }
         });
     }
+    // ========================================
+    // End Live Order Filtering Logic
+    // ========================================
 
-    // --- Call the setup function for ALL tables that need filtering ---
-    setupGenericTableFilter('order-filter-input', 'admin-order-table', 'no-admin-orders-found', 'order-row');
-    setupGenericTableFilter('order-filter-input', 'seller-order-table', 'no-seller-orders-found', 'order-row'); // Assumes same input ID pattern
-    setupGenericTableFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found', 'product-row');
-    setupGenericTableFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found', 'product-row');
-    setupGenericTableFilter('user-filter-input', 'admin-user-table', 'no-admin-users-found', 'user-row'); // User filter
 
     // ========================================
-    // End Live Table Filtering Logic
+    // Live Product Filtering Logic
+    // ========================================
+    function setupProductFilter(inputId, tableId, noResultsId) {
+        const filterInput = document.getElementById(inputId);
+        const productTable = document.getElementById(tableId);
+        const noResultsRow = document.getElementById(noResultsId);
+
+        if (filterInput && productTable && noResultsRow) {
+            const tableBody = productTable.querySelector('tbody');
+            if (!tableBody) return;
+
+            filterInput.addEventListener('input', () => {
+                const filterValue = filterInput.value.trim().toLowerCase();
+                const rows = tableBody.querySelectorAll('tr.product-row');
+                let matchFound = false;
+
+                rows.forEach(row => {
+                    const rowText = row.textContent.toLowerCase();
+                    if (filterValue === '' || rowText.includes(filterValue)) {
+                        row.style.display = '';
+                        matchFound = true;
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+
+                if (!matchFound && rows.length > 0) {
+                    noResultsRow.classList.remove('hidden');
+                    noResultsRow.style.display = '';
+                } else {
+                    noResultsRow.classList.add('hidden');
+                    noResultsRow.style.display = 'none';
+                }
+            });
+        }
+    }
+    setupProductFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found');
+    setupProductFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found');
+    // ========================================
+    // End Live Product Filtering Logic
     // ========================================
 
 
@@ -5452,11 +6438,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const slides = imageSlider.querySelectorAll('[data-product-slide]');
         const prevBtn = imageSlider.querySelector('[data-product-image-nav="prev"]');
         const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
-        const dotsContainer = imageSlider.querySelector('.product-image-dots'); // Container for dots
-        const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-product-image-dot]') : []; // Select dots within container
+        const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
         let currentImageIndex = 0;
 
-        // Touch variables
         let isProductDragging = false;
         let productStartX = 0;
         let productCurrentX = 0;
@@ -5464,7 +6448,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const productSwipeThreshold = 50;
 
         function showProductImage(index) {
-            if (!slides || slides.length < 1) return; // Allow for single slide case now
+            if (!slides || slides.length < 2) return;
             const newIndex = (index % slides.length + slides.length) % slides.length;
             slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
             dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
@@ -5483,23 +6467,19 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!isProductDragging || slides.length <= 1) return;
             productCurrentX = event.touches[0].pageX;
             productDiffX = productStartX - productCurrentX;
-             // Prevent vertical scroll only if horizontal swipe is significant
-            if (Math.abs(productDiffX) > 10) {
-                // event.preventDefault(); // Can interfere with page scroll, use with caution
-            }
+            if (Math.abs(productDiffX) > 10) { event.preventDefault(); }
         }
 
         function handleProductTouchEnd() {
             if (!isProductDragging || slides.length <= 1) return;
             isProductDragging = false;
             if (Math.abs(productDiffX) > productSwipeThreshold) {
-                if (productDiffX > 0) { showProductImage(currentImageIndex + 1); } // Swipe Left -> Next
-                else { showProductImage(currentImageIndex - 1); } // Swipe Right -> Prev
+                if (productDiffX > 0) { showProductImage(currentImageIndex + 1); }
+                else { showProductImage(currentImageIndex - 1); }
             }
             productStartX = 0; productCurrentX = 0; productDiffX = 0;
         }
 
-        // Initialize slider and controls based on slide count
         if (slides.length > 1) {
             if (nextBtn) { nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1)); }
             if (prevBtn) { prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1)); }
@@ -5509,25 +6489,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!isNaN(index)) { showProductImage(index); }
                 });
             });
-            // Add touch listeners only if multiple slides
             imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true });
-            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: true }); // Usually better for performance
+            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: false });
             imageSlider.addEventListener('touchend', handleProductTouchEnd);
             imageSlider.addEventListener('touchcancel', handleProductTouchEnd);
-            // Show controls
-            if (nextBtn) nextBtn.style.display = 'flex'; // Use flex if that's the display type
-            if (prevBtn) prevBtn.style.display = 'flex';
-            if (dotsContainer) dotsContainer.style.display = 'flex';
         } else {
-            // Hide controls if only one slide
             if (nextBtn) nextBtn.style.display = 'none';
             if (prevBtn) prevBtn.style.display = 'none';
+            const dotsContainer = imageSlider.querySelector('.product-image-dots');
             if (dotsContainer) dotsContainer.style.display = 'none';
         }
 
-        // Show the first slide initially (even if it's the only one)
         if (slides.length > 0) { showProductImage(0); }
-
     }
     // ========================================
     // End Product Image Slider Logic
@@ -5537,20 +6510,13 @@ document.addEventListener('DOMContentLoaded', () => {
 }); // End DOMContentLoaded
 
 
-// ===================================================
-// Helper Functions (Defined outside DOMContentLoaded)
-// ===================================================
+// --- Helper Functions (Outside DOMContentLoaded) ---
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     // Use the button's text or a default
-     const originalButtonText = quantityInputElement?.dataset.originalButtonText || 'Update';
+     const originalButtonText = 'Add';
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
-
-     if (!quantityInputElement?.dataset.originalButtonText) {
-         quantityInputElement.dataset.originalButtonText = buttonElement.textContent.trim() || 'Update';
-     }
 
      buttonElement.disabled = true;
      buttonElement.innerHTML = loadingButtonText;
@@ -5559,73 +6525,65 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
     try {
         const response = await fetch('/user/cart/update', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json' // Indicate expected response type
-            },
+            headers: { 'Content-Type': 'application/json', },
             body: JSON.stringify({ productId, quantity })
          });
 
-        const data = await response.json(); // Assume server always sends JSON
+        const data = await response.json();
 
         if (!response.ok) {
-             // Handle specific case where item becomes unavailable during update
-             if (data.removal === true && cartItemDiv) {
+             if (data.removal === true) {
                  showToast(data.message || 'Item unavailable and removed.', 'warning');
-                 // Animate removal
-                 cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
-                 cartItemDiv.style.opacity = '0';
-                 cartItemDiv.style.height = '0';
-                 cartItemDiv.style.marginTop = '0';
-                 cartItemDiv.style.marginBottom = '0';
-                 cartItemDiv.style.paddingTop = '0';
-                 cartItemDiv.style.paddingBottom = '0';
-                 cartItemDiv.style.borderWidth = '0';
-                 setTimeout(() => {
-                     if (cartItemDiv.parentNode) cartItemDiv.remove();
-                     updateCartTotalAndBadge(data.cartTotal); // Update total from response
-                     handleEmptyCartDisplay(); // Check if cart is now empty
-                 }, 300); // Match transition duration
-                 return; // Exit function after initiating removal
+                 if (cartItemDiv) {
+                    cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
+                    cartItemDiv.style.opacity = '0';
+                    cartItemDiv.style.height = '0';
+                    cartItemDiv.style.paddingTop = '0';
+                    cartItemDiv.style.paddingBottom = '0';
+                    cartItemDiv.style.marginBottom = '0';
+                    cartItemDiv.style.borderWidth = '0';
+                     setTimeout(() => {
+                         if (cartItemDiv.parentNode) cartItemDiv.remove();
+                         updateCartTotalAndBadge(data.cartTotal);
+                         handleEmptyCartDisplay();
+                     }, 300);
+                     return; // Exit after starting removal animation
+                 }
              } else {
-                 // General error handling
                  throw new Error(data.message || `Update failed (Status: ${response.status})`);
              }
         }
 
-         // --- Handle successful update ---
          if (data.success) {
-             if(quantityInputElement) {
-                 quantityInputElement.dataset.originalValue = data.newQuantity; // Update original value tracker
-             }
+             if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity;
 
-             if (quantity === 0 && cartItemDiv) { // Handle removal via quantity 0
-                 // Animate removal (same as above)
-                 cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
-                 cartItemDiv.style.opacity = '0';
-                 cartItemDiv.style.height = '0';
-                 cartItemDiv.style.marginTop = '0';
-                 cartItemDiv.style.marginBottom = '0';
-                 cartItemDiv.style.paddingTop = '0';
-                 cartItemDiv.style.paddingBottom = '0';
-                 cartItemDiv.style.borderWidth = '0';
-                 setTimeout(() => {
-                     if (cartItemDiv.parentNode) cartItemDiv.remove();
-                     updateCartTotalAndBadge(data.cartTotal);
-                     handleEmptyCartDisplay();
-                     showToast('Item removed from cart.', 'success');
-                 }, 300);
-                 return; // Exit after starting removal animation
-             } else if (cartItemDiv) {
+             if (quantity === 0) {
+                if (cartItemDiv) {
+                    cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
+                    cartItemDiv.style.opacity = '0';
+                    cartItemDiv.style.height = '0';
+                    cartItemDiv.style.paddingTop = '0';
+                    cartItemDiv.style.paddingBottom = '0';
+                    cartItemDiv.style.marginBottom = '0';
+                    cartItemDiv.style.borderWidth = '0';
+                    setTimeout(() => {
+                        if (cartItemDiv.parentNode) {
+                           cartItemDiv.remove();
+                        }
+                        updateCartTotalAndBadge(data.cartTotal);
+                        handleEmptyCartDisplay();
+                        showToast('Item removed from cart.', 'success');
+                    }, 300);
+                     return; // Exit after starting removal animation
+                }
+             } else {
                  // Update UI for non-zero quantity
-                 const subtotalSpan = cartItemDiv.querySelector('.item-subtotal-value');
+                 const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
                  if(quantityInputElement) quantityInputElement.value = data.newQuantity;
-                 updateCartTotalAndBadge(data.cartTotal); // Update total from response
-                 // showToast('Cart quantity updated.', 'success'); // Optional success message
+                 updateCartTotalAndBadge(data.cartTotal);
              }
          } else {
-              // Handle cases where data.success might be false but response was 200 OK (less common)
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
               if(quantityInputElement && quantityInputElement.dataset.originalValue) {
                   quantityInputElement.value = quantityInputElement.dataset.originalValue;
@@ -5635,16 +6593,14 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
     } catch (error) {
          console.error('Error updating cart quantity:', error);
           showToast(`Error: ${error.message}`, 'danger');
-          // Restore input value on error
           if(quantityInputElement && quantityInputElement.dataset.originalValue) {
             quantityInputElement.value = quantityInputElement.dataset.originalValue;
           }
 
     } finally {
-         // Re-enable button only if the item wasn't removed
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = quantityInputElement?.dataset.originalButtonText || 'Update'; // Restore original text
+             buttonElement.innerHTML = originalButtonText;
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }
@@ -5655,17 +6611,16 @@ function showToast(message, type = 'info') {
     const toastContainer = document.querySelector('.toast-container');
     if (!toastContainer) {
         console.error("Toast container not found! Falling back to alert.");
-        alert(`${type.toUpperCase()}: ${message}`); // Fallback alert
+        alert(message);
         return;
     }
 
     const toastElement = document.createElement('div');
-    toastElement.className = `toast toast-${type}`; // e.g., toast-success, toast-danger
+    toastElement.className = `toast toast-${type}`;
     toastElement.setAttribute('role', 'alert');
     toastElement.setAttribute('aria-live', 'assertive');
     toastElement.setAttribute('aria-atomic', 'true');
 
-    // Basic sanitization to prevent HTML injection from the message
     const sanitizedMessage = typeof message === 'string'
         ? message.replace(/</g, "<").replace(/>/g, ">")
         : 'An unexpected error occurred.';
@@ -5680,7 +6635,7 @@ function showToast(message, type = 'info') {
     const closeButton = toastElement.querySelector('.toast-close-btn');
     toastContainer.appendChild(toastElement);
 
-    const autoHideDelay = 5000; // 5 seconds
+    const autoHideDelay = 5000;
     let hideTimeoutId;
 
     const dismissToast = () => {
@@ -5689,66 +6644,47 @@ function showToast(message, type = 'info') {
         toastElement.classList.remove('show');
         toastElement.classList.add('hide');
         toastElement.addEventListener('transitionend', (event) => {
-             // Ensure removal only happens once and for the correct transition
-            if (event.target === toastElement && (event.propertyName === 'opacity' || event.propertyName === 'transform')) {
-                if (toastElement.classList.contains('hide') && toastElement.parentNode) {
-                   try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
-                }
+            if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
+                try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
             }
         }, { once: true });
     };
 
-    // Trigger the show animation shortly after appending
     setTimeout(() => {
-        if (toastElement.parentNode) { // Check if still in DOM
+        if (toastElement.parentNode) {
            toastElement.classList.add('show');
         }
-    }, 10); // Short delay
+    }, 10);
 
-    // Set auto-hide timer
     hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
-
-    // Add close button functionality
     if (closeButton) { closeButton.addEventListener('click', dismissToast); }
-
-    // Pause timer on hover, resume on leave
     toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
-    toastElement.addEventListener('mouseleave', () => {
-        clearTimeout(hideTimeoutId); // Clear existing timeout
-        hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2); // Resume with potentially shorter delay
-    });
+    toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 }
 
 
 // --- Helper Functions for Cart Badge and Empty Display ---
 function updateCartTotalAndBadge(newCartTotal) {
      const cartTotalSpan = document.getElementById('cart-total-value');
-     // Update Cart Total Display if element exists
-     if (cartTotalSpan) {
-         cartTotalSpan.textContent = (newCartTotal !== undefined && typeof newCartTotal === 'number' ? newCartTotal : 0).toFixed(2);
-     }
+     if (cartTotalSpan) cartTotalSpan.textContent = (newCartTotal !== undefined ? newCartTotal : 0).toFixed(2);
 
      const newCartItemCount = calculateNewCartCount();
      const cartBadge = document.querySelector('.cart-badge');
-     // Update Header Cart Badge
      if (cartBadge) {
          if (newCartItemCount > 0) {
              cartBadge.textContent = newCartItemCount;
              cartBadge.classList.remove('hide');
          } else {
-            cartBadge.textContent = '0'; // Keep badge structure but hide content visually or via class
+            cartBadge.textContent = '0';
             cartBadge.classList.add('hide');
          }
      }
 }
 
 function calculateNewCartCount() {
-    // Calculate count based on *visible* cart items in the DOM
-    // This is simpler than trying to sync perfectly with server/session state
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
-        // Check if the item is currently displayed and not marked for removal (e.g., opacity 0)
         const style = window.getComputedStyle(item);
         if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
             count++;
@@ -5759,42 +6695,35 @@ function calculateNewCartCount() {
 
 function handleEmptyCartDisplay() {
     const cartItemsContainer = document.querySelector('.cart-items');
-    const cartContainer = document.querySelector('.cart-container');
-    const cartSummary = document.querySelector('.cart-summary');
+     const cartContainer = document.querySelector('.cart-container');
+     const cartSummary = document.querySelector('.cart-summary');
 
-    // Check if the main containers exist
-    if (cartItemsContainer && cartContainer) {
-        // Check if there are any visible items left
-        const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
-            const style = window.getComputedStyle(item);
-            return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
-        });
+     if (cartItemsContainer && cartContainer) {
+         const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
+             const style = window.getComputedStyle(item);
+             return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
+         });
 
-        if (visibleItems.length === 0) {
-            // Only add the "empty" message if it's not already there
-            if (!cartContainer.querySelector('.alert-info')) {
-                // Clear the items container specifically
-                cartItemsContainer.innerHTML = '';
-                // Remove the summary section if it exists
-                if (cartSummary) cartSummary.remove();
-
-                // Create and insert the "empty cart" message
-                const emptyCartHTML = `
+         if (visibleItems.length === 0) {
+             if (!cartContainer.querySelector('.alert-info')) {
+                 cartItemsContainer.innerHTML = '';
+                 if(cartSummary) cartSummary.remove();
+                 const emptyCartHTML = `
+                    <h1>Your Shopping Cart</h1>
                     <p class="alert alert-info mt-3">
                         Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
                     </p>`;
-                 // Insert after the H1 title
-                 const h1 = cartContainer.querySelector('h1');
-                 if (h1) {
-                     h1.insertAdjacentHTML('afterend', emptyCartHTML);
-                 } else {
-                     // Fallback if H1 isn't found (less likely)
-                     cartContainer.insertAdjacentHTML('beforeend', emptyCartHTML);
-                 }
-            }
-        }
-    }
+                  const h1 = cartContainer.querySelector('h1');
+                  if (h1) {
+                      h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
+                  } else {
+                      cartContainer.innerHTML = emptyCartHTML;
+                  }
+             }
+         }
+     }
 }
+
 
 routes/adminRoutes.js:
 // routes/adminRoutes.js
