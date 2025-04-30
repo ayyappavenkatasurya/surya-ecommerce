@@ -8860,11 +8860,11 @@ views/products/detail.ejs:
                            <button type="submit"
                                    id="btn-buy-now-<%= product._id %>" <%# *** ADDED ID *** %>
                                    form="buy-now-form-<%= product._id %>"
-                                   class="btn btn-success btn-sm btn-action">
+                                   class="btn btn-success btn-sm btn-action"><i class="fas fa-bolt"></i> <%# **** ICON ADDED HERE **** %>
                                    Buy Now
                            </button>
                         <% } else {%>
-                          <button class="btn btn-success btn-sm btn-action" disabled>Buy Now</button>
+                          <button class="btn btn-success btn-sm btn-action" disabled><i class="fas fa-bolt"></i> Buy Now</button> <%# **** ICON ADDED HERE (DISABLED) **** %>
                         <% } %>
 
                    </div>
@@ -8873,7 +8873,7 @@ views/products/detail.ejs:
                 <%# Unavailable state buttons %>
                 <div class="product-actions mt-3">
                      <div class="d-flex flex-wrap align-items-center gap-2">
-                         <button class="btn btn-primary btn-sm btn-action" disabled><i class="fas fa-cart-plus"></i> Add to Cart</button>
+                         <button class="btn btn-primary btn-sm btn-action" disabled><i class="fas fa-cart-plus"></i> Add to Cart</button> <%# Keep existing icon here %>
                          <button class="btn btn-success btn-sm btn-action" disabled>Buy Now</button>
                      </div>
                      <p class="text-muted small mt-2">This product is currently under review or unavailable.</p>
@@ -9019,39 +9019,80 @@ document.addEventListener('DOMContentLoaded', () => {
         const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
         let currentImageIndex = 0;
 
+        let isProductDragging = false; // Renamed drag state variable
+        let productStartX = 0;       // Renamed touch start X
+        let productCurrentX = 0;     // Renamed touch current X
+        let productDiffX = 0;        // Renamed touch difference X
+        const productSwipeThreshold = 50;
+
         function showProductImage(index) {
             if (!slides || slides.length < 2) return; // Ensure slider elements exist and there's > 1 slide
-
-            // Calculate the new index correctly handling negative numbers
             const newIndex = (index % slides.length + slides.length) % slides.length;
-
-            // Update active classes for slides and dots
-            slides.forEach((slide, i) => {
-                slide.classList.toggle('active', i === newIndex);
-            });
-            dots.forEach((dot, i) => {
-                dot.classList.toggle('active', i === newIndex);
-            });
-
+            slides.forEach((slide, i) => { slide.classList.toggle('active', i === newIndex); });
+            dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
             currentImageIndex = newIndex;
         }
 
-        // Add event listeners if buttons/dots exist
-        if (nextBtn) {
-            nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
-        }
-        if (prevBtn) {
-            prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
+        // --- Touch Event Handling ---
+        function handleProductTouchStart(event) {
+             if (slides.length <= 1) return;
+             isProductDragging = true;
+             // Use pageX for touch events
+             productStartX = event.touches[0].pageX;
+             productCurrentX = productStartX;
+             productDiffX = 0;
+             // Prevent default only if dragging starts significantly
         }
 
-        dots.forEach(dot => {
-            dot.addEventListener('click', () => {
-                const index = parseInt(dot.dataset.productImageDot, 10);
-                if (!isNaN(index)) {
-                    showProductImage(index);
-                }
+        function handleProductTouchMove(event) {
+             if (!isProductDragging || slides.length <= 1) return;
+             productCurrentX = event.touches[0].pageX;
+             productDiffX = productStartX - productCurrentX;
+              // Prevent scrolling the page vertically if a horizontal swipe is detected
+             if (Math.abs(productDiffX) > 10) {
+                 event.preventDefault();
+             }
+        }
+
+        function handleProductTouchEnd() {
+             if (!isProductDragging || slides.length <= 1) return;
+             isProductDragging = false;
+             if (Math.abs(productDiffX) > productSwipeThreshold) {
+                 if (productDiffX > 0) { // Swiped left
+                     showProductImage(currentImageIndex + 1);
+                 } else { // Swiped right
+                     showProductImage(currentImageIndex - 1);
+                 }
+             }
+             // Reset values
+             productStartX = 0;
+             productCurrentX = 0;
+             productDiffX = 0;
+        }
+
+        // Add event listeners if buttons/dots exist and for touch
+        if (slides.length > 1) {
+            if (nextBtn) { nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1)); }
+            if (prevBtn) { prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1)); }
+            dots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    const index = parseInt(dot.dataset.productImageDot, 10);
+                    if (!isNaN(index)) { showProductImage(index); }
+                });
             });
-        });
+            // Add touch listeners to the slider container
+            imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true }); // Use passive where possible
+            imageSlider.addEventListener('touchmove', handleProductTouchMove, { passive: false }); // Prevent scroll during swipe
+            imageSlider.addEventListener('touchend', handleProductTouchEnd);
+            imageSlider.addEventListener('touchcancel', handleProductTouchEnd); // Handle cancellation
+        } else {
+             // Hide controls if only one image
+             if (nextBtn) nextBtn.style.display = 'none';
+             if (prevBtn) prevBtn.style.display = 'none';
+             const dotsContainer = imageSlider.querySelector('.product-image-dots');
+             if (dotsContainer) dotsContainer.style.display = 'none';
+        }
+
 
         // Initialize the slider to the first image
         if (slides.length > 0) {
@@ -9066,9 +9107,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
             var width = el.getAttribute('data-width');
             if (width) {
-                setTimeout(() => {
-                     el.style.width = width + '%';
-                }, 100); // Slight delay for effect
+                // Using requestAnimationFrame for smoother potentially paint timing
+                requestAnimationFrame(() => {
+                    // Check if element still exists in DOM before applying style
+                    if(el.parentNode) {
+                       el.style.width = width + '%';
+                    }
+                });
             }
         });
     });
