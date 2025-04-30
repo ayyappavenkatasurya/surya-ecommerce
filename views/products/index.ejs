@@ -112,13 +112,17 @@
                                 <% } %>
                             </div>
                         </a>
-                         <form action="/user/cart/add" method="POST" class="add-to-cart-form form-submit-spinner">
-                             <input type="hidden" name="productId" value="<%= product._id %>">
-                             <input type="hidden" name="quantity" value="1">
-                            <button type="submit" class="btn btn-primary btn-add-to-cart" <%= product.stock <= 0 ? 'disabled' : '' %>>
+                         <%# --- UPDATED: Changed to button for AJAX --- %>
+                         <div class="product-card-actions">
+                            <button type="button"
+                                    class="btn btn-primary btn-ajax-add-to-cart" <%# Use new class %>
+                                    data-product-id="<%= product._id %>" <%# Add product ID %>
+                                    <%= product.stock <= 0 ? 'disabled' : '' %>
+                                    title="Add <%= product.name %> to cart">
                                 <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                              </button>
-                        </form>
+                         </div>
+                          <%# --- END UPDATE --- %>
                     </div>
                 <% } %>
             <% }) %>

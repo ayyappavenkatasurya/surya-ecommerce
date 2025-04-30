@@ -7,11 +7,11 @@
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" placeholder="Enter product name" required>
         </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= product.shortDescription || '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -26,15 +26,15 @@
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" placeholder="e.g., 499.99" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" placeholder="e.g., 50" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL (Primary):</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" placeholder="https://example.com/main-image.jpg" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
@@ -46,7 +46,7 @@
                    id="imageUrl2"
                    name="imageUrl2"
                    class="form-control"
-                   placeholder="https://example.com/image_alt.jpg"
+                   placeholder="https://example.com/alternate-image.jpg"
                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
              <%# Preview for edit forms %>
              <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
@@ -56,7 +56,7 @@
         <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= product.specifications %></textarea>
         </div>
 
         <hr>
@@ -72,7 +72,7 @@
         </div>
         <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
             <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
-            <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>
+            <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control" placeholder="Explain why the product was rejected"><%= product.rejectionReason || '' %></textarea>
         </div>
 
         <button type="submit" class="btn btn-primary">Update Product (Admin)</button>

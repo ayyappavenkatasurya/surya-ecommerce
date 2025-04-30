@@ -4,7 +4,6 @@
     <h1>Verify OTP</h1>
     <p>An OTP has been sent to <strong><%= email %></strong>. Please enter it below.</p>
 
-    <%# --- Spinner Class Added & Input Attributes Updated --- %>
     <form action="/auth/verify-otp" method="POST" class="auth-form form-submit-spinner">
          <input type="hidden" name="email" value="<%= email %>">
         <div class="form-group">
@@ -13,11 +12,12 @@
                    id="otp"
                    name="otp"
                    required
-                   pattern="\d{6}" 
-                   maxlength="6"  
+                   pattern="\d{6}"
+                   maxlength="6"
                    inputmode="numeric"
-                   autocomplete="one-time-code" 
-                   title="Enter the 6-digit OTP code received" placeholder="Enter OTP">
+                   autocomplete="one-time-code"
+                   title="Enter the 6-digit OTP code received"
+                   placeholder="Enter 6-digit OTP"> <%# Added Placeholder %>
         </div>
         <button type="submit" class="btn btn-primary">Verify OTP</button>
     </form>
@@ -27,6 +27,31 @@
              <input type="hidden" name="email" value="<%= email %>">
              <button type="submit" class="btn btn-secondary btn-sm">Resend OTP</button>
          </form>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
+```
+
+**`views/auth/forgot-password.ejs` (Added Placeholder)**
+
+```ejs
+<%- include('../partials/header', { title: 'Forgot Password' }) %>
+
+<div class="auth-container">
+    <h1>Forgot Password</h1>
+    <p>Enter your email address below. If an account exists, we'll send an OTP to verify your request.</p>
+
+    <form action="/auth/forgot-password" method="POST" class="auth-form">
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <%# Added Placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your registered email" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Reset OTP</button>
+    </form>
+    <div class="auth-links">
+        <p><a href="/auth/login">Back to Login</a></p>
     </div>
 </div>
 

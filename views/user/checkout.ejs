@@ -39,26 +39,29 @@
 
                  <div class="form-group">
                      <label for="checkout-name-addr" class="form-label small">Full Name:</label>
-                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" required autocomplete="name">
+                     <%# Added Placeholder %>
+                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" placeholder="Enter full name" required autocomplete="name">
                  </div>
                  <div class="form-group">
                      <label for="checkout-phone" class="form-label small">Phone Number:</label>
-                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                     <%# Added Placeholder %>
+                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" placeholder="10-digit mobile number" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
                  </div>
                  <div class="form-group">
                     <label for="checkout-pincode" class="form-label small">Pincode:</label>
+                    <%# Added Placeholder %>
                     <input type="text"
                            id="checkout-pincode"
                            name="pincode"
                            class="form-control pincode-input"
                            data-target-prefix="checkout"
                            value="<%= addressFormData?.pincode || userAddress?.pincode || '' %>"
-                           required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                           placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric"
                            title="Enter 6-digit Pincode" autocomplete="postal-code">
                     <small class="pincode-status text-muted"></small>
                 </div>
 
-                <%# --- NEW: Locality Dropdown --- %>
+                <%# --- Locality Dropdown --- %>
                 <div class="form-group">
                     <label for="checkout-locality" class="form-label small">Locality / Post Office:</label>
                     <select id="checkout-locality"
@@ -98,10 +101,12 @@
 
                 <div class="form-group">
                     <label for="checkout-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                    <%# Added Placeholder %>
                     <input type="text" id="checkout-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || userAddress?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
                 </div>
                  <div class="form-group">
                     <label for="checkout-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                    <%# Added Placeholder %>
                     <input type="text" id="checkout-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || userAddress?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
                  </div>
                 <button type="submit" class="btn btn-primary me-2">Save Address</button>

@@ -50,7 +50,7 @@ const UserSchema = new mongoose.Schema({
     password: {
         type: String,
         required: [true, 'Please provide a password'],
-        minlength: 6,
+        minlength: [8, 'Password must be at least 8 characters long'], // <-- INCREASED MIN LENGTH VALIDATION
         select: false, // Keep password hidden by default
     },
     role: {
@@ -75,7 +75,12 @@ const UserSchema = new mongoose.Schema({
 
 // Hash password before saving
 UserSchema.pre('save', async function(next) {
+    // Only hash the password if it has been modified (or is new)
     if (!this.isModified('password')) return next();
+
+    // Password complexity validation should happen *before* this hook.
+    // This hook only handles the hashing.
+
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -87,11 +92,14 @@ UserSchema.pre('save', async function(next) {
 
 // Method to compare entered password with hashed password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+    // If password field wasn't selected during query, fetch it explicitly
     if (!this.password) {
+        // Need to re-fetch the user document including the password field
         const userWithPassword = await mongoose.model('User').findById(this._id).select('+password').exec();
-        if (!userWithPassword) return false;
+        if (!userWithPassword || !userWithPassword.password) return false; // User not found or no password set
         return await bcrypt.compare(enteredPassword, userWithPassword.password);
     }
+    // If password field was already selected
     return await bcrypt.compare(enteredPassword, this.password);
 };
 

@@ -707,8 +707,19 @@ const { sendEmail } = require('../config/mailer');
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
+// --- Password Complexity Regex ---
+const uppercaseRegex = /[A-Z]/;
+const lowercaseRegex = /[a-z]/;
+const numberRegex = /[0-9]/;
+// Define allowed special characters (escape regex special chars like - \ [ ] /)
+const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/;
+const minPasswordLength = 8; // INCREASED MINIMUM LENGTH
 
-// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. (No changes needed) ---
+// Generic Password Format Error Message
+const passwordFormatErrorMsg = "password doesn't match requested format";
+
+
+// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. ---
 exports.getLoginPage = (req, res) => {
     if (req.session.user) {
          return res.redirect('/'); // Redirect if already logged in
@@ -720,7 +731,12 @@ exports.getRegisterPage = (req, res) => {
     if (req.session.user) {
         return res.redirect('/'); // Redirect if already logged in
    }
-    res.render('auth/register', { title: 'Register' });
+   // Pass back potential form data from failed validation
+    res.render('auth/register', {
+        title: 'Register',
+        name: req.flash('form_name')[0] || '', // Get flashed data if exists
+        email: req.flash('form_email')[0] || ''
+    });
 };
 
 exports.getVerifyOtpPage = (req, res) => {
@@ -763,7 +779,7 @@ exports.getResetPasswordPage = async (req, res, next) => {
     }
 };
 
-// --- registerUser, verifyOtp, resendOtp, loginUser (No changes needed) ---
+// --- UPDATED registerUser ---
 exports.registerUser = async (req, res, next) => {
      if (req.session.user) {
         return res.redirect('/');
@@ -773,12 +789,39 @@ exports.registerUser = async (req, res, next) => {
     let errors = [];
     if (!name || !email || !password || !confirmPassword) { errors.push('Please fill in all fields.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
-    if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { errors.push('Please enter a valid email address.'); }
+
+    // --- MODIFIED Password Complexity Validation ---
+    let passwordComplexityFailed = false; // Flag to track if any complexity rule failed
+    if (password) {
+        if (
+            password.length < minPasswordLength ||
+            !uppercaseRegex.test(password) ||
+            !lowercaseRegex.test(password) ||
+            !numberRegex.test(password) ||
+            !specialCharRegex.test(password)
+        ) {
+            passwordComplexityFailed = true; // Set flag if any rule fails
+        }
+    } else {
+        // If password field itself is empty, it's caught by the initial check above
+    }
+
+    // Add the generic error message ONCE if any complexity rule failed
+    if (passwordComplexityFailed) {
+        // Check if the generic message is already added to avoid duplicates
+        if (!errors.includes(passwordFormatErrorMsg)) {
+             errors.push(passwordFormatErrorMsg);
+        }
+    }
+    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        return res.render('auth/register', { title: 'Register', name: name, email: email, error_msg: req.flash('error_msg') });
+        // Flash form data to repopulate
+        req.flash('form_name', name);
+        req.flash('form_email', email);
+        return res.redirect('/auth/register'); // Redirect back to GET route
     }
 
     try {
@@ -794,19 +837,22 @@ exports.registerUser = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
 
         if (user && !user.isVerified) {
+            // Update existing unverified user
             user.name = name;
-            if (password) { user.password = password; }
+            if (password) { user.password = password; } // Hashing happens in pre-save
             user.otp = otp;
             user.otpExpires = otpExpires;
             user.isVerified = false;
-            await user.save({ validateBeforeSave: false });
+            await user.save({ validateBeforeSave: true }); // Let Mongoose run its validators too
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
+            // Create new user
             user = new User({ name, email: lowerCaseEmail, password, otp, otpExpires, isVerified: false });
             await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
+        // Send OTP Email (keep existing logic)
         const subject = 'Verify Your Email Address';
         const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
         const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
@@ -826,18 +872,36 @@ exports.registerUser = async (req, res, next) => {
             res.redirect('/auth/register');
         }
     } catch (error) {
-        if (error.code === 11000) {
+        if (error.code === 11000) { // Duplicate email
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-            return res.render('auth/register', { title: 'Register', name: name, email: email });
+             req.flash('form_name', name); // Flash values back
+             req.flash('form_email', email);
+            return res.redirect('/auth/register');
         }
         if (error.name === 'ValidationError') {
+           // Mongoose validation errors
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', validationErrors.join(' '));
-            return res.render('auth/register', { title: 'Register', name: name, email: email });
+            // If Mongoose minlength error exists, ensure our generic format message is shown instead or alongside
+            if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
+                 if (!errors.includes(passwordFormatErrorMsg)) {
+                    errors.push(passwordFormatErrorMsg);
+                 }
+                 // Filter out the specific mongoose length error if we added the generic one
+                 validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
+            }
+            // Combine remaining Mongoose errors with our custom ones
+            const finalErrors = [...new Set([...errors, ...validationErrors])]; // Use Set to avoid duplicates
+            req.flash('error_msg', finalErrors.join(' '));
+            req.flash('form_name', name);
+            req.flash('form_email', email);
+            return res.redirect('/auth/register');
        }
-        next(error);
+        // Catch other errors
+        console.error("Registration Error:", error);
+        next(error); // Pass to global error handler
     }
 };
+
 
 exports.verifyOtp = async (req, res, next) => {
     const { email, otp } = req.body;
@@ -872,12 +936,12 @@ exports.verifyOtp = async (req, res, next) => {
          user.otpExpires = undefined;
 
          if (isPasswordReset) {
-             await user.save({ validateBeforeSave: false });
+             await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for reset
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
          else {
-            await user.save({ validateBeforeSave: false });
+            await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for registration
              req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
@@ -931,7 +995,7 @@ exports.resendOtp = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
         user.otp = otp;
         user.otpExpires = otpExpires;
-        await user.save({ validateBeforeSave: false });
+        await user.save({ validateBeforeSave: false }); // Skip validation for OTP resend
 
         let subject, text, html;
         if (isForReset) {
@@ -968,6 +1032,7 @@ exports.loginUser = async (req, res, next) => {
     }
     try {
         const lowerCaseEmail = email.toLowerCase();
+        // Select password explicitly for comparison
         const user = await User.findOne({ email: lowerCaseEmail }).select('+password').populate('cart.productId', 'name price imageUrl');
 
         if (!user) {
@@ -978,23 +1043,28 @@ exports.loginUser = async (req, res, next) => {
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
+        // Match password using the instance method
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
+         // Regenerate session upon successful login
          req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
+            // Set user data in the new session
             req.session.user = {
                 _id: user._id, name: user.name, email: user.email, role: user.role,
                 address: user.address ? user.address.toObject() : undefined,
+                // Ensure cart items are properly mapped for session storage
                 cart: user.cart ? user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
              };
+             // Save the session before redirecting
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -1003,7 +1073,7 @@ exports.loginUser = async (req, res, next) => {
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo;
+                 delete req.session.returnTo; // Clear the returnTo path
                  res.redirect(returnTo);
             });
         });
@@ -1012,21 +1082,43 @@ exports.loginUser = async (req, res, next) => {
     }
 };
 
-// --- UPDATED logoutUser ---
+// --- REFINED logoutUser ---
 exports.logoutUser = (req, res, next) => {
+    const sessionUserEmail = req.session?.user?.email || 'User'; // Safely get email before potential destruction
+
+    // 1. Set the flash message BEFORE destroying the session
     req.flash('success_msg', 'You have been logged out successfully.');
-    req.session.destroy(err => {
-        if (err) {
-            console.error('Session destruction error:', err);
-             return res.redirect('/auth/login');
-        }
-        res.clearCookie(req.app.get('session cookie name') || 'connect.sid');
-        res.redirect('/auth/login');
-    });
+
+    // 2. Clear the user data from the current session object
+    if (req.session) {
+        req.session.user = null;
+    }
+
+    // 3. Clear the session cookie on the client side
+    const cookieName = req.app.get('session cookie name') || 'connect.sid';
+    res.clearCookie(cookieName);
+    console.log(`${sessionUserEmail} - Cleared session cookie: ${cookieName}`);
+
+    // 4. Initiate the session destruction in the store (asynchronously)
+    // Log any errors but don't wait for it to complete before redirecting
+    if (req.session) {
+        req.session.destroy(err => {
+            if (err) {
+                console.error(`${sessionUserEmail} - Session destruction error (may be ignorable):`, err);
+            } else {
+                console.log(`${sessionUserEmail} - Session destroyed successfully in store.`);
+            }
+            // **DO NOT redirect inside this callback**
+        });
+    } else {
+        console.log(`${sessionUserEmail} - No active session found to destroy.`);
+    }
+
+    // 5. Redirect the user immediately after clearing the cookie and initiating destruction
+    return res.redirect('/auth/login');
 };
 
 
-// --- forgotPassword, resetPassword (No changes needed) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -1037,34 +1129,42 @@ exports.forgotPassword = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage);
+        req.flash('info_msg', genericMessage); // Use info_msg for neutral feedback
 
+        // Send generic message even if user not found or not verified for security
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
             return res.redirect('/auth/forgot-password');
         }
 
+         // Generate OTP and Reset Token
          const otp = generateOTP();
          const resetToken = crypto.randomBytes(20).toString('hex');
-        const otpExpires = setOTPExpiration(10);
-        const resetExpires = setOTPExpiration(60);
+        const otpExpires = setOTPExpiration(10); // OTP expiry (short)
+        const resetExpires = setOTPExpiration(60); // Token expiry (longer)
 
+        // Update user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false });
+        await user.save({ validateBeforeSave: false }); // Skip validation for setting tokens/OTP
 
+        // Send Email
         const subject = 'Password Reset Request - Verify OTP';
         const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
         const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
          const emailSent = await sendEmail(user.email, subject, text, html);
 
+        // Redirect user to OTP verification page
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
+             // Redirect to verify OTP page, indicating it's for reset
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
+            // Handle email failure (keep generic message flashed)
             console.error(`Failed to send password reset OTP email to ${user.email}`);
+            // Don't reveal email failure to user, redirect back
             res.redirect('/auth/forgot-password');
         }
     } catch (error) {
@@ -1074,6 +1174,7 @@ exports.forgotPassword = async (req, res, next) => {
     }
 };
 
+// --- UPDATED resetPassword ---
 exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
@@ -1081,38 +1182,74 @@ exports.resetPassword = async (req, res, next) => {
     let errors = [];
     if (!password || !confirmPassword) { errors.push('Please enter and confirm your new password.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
-     if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
+
+    // --- MODIFIED Password Complexity Validation ---
+    let passwordComplexityFailed = false; // Flag
+    if (password) {
+        if (
+            password.length < minPasswordLength ||
+            !uppercaseRegex.test(password) ||
+            !lowercaseRegex.test(password) ||
+            !numberRegex.test(password) ||
+            !specialCharRegex.test(password)
+        ) {
+            passwordComplexityFailed = true; // Set flag
+        }
+    }
+
+    // Add the generic error message ONCE if needed
+    if (passwordComplexityFailed) {
+         if (!errors.includes(passwordFormatErrorMsg)) {
+            errors.push(passwordFormatErrorMsg);
+         }
+    }
+    // --- END MODIFIED Password Complexity Validation ---
+
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         return res.redirect(`/auth/reset-password/${token}`);
+         return res.redirect(`/auth/reset-password/${token}`); // Redirect back to the form
     }
 
     try {
-        const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: Date.now() }, }).select('+password');
+        // Find user by valid token and expiry, select password for pre-save hook
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() },
+        }).select('+password');
+
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
             return res.redirect('/auth/forgot-password');
         }
 
+        // Assign the new password (bcrypt hashing is handled by the pre-save hook in User model)
         user.password = password;
+
+        // Clear reset and OTP fields
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true;
+        user.isVerified = true; // Ensure user is marked as verified
+
+        // Save the user (will trigger pre-save hook for hashing)
         await user.save();
 
+        // Log the user in after successful password reset
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
+              // Populate session data
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
-                  cart: user.cart ? user.cart.map(item => ({ productId: item.productId, quantity: item.quantity })) : []
+                  // Initialize cart as empty after reset login.
+                  cart: []
               };
+            // Save session before redirecting
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
@@ -1120,25 +1257,35 @@ exports.resetPassword = async (req, res, next) => {
                     return res.redirect('/auth/login');
                  }
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                res.redirect('/');
+                res.redirect('/'); // Redirect to homepage
              });
          });
     } catch (error) {
         if (error.name === 'ValidationError') {
+           // Handle Mongoose validation errors during save (e.g., if minlength check fails again)
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', validationErrors.join(' '));
+            // Similar logic to handle Mongoose length error vs our generic one
+             if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
+                 if (!errors.includes(passwordFormatErrorMsg)) {
+                    errors.push(passwordFormatErrorMsg);
+                 }
+                 validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
+            }
+            const finalErrors = [...new Set([...errors, ...validationErrors])];
+            req.flash('error_msg', finalErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        next(error);
+        // Handle other errors
+        console.error("Reset Password Error:", error);
+        next(error); // Pass to global error handler
     }
 };
 
 
-// --- Modified getHomePage ---
+// --- getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
-    // *** Get category from query ***
     const categoryFilter = req.query.category || '';
 
     let query = {
@@ -1147,15 +1294,16 @@ exports.getHomePage = async (req, res, next) => {
     };
 
     if (searchTerm) {
+         // Using MongoDB's text index for searching
          query.$text = { $search: searchTerm };
     }
-    // *** Add category to query if valid ***
     if (categoryFilter && categoryNames.includes(categoryFilter)) {
         query.category = categoryFilter;
     } else if (categoryFilter) {
         console.warn(`Invalid category filter attempted: ${categoryFilter}`);
     }
 
+     // Define projection and sort based on whether a search term is present
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
@@ -1181,9 +1329,8 @@ exports.getHomePage = async (req, res, next) => {
       title: pageTitle,
       products: products,
       searchTerm: searchTerm,
-      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null, // Pass selected category
+      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null,
       homepageBanners: validBanners,
-      // *** Pass display categories to the view ***
       displayCategories: categories
     });
   } catch (error) {
@@ -1883,7 +2030,7 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 
 // ===================================================
-// Existing functions (getUserProfilePage, updateUserName - NO CHANGES needed)
+// Existing functions (getUserProfilePage, updateUserName - NO CHANGES)
 // ===================================================
 exports.getUserProfilePage = async (req, res, next) => {
     try {
@@ -2026,7 +2173,7 @@ exports.saveAddress = async (req, res, next) => {
 };
 
 // ===================================================
-// Existing Cart/Checkout functions (NO CHANGES needed)
+// Cart/Checkout functions
 // ===================================================
 exports.getCart = async (req, res, next) => {
     try {
@@ -2091,6 +2238,7 @@ exports.getCart = async (req, res, next) => {
       }
 };
 
+// Handles 'Add to Cart' from forms (e.g., Product Detail Page)
 exports.addToCart = async (req, res, next) => {
     const { productId, quantity = 1 } = req.body;
     const userId = req.session.user._id;
@@ -2133,12 +2281,14 @@ exports.addToCart = async (req, res, next) => {
            const newQuantity = existingQuantity + numQuantity;
             if (product.stock < newQuantity) {
                req.flash('error_msg', `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total (you have ${existingQuantity} in cart).`);
+                // Redirect back to product page if adding too many from detail page
                 return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
            }
             user.cart[existingCartItemIndex].quantity = newQuantity;
        } else {
            if (product.stock < numQuantity) {
                req.flash('error_msg', `Insufficient stock for ${product.name}. Only ${product.stock} available.`);
+               // Redirect back to product page if adding too many from detail page
                 return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
            }
            user.cart.push({ productId, quantity: numQuantity });
@@ -2151,10 +2301,16 @@ exports.addToCart = async (req, res, next) => {
 
         req.flash('success_msg', `${product.name} added to cart!`);
 
-        if(req.query.redirectTo === 'checkout') {
+       // --- MODIFIED REDIRECT LOGIC ---
+       if(req.query.redirectTo === 'checkout') {
+           // This is for the "Buy Now" button functionality
            return res.redirect('/user/checkout');
+       } else {
+           // For the standard "Add to Cart" button (e.g., from product detail page),
+           // redirect to the cart page.
+           return res.redirect('/user/cart'); // <<<<<<<<<<< THIS IS THE CHANGE
        }
-        res.redirect('/user/cart');
+       // --- END MODIFIED REDIRECT LOGIC ---
 
     } catch (error) {
          if (error.name === 'CastError') {
@@ -2163,6 +2319,88 @@ exports.addToCart = async (req, res, next) => {
          }
          console.error("Add to Cart Error:", error);
         next(error);
+    }
+};
+
+// Handles 'Add to Cart' from AJAX requests (e.g., Product Index Page)
+exports.addToCartAjax = async (req, res, next) => {
+    const { productId, quantity = 1 } = req.body;
+    const userId = req.session.user._id;
+    const numQuantity = parseInt(quantity, 10);
+
+    // Basic Validation
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ success: false, message: 'Invalid product ID.' });
+    }
+    if (isNaN(numQuantity) || numQuantity < 1) {
+        return res.status(400).json({ success: false, message: 'Invalid quantity.' });
+    }
+
+    try {
+        const [user, product] = await Promise.all([
+            User.findById(userId),
+            Product.findById(productId).select('name stock reviewStatus')
+        ]);
+
+        if (!user) { // Should not happen if isAuthenticated is used
+            return res.status(401).json({ success: false, message: 'User session error. Please log in again.' });
+        }
+        if (!product) {
+            return res.status(404).json({ success: false, message: 'Product not found.' });
+        }
+
+        if (product.reviewStatus !== 'approved') {
+            return res.status(400).json({ success: false, message: `Sorry, "${product.name}" is currently unavailable.` });
+        }
+
+        if (product.stock <= 0) {
+            return res.status(400).json({ success: false, message: `${product.name} is currently out of stock.` });
+        }
+
+        const existingCartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
+
+        let finalQuantityInCart = 0;
+
+        if (existingCartItemIndex > -1) {
+            const existingQuantity = user.cart[existingCartItemIndex].quantity;
+            const newQuantity = existingQuantity + numQuantity;
+            if (product.stock < newQuantity) {
+                return res.status(400).json({ success: false, message: `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total (you have ${existingQuantity} in cart).` });
+            }
+            user.cart[existingCartItemIndex].quantity = newQuantity;
+            finalQuantityInCart = newQuantity;
+        } else {
+            if (product.stock < numQuantity) {
+                return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}. Only ${product.stock} available.` });
+            }
+            user.cart.push({ productId, quantity: numQuantity });
+            finalQuantityInCart = numQuantity;
+        }
+
+        await user.save();
+
+        // Update session cart
+        req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
+        await req.session.save();
+
+        // Calculate updated cart item count for the response
+        const updatedCartItemCount = user.cart.reduce((count, item) => count + (item.quantity || 0), 0);
+
+        return res.status(200).json({
+            success: true,
+            message: `${product.name} added to cart!`,
+            cartItemCount: updatedCartItemCount // Send back the updated count
+        });
+
+    } catch (error) {
+        console.error("AJAX Add to Cart Error:", error);
+        let statusCode = 500;
+        let message = 'Error adding item to cart.';
+        if (error.name === 'CastError') {
+            statusCode = 400;
+            message = 'Invalid product ID format.';
+        }
+        return res.status(statusCode).json({ success: false, message: message });
     }
 };
 
@@ -2390,7 +2628,7 @@ exports.getCheckoutPage = async (req, res, next) => {
 };
 
 // ============================================================
-// *** UPDATED Pincode Lookup using api.postalpincode.in ***
+// Pincode Lookup
 // ============================================================
 exports.lookupPincode = async (req, res) => {
     const pincode = req.params.pincode;
@@ -2436,7 +2674,6 @@ exports.lookupPincode = async (req, res) => {
                     localities: [] // Return empty array
                 }
             });
-            // OR: return res.status(404).json({ success: false, message: 'Pincode found, but no location details available.' });
         }
 
         // --- Extract and Map Data ---
@@ -2460,7 +2697,6 @@ exports.lookupPincode = async (req, res) => {
                                 : firstPO.Division || ''),
             districtName: firstPO.District || '',
             stateName: firstPO.State || '',
-            // --- Add localities array ---
             localities: uniqueLocalities
         };
 
@@ -2486,9 +2722,6 @@ exports.lookupPincode = async (req, res) => {
         res.status(statusCode).json({ success: false, message: message });
     }
 };
-// ============================================================
-// End Updated Pincode Lookup
-// ============================================================
 
 controllers/sellerController.js:
 // controllers/sellerController.js
@@ -3493,7 +3726,7 @@ const UserSchema = new mongoose.Schema({
     password: {
         type: String,
         required: [true, 'Please provide a password'],
-        minlength: 6,
+        minlength: [8, 'Password must be at least 8 characters long'], // <-- INCREASED MIN LENGTH VALIDATION
         select: false, // Keep password hidden by default
     },
     role: {
@@ -3518,7 +3751,12 @@ const UserSchema = new mongoose.Schema({
 
 // Hash password before saving
 UserSchema.pre('save', async function(next) {
+    // Only hash the password if it has been modified (or is new)
     if (!this.isModified('password')) return next();
+
+    // Password complexity validation should happen *before* this hook.
+    // This hook only handles the hashing.
+
     try {
         const salt = await bcrypt.genSalt(10);
         this.password = await bcrypt.hash(this.password, salt);
@@ -3530,11 +3768,14 @@ UserSchema.pre('save', async function(next) {
 
 // Method to compare entered password with hashed password
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+    // If password field wasn't selected during query, fetch it explicitly
     if (!this.password) {
+        // Need to re-fetch the user document including the password field
         const userWithPassword = await mongoose.model('User').findById(this._id).select('+password').exec();
-        if (!userWithPassword) return false;
+        if (!userWithPassword || !userWithPassword.password) return false; // User not found or no password set
         return await bcrypt.compare(enteredPassword, userWithPassword.password);
     }
+    // If password field was already selected
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
@@ -3739,6 +3980,11 @@ label.form-label-inline {
     font-weight: normal;
 }
 
+/* --- ADDED: Position relative for password wrapper --- */
+.password-wrapper {
+    position: relative;
+}
+
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -3758,6 +4004,15 @@ select {
   color: var(--text-color);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
+
+/* --- ADDED: Padding-right for password input when toggle is present --- */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+    /* Adjust padding-right to make space for the icon */
+    padding-right: calc(var(--spacing-unit) * 2.5) !important;
+}
+
+
 .form-control {
     display: block;
     width: 100%;
@@ -3772,6 +4027,14 @@ select {
     appearance: none;
     border-radius: var(--border-radius);
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+/* Helper text style */
+.form-text {
+    display: block;
+    margin-top: .25rem;
+    font-size: .8em; /* Smaller font size */
+    color: var(--secondary-color); /* Muted color */
 }
 
 
@@ -3811,6 +4074,33 @@ select.form-control-sm {
   height: calc(1.8125rem + 2px);
 }
 
+/* --- ADDED: Password Toggle Icon Button --- */
+.password-toggle-btn {
+    position: absolute;
+    right: 10px; /* Adjust as needed */
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--secondary-color); /* Icon color */
+    font-size: 1rem; /* Adjust icon size */
+    line-height: 1;
+    z-index: 10; /* Ensure it's clickable */
+}
+.password-toggle-btn:hover,
+.password-toggle-btn:focus {
+    color: var(--primary-color);
+    outline: none;
+}
+.password-toggle-btn i {
+    display: block; /* Helps with vertical alignment if needed */
+    width: 1em; /* Ensure consistent width for icon change */
+    text-align: center;
+}
+
+
 /* Buttons */
 .btn {
   display: inline-block;
@@ -3826,7 +4116,7 @@ select.form-control-sm {
   font-size: 1rem;
   line-height: 1.5;
   border-radius: var(--border-radius);
-  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, opacity 0.15s ease-in-out; /* Added opacity transition */
   text-transform: capitalize;
 }
 
@@ -3851,6 +4141,19 @@ select.form-control-sm {
     opacity: 0.75;
     cursor: wait;
     pointer-events: none;
+}
+
+/* --- ADDED: AJAX Add to Cart Button States --- */
+.btn-ajax-add-to-cart.loading {
+    opacity: 0.7;
+    cursor: wait;
+    pointer-events: none;
+}
+.btn-ajax-add-to-cart.success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+    color: white;
+    pointer-events: none; /* Optionally disable clicks while showing success */
 }
 
 
@@ -4388,13 +4691,22 @@ select.form-control-sm {
 .product-rating .fa-star, .product-rating .fa-star-half-alt { color: #f8d347; }
 .product-rating .fa-star-regular { color: #e4e5e9; }
 
-.add-to-cart-form { padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6); }
-.btn-add-to-cart {
+/* --- UPDATED: Add to Cart Form (AJAX) Container --- */
+.product-card-actions {
+    padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
+}
+/* --- UPDATED: Styling for AJAX Add Button --- */
+.btn-ajax-add-to-cart {
   width: 100%;
   padding: calc(var(--spacing-unit) * 0.5);
   font-size: 0.9rem;
 }
-.btn-add-to-cart i { margin-right: calc(var(--spacing-unit) * 0.25); }
+.btn-ajax-add-to-cart i {
+    margin-right: calc(var(--spacing-unit) * 0.25);
+    /* Ensure spinner aligns well */
+    vertical-align: middle;
+}
+
 
 /* Product Detail */
 .product-detail-container {
@@ -5078,7 +5390,7 @@ select.form-control-sm {
 }
 
 /* ============================ */
-/* **** NEW: Pincode Lookup Styles **** */
+/* **** Pincode Lookup Styles **** */
 /* ============================ */
 
 /* Style for the container holding auto-filled fields */
@@ -5188,8 +5500,7 @@ select.form-control-sm {
   .product-name { height: auto; white-space: normal; display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
   .product-detail-main { flex-direction: row; align-items: flex-start; }
   .product-detail-info { flex: 1 1 60%; }
-  /* .product-detail-image { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } */ /* Moved to image section */
-  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } /* Apply flex to the section */
+  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; }
   .product-actions { flex-direction: row; align-items: center; }
   .product-actions .btn { width: auto; }
   .quantity-selector { max-width: 120px; margin-bottom: 0; }
@@ -5344,7 +5655,10 @@ select.form-control-sm {
 
 /* Style for the "no results" row */
 #no-admin-orders-found td,
-#no-seller-orders-found td {
+#no-seller-orders-found td,
+#no-admin-products-found td,
+#no-seller-products-found td,
+#no-admin-users-found td {
     text-align: center;
     padding: var(--spacing-unit);
     color: var(--secondary-color);
@@ -5491,27 +5805,6 @@ tr.hidden {
 
 /* --- End Product Image Slider Styles --- */
 
-/* Add this rule or adjust existing margins */
-.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
-  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
-}
-
-/* Style for the "no results" row */
-#no-admin-orders-found td,
-#no-seller-orders-found td,
-#no-admin-products-found td,  /* <<< ADDED for admin products */
-#no-seller-products-found td { /* <<< ADDED for seller products */
-    text-align: center;
-    padding: var(--spacing-unit);
-    color: var(--secondary-color);
-    font-style: italic;
-}
-
-/* Ensure hidden rows are truly hidden */
-tr.hidden {
-    display: none !important;
-}
-
 public/js/main.js:
 // public/js/main.js
 console.log("Main JS loaded.");
@@ -5531,7 +5824,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const originalText = submitButton.innerHTML;
                 submitButton.dataset.originalText = originalText; // Store original HTML
                 submitButton.disabled = true;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working...';
 
                 // Reset button if user navigates back without form submitting (browser specific)
                 window.addEventListener('pageshow', function(pageEvent) { // Renamed event variable
@@ -6387,35 +6680,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Live Product Filtering Logic
+    // Live Product/User Filtering Logic (Refactored)
     // ========================================
-    function setupProductFilter(inputId, tableId, noResultsId) {
+    function setupLiveFilter(inputId, tableId, noResultsId, rowSelector) {
         const filterInput = document.getElementById(inputId);
-        const productTable = document.getElementById(tableId);
+        const table = document.getElementById(tableId);
         const noResultsRow = document.getElementById(noResultsId);
 
-        if (filterInput && productTable && noResultsRow) {
-            const tableBody = productTable.querySelector('tbody');
+        if (filterInput && table && noResultsRow) {
+            const tableBody = table.querySelector('tbody');
             if (!tableBody) return;
 
             filterInput.addEventListener('input', () => {
                 const filterValue = filterInput.value.trim().toLowerCase();
-                const rows = tableBody.querySelectorAll('tr.product-row');
+                const rows = tableBody.querySelectorAll(rowSelector); // Use the specific row selector
                 let matchFound = false;
 
                 rows.forEach(row => {
                     const rowText = row.textContent.toLowerCase();
                     if (filterValue === '' || rowText.includes(filterValue)) {
-                        row.style.display = '';
+                        row.style.display = ''; // Use default display (usually 'table-row')
                         matchFound = true;
                     } else {
                         row.style.display = 'none';
                     }
                 });
 
+                // Toggle visibility of the "no results" row
                 if (!matchFound && rows.length > 0) {
                     noResultsRow.classList.remove('hidden');
-                    noResultsRow.style.display = '';
+                    noResultsRow.style.display = ''; // Use default display
                 } else {
                     noResultsRow.classList.add('hidden');
                     noResultsRow.style.display = 'none';
@@ -6423,10 +6717,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-    setupProductFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found');
-    setupProductFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found');
+    // Apply the filter to different tables
+    setupLiveFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found', 'tr.product-row');
+    setupLiveFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found', 'tr.product-row');
+    setupLiveFilter('user-filter-input', 'admin-user-table', 'no-admin-users-found', 'tr.user-row');
     // ========================================
-    // End Live Product Filtering Logic
+    // End Live Filtering Logic
     // ========================================
 
 
@@ -6506,6 +6802,98 @@ document.addEventListener('DOMContentLoaded', () => {
     // End Product Image Slider Logic
     // ========================================
 
+    // ========================================
+    // --- ADDED: Password Visibility Toggle ---
+    // ========================================
+    document.querySelectorAll('.password-toggle-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const passwordInput = button.previousElementSibling; // Assumes input is directly before button
+            if (passwordInput && (passwordInput.type === 'password' || passwordInput.type === 'text')) {
+                // Toggle input type
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+
+                // Toggle icon
+                const icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-eye', !isPassword);
+                    icon.classList.toggle('fa-eye-slash', isPassword);
+                }
+            }
+        });
+    });
+    // ========================================
+    // --- End: Password Visibility Toggle ---
+    // ========================================
+
+
+    // ========================================
+    // --- ADDED: AJAX Add to Cart (Index Page) ---
+    // ========================================
+    document.querySelectorAll('.btn-ajax-add-to-cart').forEach(button => {
+        const originalHtml = button.innerHTML; // Store original button content
+        const loadingHtml = '<i class="fas fa-spinner fa-spin"></i>';
+        const successHtml = '<i class="fas fa-check"></i> Added';
+
+        button.addEventListener('click', async () => {
+            const productId = button.dataset.productId;
+            if (!productId) {
+                console.error('Product ID not found on button');
+                showToast('Could not add item (missing ID).', 'danger');
+                return;
+            }
+            const quantity = 1; // Always add 1 from index page
+
+            // Set loading state
+            button.disabled = true;
+            button.classList.add('loading');
+            button.innerHTML = loadingHtml;
+
+            try {
+                const response = await fetch('/user/cart/add-ajax', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ productId, quantity })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || `Failed to add item (${response.status})`);
+                }
+
+                // Success State
+                showToast(data.message || 'Item added to cart!', 'success');
+                updateCartBadge(data.cartItemCount);
+
+                // Temporary success indication on button
+                button.classList.remove('loading');
+                button.classList.add('success');
+                button.innerHTML = successHtml;
+
+                // Revert button after a delay
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.classList.remove('success');
+                    button.innerHTML = originalHtml;
+                }, 1500); // Revert after 1.5 seconds
+
+            } catch (error) {
+                console.error("AJAX Add to Cart error:", error);
+                showToast(error.message || 'Could not add item to cart.', 'danger');
+                // Revert button immediately on error
+                button.disabled = false;
+                button.classList.remove('loading');
+                button.innerHTML = originalHtml;
+            }
+        });
+    });
+    // ========================================
+    // --- End: AJAX Add to Cart (Index Page) ---
+    // ========================================
+
 
 }); // End DOMContentLoaded
 
@@ -6514,7 +6902,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Add';
+     const originalButtonText = 'Add'; // Consider changing this if needed
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -6544,7 +6932,9 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                     cartItemDiv.style.borderWidth = '0';
                      setTimeout(() => {
                          if (cartItemDiv.parentNode) cartItemDiv.remove();
-                         updateCartTotalAndBadge(data.cartTotal);
+                         // --- UPDATED: Call updateCartBadge only ---
+                         updateCartBadgeOnly();
+                         // --- END UPDATE ---
                          handleEmptyCartDisplay();
                      }, 300);
                      return; // Exit after starting removal animation
@@ -6570,7 +6960,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                         if (cartItemDiv.parentNode) {
                            cartItemDiv.remove();
                         }
-                        updateCartTotalAndBadge(data.cartTotal);
+                        updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
                         handleEmptyCartDisplay();
                         showToast('Item removed from cart.', 'success');
                     }, 300);
@@ -6581,7 +6971,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
                  if(quantityInputElement) quantityInputElement.value = data.newQuantity;
-                 updateCartTotalAndBadge(data.cartTotal);
+                 updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
              }
          } else {
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
@@ -6664,30 +7054,54 @@ function showToast(message, type = 'info') {
 
 
 // --- Helper Functions for Cart Badge and Empty Display ---
+
+// Updates BOTH cart total display (on cart page) and header badge
 function updateCartTotalAndBadge(newCartTotal) {
      const cartTotalSpan = document.getElementById('cart-total-value');
      if (cartTotalSpan) cartTotalSpan.textContent = (newCartTotal !== undefined ? newCartTotal : 0).toFixed(2);
 
-     const newCartItemCount = calculateNewCartCount();
-     const cartBadge = document.querySelector('.cart-badge');
-     if (cartBadge) {
-         if (newCartItemCount > 0) {
-             cartBadge.textContent = newCartItemCount;
-             cartBadge.classList.remove('hide');
-         } else {
-            cartBadge.textContent = '0';
-            cartBadge.classList.add('hide');
-         }
-     }
+     // --- UPDATED: Call the badge-specific update function ---
+     updateCartBadgeOnly();
 }
 
+// --- ADDED: Function to ONLY update the header cart badge ---
+// (Used by AJAX add-to-cart and can be called directly if needed)
+function updateCartBadge(newCount) {
+    const cartBadge = document.querySelector('.cart-badge');
+    if (cartBadge) {
+        if (newCount > 0) {
+            cartBadge.textContent = newCount;
+            cartBadge.classList.remove('hide');
+        } else {
+            cartBadge.textContent = '0';
+            cartBadge.classList.add('hide');
+        }
+    }
+}
+
+// --- ADDED: Helper to update badge by recalculating from cart page elements ---
+// (Used by updateCartItemQuantityAJAX after removing item)
+function updateCartBadgeOnly() {
+     const newCartItemCount = calculateNewCartCount();
+     updateCartBadge(newCartItemCount);
+}
+
+
 function calculateNewCartCount() {
+    // This calculation might be slightly off if called during the removal animation.
+    // A more robust way is to get the count from the server response (as done in addToCartAjax).
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
         const style = window.getComputedStyle(item);
+        // Check if item is visually present (not display:none and not faded out)
         if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
-            count++;
+             const qtyInput = item.querySelector('.quantity-input');
+             if (qtyInput) {
+                 count += parseInt(qtyInput.value, 10) || 0; // Sum quantities
+             } else {
+                 count++; // Fallback if quantity input isn't found (less accurate)
+             }
         }
     });
     return count;
@@ -6699,6 +7113,7 @@ function handleEmptyCartDisplay() {
      const cartSummary = document.querySelector('.cart-summary');
 
      if (cartItemsContainer && cartContainer) {
+         // Check based on actual elements remaining, not just the count from calculation
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
              return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
@@ -6706,7 +7121,7 @@ function handleEmptyCartDisplay() {
 
          if (visibleItems.length === 0) {
              if (!cartContainer.querySelector('.alert-info')) {
-                 cartItemsContainer.innerHTML = '';
+                 cartItemsContainer.innerHTML = ''; // Clear the container definitively
                  if(cartSummary) cartSummary.remove();
                  const emptyCartHTML = `
                     <h1>Your Shopping Cart</h1>
@@ -6717,6 +7132,7 @@ function handleEmptyCartDisplay() {
                   if (h1) {
                       h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
                   } else {
+                      // If h1 somehow got removed, replace container content
                       cartContainer.innerHTML = emptyCartHTML;
                   }
              }
@@ -6880,7 +7296,10 @@ router.post('/profile/update-name', userController.updateUserName);
 
 // User Cart Management
 router.get('/cart', userController.getCart);                // View cart (controller filters unapproved)
-router.post('/cart/add', userController.addToCart);         // Add to cart (controller checks approval)
+router.post('/cart/add', userController.addToCart);         // Add to cart (controller checks approval) - FOR FORMS (e.g., Product Detail)
+// --- ADDED: AJAX Add to Cart Route ---
+router.post('/cart/add-ajax', userController.addToCartAjax); // AJAX add to cart (e.g., from Product Index)
+// --- END: AJAX Add to Cart Route ---
 router.post('/cart/update', userController.updateCartQuantity); // Update quantity (controller checks approval/stock)
 router.post('/cart/remove/:productId', userController.removeFromCart); // Remove from cart
 
@@ -7227,7 +7646,6 @@ views/admin/dashboard.ejs:
  <%- include('../partials/footer') %>
 
 views/admin/manage-banners.ejs:
-<%# views/admin/manage-banners.ejs %>
 <%- include('../partials/header', { title: title }) %>
 
 <div class="admin-manage-container">
@@ -7278,11 +7696,11 @@ views/admin/edit-product.ejs:
     <form action="/admin/manage-products/update/<%= product._id %>" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" placeholder="Enter product name" required>
         </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= product.shortDescription || '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -7297,15 +7715,15 @@ views/admin/edit-product.ejs:
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" placeholder="e.g., 499.99" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" placeholder="e.g., 50" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL (Primary):</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" placeholder="https://example.com/main-image.jpg" required>
             <% if (product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border:1px solid #ccc; padding:2px;">
             <% } %>
@@ -7317,7 +7735,7 @@ views/admin/edit-product.ejs:
                    id="imageUrl2"
                    name="imageUrl2"
                    class="form-control"
-                   placeholder="https://example.com/image_alt.jpg"
+                   placeholder="https://example.com/alternate-image.jpg"
                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
              <%# Preview for edit forms %>
              <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
@@ -7327,7 +7745,7 @@ views/admin/edit-product.ejs:
         <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications:</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= product.specifications %></textarea>
         </div>
 
         <hr>
@@ -7343,7 +7761,7 @@ views/admin/edit-product.ejs:
         </div>
         <div class="form-group" id="rejectionReasonGroup" <%= product.reviewStatus !== 'rejected' ? 'style="display: none;"' : '' %>>
             <label for="rejectionReason">Rejection Reason (Required if Rejected):</label>
-            <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control"><%= product.rejectionReason || '' %></textarea>
+            <textarea id="rejectionReason" name="rejectionReason" rows="3" class="form-control" placeholder="Explain why the product was rejected"><%= product.rejectionReason || '' %></textarea>
         </div>
 
         <button type="submit" class="btn btn-primary">Update Product (Admin)</button>
@@ -7485,6 +7903,7 @@ views/admin/manage-orders.ejs:
                                             </form>
                                         <% } %>
                                         <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
+                                            <%# Added Placeholder %>
                                             <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
                                                 <i class="fas fa-check-double"></i> Confirm
@@ -7547,6 +7966,7 @@ views/admin/manage-products.ejs:
     <%# --- ADD FILTER INPUT --- %>
     <div class="form-group mb-3"> <%# Added mb-3 for spacing %>
         <label for="admin-product-filter-input" class="visually-hidden">Filter Products:</label>
+        <%# Added Placeholder %>
         <input type="text" id="admin-product-filter-input" class="form-control" placeholder="Type to filter products (Name, Category, Seller, Status...)" aria-label="Filter Products">
     </div>
     <%# --- END FILTER INPUT --- %>
@@ -7593,7 +8013,7 @@ views/admin/manage-products.ejs:
                                     <%= product.reviewStatus %>
                                 </span>
                             </td>
-                            <td data-label="Reason">
+                             <td data-label="Reason">
                                 <% if(product.reviewStatus === 'rejected' && product.rejectionReason) { %>
                                     <small class="text-danger" title="Rejection Reason"><%= product.rejectionReason %></small>
                                 <% } else { %>
@@ -7645,6 +8065,7 @@ views/admin/manage-users.ejs:
     <%# --- ADD FILTER INPUT --- %>
     <div class="form-group mb-3">
         <label for="user-filter-input" class="visually-hidden">Filter Users:</label>
+        <%# Added Placeholder %>
         <input type="text" id="user-filter-input" class="form-control" placeholder="Type to filter users (Name, Email, Role...)" aria-label="Filter Users">
     </div>
     <%# --- END FILTER INPUT --- %>
@@ -7719,11 +8140,13 @@ views/admin/upload-product.ejs:
     <form action="/admin/upload-product" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" placeholder="Enter product name" required>
         </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+             <%# Added Placeholder %>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -7738,15 +8161,17 @@ views/admin/upload-product.ejs:
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+             <%# Added Placeholder %>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" placeholder="e.g., 499.99" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+             <%# Added Placeholder %>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" placeholder="e.g., 50" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL (Primary):</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/main-image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <!-- --- UPDATED: Add Second Image URL Input --- -->
         <div class="form-group">
@@ -7755,13 +8180,14 @@ views/admin/upload-product.ejs:
                    id="imageUrl2"
                    name="imageUrl2"
                    class="form-control"
-                   placeholder="https://example.com/image_alt.jpg"
+                   placeholder="https://example.com/alternate-image.jpg"
                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
         </div>
         <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+             <%# Added Placeholder %>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>
@@ -7769,6 +8195,7 @@ views/admin/upload-product.ejs:
 </div>
 
 <%- include('../partials/footer') %>
+
 
 views/auth/forgot-password.ejs:
 <%- include('../partials/header', { title: 'Forgot Password' }) %>
@@ -7798,16 +8225,24 @@ views/auth/login.ejs:
 <div class="auth-container">
     <h1>Login</h1>
 
-    <%# --- Spinner Class Added --- %>
     <form action="/auth/login" method="POST" class="auth-form form-submit-spinner">
         <div class="form-group">
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required autocomplete="email">
+            <%# Added Placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your email" required autocomplete="email">
         </div>
+        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required autocomplete="current-password">
+            <div class="password-wrapper">
+                <%# Added Placeholder %>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
         </div>
+        <%# --- END: Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
     <div class="auth-links">
@@ -7824,24 +8259,43 @@ views/auth/register.ejs:
 <div class="auth-container">
     <h1>Register</h1>
 
-    <%# --- Spinner Class Added --- %>
     <form action="/auth/register" method="POST" class="auth-form form-submit-spinner">
          <div class="form-group">
             <label for="name">Name:</label>
-            <input type="text" id="name" name="name" required autocomplete="name">
+            <%# Retain value on error, added placeholder %>
+            <input type="text" id="name" name="name" placeholder="Enter your full name" required autocomplete="name" value="<%= typeof name !== 'undefined' ? name : '' %>">
         </div>
         <div class="form-group">
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required autocomplete="email">
+             <%# Retain value on error, added placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your email address" required autocomplete="email" value="<%= typeof email !== 'undefined' ? email : '' %>">
         </div>
+         <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" minlength="6" required autocomplete="new-password">
+            <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder, title attr, added helper text --- %>
+                <input type="password" id="password" name="password" placeholder="Create a password" minlength="8" required autocomplete="new-password" title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
+                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
+            <%# --- ADDED: Helper Text --- %>
+            <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
         </div>
+         <%# --- END: Password Wrapper & Toggle Button --- %>
+         <%# --- ADDED: Confirm Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="confirmPassword">Confirm Password:</label>
-            <input type="password" id="confirmPassword" name="confirmPassword" minlength="6" required autocomplete="new-password">
+             <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder --- %>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" minlength="8" required autocomplete="new-password">
+                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
         </div>
+        <%# --- END: Confirm Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Register</button>
     </form>
     <div class="auth-links">
@@ -7851,7 +8305,7 @@ views/auth/register.ejs:
 
 <%- include('../partials/footer') %>
 
-views/auth/reset-password.ejs:
+views/auth/reset-password.ejs :
 <%- include('../partials/header', { title: 'Reset Password' }) %>
 
 <div class="auth-container">
@@ -7859,14 +8313,32 @@ views/auth/reset-password.ejs:
     <p>Enter your new password below.</p>
 
     <form action="/auth/reset-password/<%= token %>" method="POST" class="auth-form">
+        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">New Password:</label>
-            <input type="password" id="password" name="password" minlength="6" required>
+             <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder, title, added helper text --- %>
+                <input type="password" id="password" name="password" placeholder="Enter new password" minlength="8" required title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
+                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
+             <%# --- ADDED: Helper Text --- %>
+            <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g., !@#$).</small>
         </div>
+         <%# --- END: Password Wrapper & Toggle Button --- %>
+         <%# --- ADDED: Confirm Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="confirmPassword">Confirm New Password:</label>
-            <input type="password" id="confirmPassword" name="confirmPassword" minlength="6" required>
+             <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder --- %>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password" minlength="8" required>
+                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
         </div>
+        <%# --- END: Confirm Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Reset Password</button>
     </form>
      <div class="auth-links">
@@ -7876,7 +8348,6 @@ views/auth/reset-password.ejs:
 
 <%- include('../partials/footer') %>
 
-
 views/auth/verify-otp.ejs:
 <%- include('../partials/header', { title: title || 'Verify OTP' }) %>
 
@@ -7884,20 +8355,20 @@ views/auth/verify-otp.ejs:
     <h1>Verify OTP</h1>
     <p>An OTP has been sent to <strong><%= email %></strong>. Please enter it below.</p>
 
-    <%# --- Spinner Class Added & Input Attributes Updated --- %>
     <form action="/auth/verify-otp" method="POST" class="auth-form form-submit-spinner">
          <input type="hidden" name="email" value="<%= email %>">
         <div class="form-group">
             <label for="otp">OTP Code:</label>
-            <input type="text" <%# Changed type to text for better compatibility %>
+            <input type="text"
                    id="otp"
                    name="otp"
                    required
-                   pattern="\d{6}" <%# Ensures exactly 6 digits %>
-                   maxlength="6"  <%# Limits input length %>
-                   inputmode="numeric" <%# Suggests numeric keyboard on mobile %>
-                   autocomplete="one-time-code" <%# Helps password managers/browsers %>
-                   title="Enter the 6-digit OTP code received"> <%# Clear hint %>
+                   pattern="\d{6}"
+                   maxlength="6"
+                   inputmode="numeric"
+                   autocomplete="one-time-code"
+                   title="Enter the 6-digit OTP code received"
+                   placeholder="Enter 6-digit OTP"> <%# Added Placeholder %>
         </div>
         <button type="submit" class="btn btn-primary">Verify OTP</button>
     </form>
@@ -7907,6 +8378,31 @@ views/auth/verify-otp.ejs:
              <input type="hidden" name="email" value="<%= email %>">
              <button type="submit" class="btn btn-secondary btn-sm">Resend OTP</button>
          </form>
+    </div>
+</div>
+
+<%- include('../partials/footer') %>
+```
+
+**`views/auth/forgot-password.ejs` (Added Placeholder)**
+
+```ejs
+<%- include('../partials/header', { title: 'Forgot Password' }) %>
+
+<div class="auth-container">
+    <h1>Forgot Password</h1>
+    <p>Enter your email address below. If an account exists, we'll send an OTP to verify your request.</p>
+
+    <form action="/auth/forgot-password" method="POST" class="auth-form">
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <%# Added Placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your registered email" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Send Reset OTP</button>
+    </form>
+    <div class="auth-links">
+        <p><a href="/auth/login">Back to Login</a></p>
     </div>
 </div>
 
@@ -7937,8 +8433,6 @@ views/partials/header.ejs:
   <% const currentMetaImage = typeof metaImageUrl !== 'undefined' ? metaImageUrl : '/images/default-logo.png'; %>
   <% const currentMetaUrl = typeof fullUrl !== 'undefined' ? fullUrl : ''; %>
   <% const currentMetaType = typeof metaType !== 'undefined' ? metaType : 'website'; %>
-
-  <%# --- REMOVED the problematic EJS block that tried to set res.locals --- %>
 
   <title><%= pageTitle %></title>
   <meta name="description" content="<%= currentMetaDesc %>">
@@ -7975,7 +8469,7 @@ views/partials/header.ejs:
               <input type="search"
                      id="search-input-dynamic"
                      name="search"
-                     placeholder="Search products..."
+                     placeholder="Search products..." <%# Already had placeholder %>
                      aria-label="Search Products"
                      autocomplete="off">
               <button type="submit" class="search-submit-btn-dynamic" aria-label="Submit Search">
@@ -8479,13 +8973,17 @@ views/products/index.ejs:
                                 <% } %>
                             </div>
                         </a>
-                         <form action="/user/cart/add" method="POST" class="add-to-cart-form form-submit-spinner">
-                             <input type="hidden" name="productId" value="<%= product._id %>">
-                             <input type="hidden" name="quantity" value="1">
-                            <button type="submit" class="btn btn-primary btn-add-to-cart" <%= product.stock <= 0 ? 'disabled' : '' %>>
+                         <%# --- UPDATED: Changed to button for AJAX --- %>
+                         <div class="product-card-actions">
+                            <button type="button"
+                                    class="btn btn-primary btn-ajax-add-to-cart" <%# Use new class %>
+                                    data-product-id="<%= product._id %>" <%# Add product ID %>
+                                    <%= product.stock <= 0 ? 'disabled' : '' %>
+                                    title="Add <%= product.name %> to cart">
                                 <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                              </button>
-                        </form>
+                         </div>
+                          <%# --- END UPDATE --- %>
                     </div>
                 <% } %>
             <% }) %>
@@ -8555,11 +9053,13 @@ views/seller/edit-product.ejs:
 
         <div class="form-group">
              <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" required>
+             <%# Added Placeholder %>
+            <input type="text" id="name" name="name" class="form-control" value="<%= product.name %>" placeholder="Enter product name" required>
          </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= product.shortDescription || '' %></textarea>
+            <%# Added Placeholder %>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= product.shortDescription || '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -8574,15 +9074,18 @@ views/seller/edit-product.ejs:
         </div>
          <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" required>
+            <%# Added Placeholder %>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= product.price %>" placeholder="e.g., 499.99" required>
          </div>
         <div class="form-group">
              <label for="stock">Stock Quantity:</label>
-             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" required>
+             <%# Added Placeholder %>
+             <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= product.stock %>" placeholder="e.g., 50" required>
         </div>
          <div class="form-group">
              <label for="imageUrl">Image URL (Primary):</label>
-             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" required>
+             <%# Added Placeholder %>
+             <input type="url" id="imageUrl" name="imageUrl" class="form-control" value="<%= product.imageUrl %>" placeholder="https://example.com/main-image.jpg" required>
              <% if(product.imageUrl) { %>
                 <img src="<%= product.imageUrl %>" alt="Current Image" style="max-width: 100px; margin-top: 5px; border: 1px solid #ddd; padding: 2px;">
              <% } %>
@@ -8590,11 +9093,12 @@ views/seller/edit-product.ejs:
          <!-- --- UPDATED: Add Second Image URL Input --- -->
          <div class="form-group">
              <label for="imageUrl2">Second Image URL (Optional):</label>
+             <%# Added Placeholder %>
              <input type="url"
                     id="imageUrl2"
                     name="imageUrl2"
                     class="form-control"
-                    placeholder="https://example.com/image_alt.jpg"
+                    placeholder="https://example.com/alternate-image.jpg"
                     value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
               <%# Preview for edit forms %>
               <% if (typeof product !== 'undefined' && product.imageUrl2) { %>
@@ -8604,7 +9108,8 @@ views/seller/edit-product.ejs:
          <!-- --- END UPDATED --- -->
          <div class="form-group">
              <label for="specifications">Specifications (Optional):</label>
-             <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= product.specifications %></textarea>
+             <%# Added Placeholder %>
+             <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= product.specifications %></textarea>
         </div>
          <button type="submit" class="btn btn-primary">Update & Resubmit for Review</button>
          <a href="/seller/products" class="btn btn-secondary">Cancel</a>
@@ -8624,6 +9129,7 @@ views/seller/manage-orders.ejs:
     <%# --- ADD FILTER INPUT --- %>
     <div class="form-group mb-3">
         <label for="order-filter-input" class="visually-hidden">Filter Orders:</label>
+        <%# Added Placeholder %>
         <input type="text" id="order-filter-input" class="form-control" placeholder="Type to filter orders (ID, Name, Email, Product, Status...)" aria-label="Filter Orders">
     </div>
     <%# --- END FILTER INPUT --- %>
@@ -8709,6 +9215,7 @@ views/seller/manage-orders.ejs:
                                             </form>
                                         <% } %>
                                         <form action="/seller/orders/<%= order._id %>/confirm-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
+                                             <%# Added Placeholder %>
                                             <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm delivery using customer's OTP">
                                                 <i class="fas fa-check-double"></i> Confirm
@@ -8771,6 +9278,7 @@ views/seller/manage-products.ejs:
     <%# --- ADD FILTER INPUT --- %>
     <div class="form-group mb-3"> <%# Added mb-3 for spacing %>
         <label for="seller-product-filter-input" class="visually-hidden">Filter Your Products:</label>
+        <%# Added Placeholder %>
         <input type="text" id="seller-product-filter-input" class="form-control" placeholder="Type to filter your products (Name, Category, Status...)" aria-label="Filter Your Products">
     </div>
     <%# --- END FILTER INPUT --- %>
@@ -8845,11 +9353,13 @@ views/seller/upload-product.ejs:
     <form action="/seller/products/upload" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" placeholder="Enter product name" required>
         </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+            <%# Added Placeholder %>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -8864,30 +9374,35 @@ views/seller/upload-product.ejs:
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" placeholder="e.g., 499.99" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" placeholder="e.g., 50" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL (Primary):</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/main-image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <!-- --- UPDATED: Add Second Image URL Input --- -->
         <div class="form-group">
             <label for="imageUrl2">Second Image URL (Optional):</label>
+             <%# Added Placeholder %>
             <input type="url"
                    id="imageUrl2"
                    name="imageUrl2"
                    class="form-control"
-                   placeholder="https://example.com/image_alt.jpg"
+                   placeholder="https://example.com/alternate-image.jpg"
                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
         </div>
         <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+            <%# Added Placeholder %>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/seller/dashboard" class="btn btn-secondary">Cancel</a>
@@ -9001,26 +9516,29 @@ views/user/checkout.ejs:
 
                  <div class="form-group">
                      <label for="checkout-name-addr" class="form-label small">Full Name:</label>
-                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" required autocomplete="name">
+                     <%# Added Placeholder %>
+                     <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" placeholder="Enter full name" required autocomplete="name">
                  </div>
                  <div class="form-group">
                      <label for="checkout-phone" class="form-label small">Phone Number:</label>
-                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                     <%# Added Placeholder %>
+                     <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" placeholder="10-digit mobile number" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
                  </div>
                  <div class="form-group">
                     <label for="checkout-pincode" class="form-label small">Pincode:</label>
+                    <%# Added Placeholder %>
                     <input type="text"
                            id="checkout-pincode"
                            name="pincode"
                            class="form-control pincode-input"
                            data-target-prefix="checkout"
                            value="<%= addressFormData?.pincode || userAddress?.pincode || '' %>"
-                           required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                           placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric"
                            title="Enter 6-digit Pincode" autocomplete="postal-code">
                     <small class="pincode-status text-muted"></small>
                 </div>
 
-                <%# --- NEW: Locality Dropdown --- %>
+                <%# --- Locality Dropdown --- %>
                 <div class="form-group">
                     <label for="checkout-locality" class="form-label small">Locality / Post Office:</label>
                     <select id="checkout-locality"
@@ -9060,10 +9578,12 @@ views/user/checkout.ejs:
 
                 <div class="form-group">
                     <label for="checkout-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                    <%# Added Placeholder %>
                     <input type="text" id="checkout-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || userAddress?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
                 </div>
                  <div class="form-group">
                     <label for="checkout-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                    <%# Added Placeholder %>
                     <input type="text" id="checkout-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || userAddress?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
                  </div>
                 <button type="submit" class="btn btn-primary me-2">Save Address</button>
@@ -9231,6 +9751,7 @@ views/user/profile.ejs:
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
             <form action="/user/profile/update-name" method="POST" id="name-form" class="hidden inline-form align-items-center ms-2 form-submit-spinner">
                 <label for="name-input" class="visually-hidden">New Name:</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="name-input" name="name" class="form-control form-control-sm me-2" value="<%= user.name %>" required minlength="2" placeholder="Enter new name">
                 <button type="submit" class="btn btn-primary btn-sm me-1">Save</button>
                 <button type="button" id="cancel-edit-name-btn" class="btn btn-secondary btn-sm">Cancel</button>
@@ -9300,29 +9821,31 @@ views/user/profile.ejs:
 
             <div class="form-group">
                 <label for="profile-name-addr" class="form-label small">Full Name:</label>
-                <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || user.address?.name || '' %>" required autocomplete="name">
+                <%# Added Placeholder %>
+                <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || user.address?.name || '' %>" placeholder="Enter full name" required autocomplete="name">
             </div>
             <div class="form-group">
                 <label for="profile-phone" class="form-label small">Phone Number:</label>
-                <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                 <%# Added Placeholder %>
+                <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || user.address?.phone || '' %>" placeholder="10-digit mobile number" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
             </div>
             <div class="form-group">
                 <label for="profile-pincode" class="form-label small">Pincode:</label>
+                 <%# Added Placeholder %>
                 <input type="text"
                        id="profile-pincode"
                        name="pincode"
                        class="form-control pincode-input"
                        data-target-prefix="profile"
                        value="<%= addressFormData?.pincode || user.address?.pincode || '' %>"
-                       required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                       placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric"
                        title="Enter 6-digit Pincode" autocomplete="postal-code">
                 <small class="pincode-status text-muted"></small>
             </div>
 
-            <%# --- NEW: Locality Dropdown --- %>
+            <%# --- Locality Dropdown --- %>
             <div class="form-group">
                 <label for="profile-locality" class="form-label small">Locality / Post Office:</label>
-                <%# Populate dataset if editing/repopulating for JS pre-selection %>
                 <select id="profile-locality"
                         name="locality"
                         class="form-control"
@@ -9360,10 +9883,12 @@ views/user/profile.ejs:
 
             <div class="form-group">
                 <label for="profile-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || user.address?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
             </div>
             <div class="form-group">
                 <label for="profile-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || user.address?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
             </div>
             <button type="submit" class="btn btn-primary me-2">Save Address</button>

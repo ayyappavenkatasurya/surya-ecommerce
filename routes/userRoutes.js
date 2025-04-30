@@ -18,7 +18,10 @@ router.post('/profile/update-name', userController.updateUserName);
 
 // User Cart Management
 router.get('/cart', userController.getCart);                // View cart (controller filters unapproved)
-router.post('/cart/add', userController.addToCart);         // Add to cart (controller checks approval)
+router.post('/cart/add', userController.addToCart);         // Add to cart (controller checks approval) - FOR FORMS (e.g., Product Detail)
+// --- ADDED: AJAX Add to Cart Route ---
+router.post('/cart/add-ajax', userController.addToCartAjax); // AJAX add to cart (e.g., from Product Index)
+// --- END: AJAX Add to Cart Route ---
 router.post('/cart/update', userController.updateCartQuantity); // Update quantity (controller checks approval/stock)
 router.post('/cart/remove/:productId', userController.removeFromCart); // Remove from cart
 

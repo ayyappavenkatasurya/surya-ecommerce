@@ -10,8 +10,19 @@ const { sendEmail } = require('../config/mailer');
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
+// --- Password Complexity Regex ---
+const uppercaseRegex = /[A-Z]/;
+const lowercaseRegex = /[a-z]/;
+const numberRegex = /[0-9]/;
+// Define allowed special characters (escape regex special chars like - \ [ ] /)
+const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/;
+const minPasswordLength = 8; // INCREASED MINIMUM LENGTH
 
-// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. (No changes needed) ---
+// Generic Password Format Error Message
+const passwordFormatErrorMsg = "password doesn't match requested format";
+
+
+// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. ---
 exports.getLoginPage = (req, res) => {
     if (req.session.user) {
          return res.redirect('/'); // Redirect if already logged in
@@ -23,7 +34,12 @@ exports.getRegisterPage = (req, res) => {
     if (req.session.user) {
         return res.redirect('/'); // Redirect if already logged in
    }
-    res.render('auth/register', { title: 'Register' });
+   // Pass back potential form data from failed validation
+    res.render('auth/register', {
+        title: 'Register',
+        name: req.flash('form_name')[0] || '', // Get flashed data if exists
+        email: req.flash('form_email')[0] || ''
+    });
 };
 
 exports.getVerifyOtpPage = (req, res) => {
@@ -66,7 +82,7 @@ exports.getResetPasswordPage = async (req, res, next) => {
     }
 };
 
-// --- registerUser, verifyOtp, resendOtp, loginUser (No changes needed) ---
+// --- UPDATED registerUser ---
 exports.registerUser = async (req, res, next) => {
      if (req.session.user) {
         return res.redirect('/');
@@ -76,12 +92,39 @@ exports.registerUser = async (req, res, next) => {
     let errors = [];
     if (!name || !email || !password || !confirmPassword) { errors.push('Please fill in all fields.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
-    if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { errors.push('Please enter a valid email address.'); }
+
+    // --- MODIFIED Password Complexity Validation ---
+    let passwordComplexityFailed = false; // Flag to track if any complexity rule failed
+    if (password) {
+        if (
+            password.length < minPasswordLength ||
+            !uppercaseRegex.test(password) ||
+            !lowercaseRegex.test(password) ||
+            !numberRegex.test(password) ||
+            !specialCharRegex.test(password)
+        ) {
+            passwordComplexityFailed = true; // Set flag if any rule fails
+        }
+    } else {
+        // If password field itself is empty, it's caught by the initial check above
+    }
+
+    // Add the generic error message ONCE if any complexity rule failed
+    if (passwordComplexityFailed) {
+        // Check if the generic message is already added to avoid duplicates
+        if (!errors.includes(passwordFormatErrorMsg)) {
+             errors.push(passwordFormatErrorMsg);
+        }
+    }
+    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        return res.render('auth/register', { title: 'Register', name: name, email: email, error_msg: req.flash('error_msg') });
+        // Flash form data to repopulate
+        req.flash('form_name', name);
+        req.flash('form_email', email);
+        return res.redirect('/auth/register'); // Redirect back to GET route
     }
 
     try {
@@ -97,19 +140,22 @@ exports.registerUser = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
 
         if (user && !user.isVerified) {
+            // Update existing unverified user
             user.name = name;
-            if (password) { user.password = password; }
+            if (password) { user.password = password; } // Hashing happens in pre-save
             user.otp = otp;
             user.otpExpires = otpExpires;
             user.isVerified = false;
-            await user.save({ validateBeforeSave: false });
+            await user.save({ validateBeforeSave: true }); // Let Mongoose run its validators too
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
+            // Create new user
             user = new User({ name, email: lowerCaseEmail, password, otp, otpExpires, isVerified: false });
             await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
+        // Send OTP Email (keep existing logic)
         const subject = 'Verify Your Email Address';
         const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
         const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
@@ -129,18 +175,36 @@ exports.registerUser = async (req, res, next) => {
             res.redirect('/auth/register');
         }
     } catch (error) {
-        if (error.code === 11000) {
+        if (error.code === 11000) { // Duplicate email
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-            return res.render('auth/register', { title: 'Register', name: name, email: email });
+             req.flash('form_name', name); // Flash values back
+             req.flash('form_email', email);
+            return res.redirect('/auth/register');
         }
         if (error.name === 'ValidationError') {
+           // Mongoose validation errors
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', validationErrors.join(' '));
-            return res.render('auth/register', { title: 'Register', name: name, email: email });
+            // If Mongoose minlength error exists, ensure our generic format message is shown instead or alongside
+            if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
+                 if (!errors.includes(passwordFormatErrorMsg)) {
+                    errors.push(passwordFormatErrorMsg);
+                 }
+                 // Filter out the specific mongoose length error if we added the generic one
+                 validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
+            }
+            // Combine remaining Mongoose errors with our custom ones
+            const finalErrors = [...new Set([...errors, ...validationErrors])]; // Use Set to avoid duplicates
+            req.flash('error_msg', finalErrors.join(' '));
+            req.flash('form_name', name);
+            req.flash('form_email', email);
+            return res.redirect('/auth/register');
        }
-        next(error);
+        // Catch other errors
+        console.error("Registration Error:", error);
+        next(error); // Pass to global error handler
     }
 };
+
 
 exports.verifyOtp = async (req, res, next) => {
     const { email, otp } = req.body;
@@ -175,12 +239,12 @@ exports.verifyOtp = async (req, res, next) => {
          user.otpExpires = undefined;
 
          if (isPasswordReset) {
-             await user.save({ validateBeforeSave: false });
+             await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for reset
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
          else {
-            await user.save({ validateBeforeSave: false });
+            await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for registration
              req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
@@ -234,7 +298,7 @@ exports.resendOtp = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
         user.otp = otp;
         user.otpExpires = otpExpires;
-        await user.save({ validateBeforeSave: false });
+        await user.save({ validateBeforeSave: false }); // Skip validation for OTP resend
 
         let subject, text, html;
         if (isForReset) {
@@ -271,6 +335,7 @@ exports.loginUser = async (req, res, next) => {
     }
     try {
         const lowerCaseEmail = email.toLowerCase();
+        // Select password explicitly for comparison
         const user = await User.findOne({ email: lowerCaseEmail }).select('+password').populate('cart.productId', 'name price imageUrl');
 
         if (!user) {
@@ -281,23 +346,28 @@ exports.loginUser = async (req, res, next) => {
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
+        // Match password using the instance method
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
+         // Regenerate session upon successful login
          req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
+            // Set user data in the new session
             req.session.user = {
                 _id: user._id, name: user.name, email: user.email, role: user.role,
                 address: user.address ? user.address.toObject() : undefined,
+                // Ensure cart items are properly mapped for session storage
                 cart: user.cart ? user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
              };
+             // Save the session before redirecting
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -306,7 +376,7 @@ exports.loginUser = async (req, res, next) => {
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo;
+                 delete req.session.returnTo; // Clear the returnTo path
                  res.redirect(returnTo);
             });
         });
@@ -315,21 +385,43 @@ exports.loginUser = async (req, res, next) => {
     }
 };
 
-// --- UPDATED logoutUser ---
+// --- REFINED logoutUser ---
 exports.logoutUser = (req, res, next) => {
+    const sessionUserEmail = req.session?.user?.email || 'User'; // Safely get email before potential destruction
+
+    // 1. Set the flash message BEFORE destroying the session
     req.flash('success_msg', 'You have been logged out successfully.');
-    req.session.destroy(err => {
-        if (err) {
-            console.error('Session destruction error:', err);
-             return res.redirect('/auth/login');
-        }
-        res.clearCookie(req.app.get('session cookie name') || 'connect.sid');
-        res.redirect('/auth/login');
-    });
+
+    // 2. Clear the user data from the current session object
+    if (req.session) {
+        req.session.user = null;
+    }
+
+    // 3. Clear the session cookie on the client side
+    const cookieName = req.app.get('session cookie name') || 'connect.sid';
+    res.clearCookie(cookieName);
+    console.log(`${sessionUserEmail} - Cleared session cookie: ${cookieName}`);
+
+    // 4. Initiate the session destruction in the store (asynchronously)
+    // Log any errors but don't wait for it to complete before redirecting
+    if (req.session) {
+        req.session.destroy(err => {
+            if (err) {
+                console.error(`${sessionUserEmail} - Session destruction error (may be ignorable):`, err);
+            } else {
+                console.log(`${sessionUserEmail} - Session destroyed successfully in store.`);
+            }
+            // **DO NOT redirect inside this callback**
+        });
+    } else {
+        console.log(`${sessionUserEmail} - No active session found to destroy.`);
+    }
+
+    // 5. Redirect the user immediately after clearing the cookie and initiating destruction
+    return res.redirect('/auth/login');
 };
 
 
-// --- forgotPassword, resetPassword (No changes needed) ---
 exports.forgotPassword = async (req, res, next) => {
     const { email } = req.body;
     if (!email) {
@@ -340,34 +432,42 @@ exports.forgotPassword = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage);
+        req.flash('info_msg', genericMessage); // Use info_msg for neutral feedback
 
+        // Send generic message even if user not found or not verified for security
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
             return res.redirect('/auth/forgot-password');
         }
 
+         // Generate OTP and Reset Token
          const otp = generateOTP();
          const resetToken = crypto.randomBytes(20).toString('hex');
-        const otpExpires = setOTPExpiration(10);
-        const resetExpires = setOTPExpiration(60);
+        const otpExpires = setOTPExpiration(10); // OTP expiry (short)
+        const resetExpires = setOTPExpiration(60); // Token expiry (longer)
 
+        // Update user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false });
+        await user.save({ validateBeforeSave: false }); // Skip validation for setting tokens/OTP
 
+        // Send Email
         const subject = 'Password Reset Request - Verify OTP';
         const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
         const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
          const emailSent = await sendEmail(user.email, subject, text, html);
 
+        // Redirect user to OTP verification page
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
+             // Redirect to verify OTP page, indicating it's for reset
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
+            // Handle email failure (keep generic message flashed)
             console.error(`Failed to send password reset OTP email to ${user.email}`);
+            // Don't reveal email failure to user, redirect back
             res.redirect('/auth/forgot-password');
         }
     } catch (error) {
@@ -377,6 +477,7 @@ exports.forgotPassword = async (req, res, next) => {
     }
 };
 
+// --- UPDATED resetPassword ---
 exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
@@ -384,38 +485,74 @@ exports.resetPassword = async (req, res, next) => {
     let errors = [];
     if (!password || !confirmPassword) { errors.push('Please enter and confirm your new password.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
-     if (password && password.length < 6) { errors.push('Password must be at least 6 characters.'); }
+
+    // --- MODIFIED Password Complexity Validation ---
+    let passwordComplexityFailed = false; // Flag
+    if (password) {
+        if (
+            password.length < minPasswordLength ||
+            !uppercaseRegex.test(password) ||
+            !lowercaseRegex.test(password) ||
+            !numberRegex.test(password) ||
+            !specialCharRegex.test(password)
+        ) {
+            passwordComplexityFailed = true; // Set flag
+        }
+    }
+
+    // Add the generic error message ONCE if needed
+    if (passwordComplexityFailed) {
+         if (!errors.includes(passwordFormatErrorMsg)) {
+            errors.push(passwordFormatErrorMsg);
+         }
+    }
+    // --- END MODIFIED Password Complexity Validation ---
+
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         return res.redirect(`/auth/reset-password/${token}`);
+         return res.redirect(`/auth/reset-password/${token}`); // Redirect back to the form
     }
 
     try {
-        const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: Date.now() }, }).select('+password');
+        // Find user by valid token and expiry, select password for pre-save hook
+        const user = await User.findOne({
+            resetPasswordToken: token,
+            resetPasswordExpires: { $gt: Date.now() },
+        }).select('+password');
+
         if (!user) {
             req.flash('error_msg', 'Password reset token is invalid or has expired. Please request a new reset link.');
             return res.redirect('/auth/forgot-password');
         }
 
+        // Assign the new password (bcrypt hashing is handled by the pre-save hook in User model)
         user.password = password;
+
+        // Clear reset and OTP fields
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true;
+        user.isVerified = true; // Ensure user is marked as verified
+
+        // Save the user (will trigger pre-save hook for hashing)
         await user.save();
 
+        // Log the user in after successful password reset
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
+              // Populate session data
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
-                  cart: user.cart ? user.cart.map(item => ({ productId: item.productId, quantity: item.quantity })) : []
+                  // Initialize cart as empty after reset login.
+                  cart: []
               };
+            // Save session before redirecting
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
@@ -423,25 +560,35 @@ exports.resetPassword = async (req, res, next) => {
                     return res.redirect('/auth/login');
                  }
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                res.redirect('/');
+                res.redirect('/'); // Redirect to homepage
              });
          });
     } catch (error) {
         if (error.name === 'ValidationError') {
+           // Handle Mongoose validation errors during save (e.g., if minlength check fails again)
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            req.flash('error_msg', validationErrors.join(' '));
+            // Similar logic to handle Mongoose length error vs our generic one
+             if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
+                 if (!errors.includes(passwordFormatErrorMsg)) {
+                    errors.push(passwordFormatErrorMsg);
+                 }
+                 validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
+            }
+            const finalErrors = [...new Set([...errors, ...validationErrors])];
+            req.flash('error_msg', finalErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        next(error);
+        // Handle other errors
+        console.error("Reset Password Error:", error);
+        next(error); // Pass to global error handler
     }
 };
 
 
-// --- Modified getHomePage ---
+// --- getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
-    // *** Get category from query ***
     const categoryFilter = req.query.category || '';
 
     let query = {
@@ -450,15 +597,16 @@ exports.getHomePage = async (req, res, next) => {
     };
 
     if (searchTerm) {
+         // Using MongoDB's text index for searching
          query.$text = { $search: searchTerm };
     }
-    // *** Add category to query if valid ***
     if (categoryFilter && categoryNames.includes(categoryFilter)) {
         query.category = categoryFilter;
     } else if (categoryFilter) {
         console.warn(`Invalid category filter attempted: ${categoryFilter}`);
     }
 
+     // Define projection and sort based on whether a search term is present
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
@@ -484,9 +632,8 @@ exports.getHomePage = async (req, res, next) => {
       title: pageTitle,
       products: products,
       searchTerm: searchTerm,
-      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null, // Pass selected category
+      selectedCategory: categoryFilter && categoryNames.includes(categoryFilter) ? categoryFilter : null,
       homepageBanners: validBanners,
-      // *** Pass display categories to the view ***
       displayCategories: categories
     });
   } catch (error) {

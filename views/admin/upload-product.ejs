@@ -7,11 +7,13 @@
     <form action="/admin/upload-product" method="POST" class="form-submit-spinner">
         <div class="form-group">
             <label for="name">Product Name:</label>
-            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" required>
+            <%# Added Placeholder %>
+            <input type="text" id="name" name="name" class="form-control" value="<%= typeof product !== 'undefined' ? product.name : '' %>" placeholder="Enter product name" required>
         </div>
         <div class="form-group">
             <label for="shortDescription">Short Description (Optional):</label>
-            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
+             <%# Added Placeholder %>
+            <textarea id="shortDescription" name="shortDescription" class="form-control" rows="2" placeholder="Briefly describe the product (max 200 chars)"><%= typeof product !== 'undefined' ? product.shortDescription : '' %></textarea>
         </div>
         <div class="form-group">
             <label for="category">Category:</label>
@@ -26,15 +28,17 @@
         </div>
         <div class="form-group">
             <label for="price">Price (₹):</label>
-            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" required>
+             <%# Added Placeholder %>
+            <input type="number" id="price" name="price" class="form-control" step="0.01" min="0" value="<%= typeof product !== 'undefined' ? product.price : '' %>" placeholder="e.g., 499.99" required>
         </div>
         <div class="form-group">
             <label for="stock">Stock Quantity:</label>
-            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" required>
+             <%# Added Placeholder %>
+            <input type="number" id="stock" name="stock" class="form-control" min="0" value="<%= typeof product !== 'undefined' ? product.stock : '' %>" placeholder="e.g., 50" required>
         </div>
         <div class="form-group">
             <label for="imageUrl">Image URL (Primary):</label>
-            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
+            <input type="url" id="imageUrl" name="imageUrl" class="form-control" placeholder="https://example.com/main-image.jpg" value="<%= typeof product !== 'undefined' ? product.imageUrl : '' %>" required>
         </div>
         <!-- --- UPDATED: Add Second Image URL Input --- -->
         <div class="form-group">
@@ -43,13 +47,14 @@
                    id="imageUrl2"
                    name="imageUrl2"
                    class="form-control"
-                   placeholder="https://example.com/image_alt.jpg"
+                   placeholder="https://example.com/alternate-image.jpg"
                    value="<%= (typeof product !== 'undefined' && product.imageUrl2) ? product.imageUrl2 : '' %>">
         </div>
         <!-- --- END UPDATED --- -->
         <div class="form-group">
             <label for="specifications">Specifications (Optional):</label>
-            <textarea id="specifications" name="specifications" class="form-control" rows="5"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
+             <%# Added Placeholder %>
+            <textarea id="specifications" name="specifications" class="form-control" rows="5" placeholder="Enter product details, features, dimensions, etc. (one per line recommended)"><%= typeof product !== 'undefined' ? product.specifications : '' %></textarea>
         </div>
         <button type="submit" class="btn btn-primary">Upload & Submit for Review</button>
         <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>

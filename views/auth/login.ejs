@@ -3,16 +3,24 @@
 <div class="auth-container">
     <h1>Login</h1>
 
-    <%# --- Spinner Class Added --- %>
     <form action="/auth/login" method="POST" class="auth-form form-submit-spinner">
         <div class="form-group">
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required autocomplete="email" placeholder="Enter email">
+            <%# Added Placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your email" required autocomplete="email">
         </div>
+        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Enter password">
+            <div class="password-wrapper">
+                <%# Added Placeholder %>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+                <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
         </div>
+        <%# --- END: Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
     <div class="auth-links">

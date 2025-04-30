@@ -112,6 +112,7 @@
                                             </form>
                                         <% } %>
                                         <form action="/admin/orders/<%= order._id %>/confirm-direct-delivery" method="POST" class="inline-form verify-otp-form form-submit-spinner">
+                                            <%# Added Placeholder %>
                                             <input type="text" name="otp" placeholder="Enter OTP" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit OTP from customer">
                                             <button type="submit" class="btn btn-success btn-sm" title="Confirm direct delivery">
                                                 <i class="fas fa-check-double"></i> Confirm

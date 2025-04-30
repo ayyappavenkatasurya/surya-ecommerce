@@ -10,6 +10,7 @@
             <button type="button" id="edit-name-btn" class="btn btn-text btn-sm" title="Edit Name"><i class="fas fa-edit"></i></button>
             <form action="/user/profile/update-name" method="POST" id="name-form" class="hidden inline-form align-items-center ms-2 form-submit-spinner">
                 <label for="name-input" class="visually-hidden">New Name:</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="name-input" name="name" class="form-control form-control-sm me-2" value="<%= user.name %>" required minlength="2" placeholder="Enter new name">
                 <button type="submit" class="btn btn-primary btn-sm me-1">Save</button>
                 <button type="button" id="cancel-edit-name-btn" class="btn btn-secondary btn-sm">Cancel</button>
@@ -79,29 +80,31 @@
 
             <div class="form-group">
                 <label for="profile-name-addr" class="form-label small">Full Name:</label>
-                <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || user.address?.name || '' %>" required autocomplete="name">
+                <%# Added Placeholder %>
+                <input type="text" id="profile-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || user.address?.name || '' %>" placeholder="Enter full name" required autocomplete="name">
             </div>
             <div class="form-group">
                 <label for="profile-phone" class="form-label small">Phone Number:</label>
-                <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || user.address?.phone || '' %>" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
+                 <%# Added Placeholder %>
+                <input type="tel" id="profile-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || user.address?.phone || '' %>" placeholder="10-digit mobile number" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
             </div>
             <div class="form-group">
                 <label for="profile-pincode" class="form-label small">Pincode:</label>
+                 <%# Added Placeholder %>
                 <input type="text"
                        id="profile-pincode"
                        name="pincode"
                        class="form-control pincode-input"
                        data-target-prefix="profile"
                        value="<%= addressFormData?.pincode || user.address?.pincode || '' %>"
-                       required pattern="\d{6}" maxlength="6" inputmode="numeric"
+                       placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric"
                        title="Enter 6-digit Pincode" autocomplete="postal-code">
                 <small class="pincode-status text-muted"></small>
             </div>
 
-            <%# --- NEW: Locality Dropdown --- %>
+            <%# --- Locality Dropdown --- %>
             <div class="form-group">
                 <label for="profile-locality" class="form-label small">Locality / Post Office:</label>
-                <%# Populate dataset if editing/repopulating for JS pre-selection %>
                 <select id="profile-locality"
                         name="locality"
                         class="form-control"
@@ -139,10 +142,12 @@
 
             <div class="form-group">
                 <label for="profile-cityVillage" class="form-label small">House No. / Building / Area:</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="profile-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || user.address?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
             </div>
             <div class="form-group">
                 <label for="profile-landmarkNearby" class="form-label small">Landmark (Optional):</label>
+                 <%# Added Placeholder %>
                 <input type="text" id="profile-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || user.address?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
             </div>
             <button type="submit" class="btn btn-primary me-2">Save Address</button>

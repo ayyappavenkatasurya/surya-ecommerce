@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const originalText = submitButton.innerHTML;
                 submitButton.dataset.originalText = originalText; // Store original HTML
                 submitButton.disabled = true;
-                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working...';
 
                 // Reset button if user navigates back without form submitting (browser specific)
                 window.addEventListener('pageshow', function(pageEvent) { // Renamed event variable
@@ -872,35 +872,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // ========================================
-    // Live Product Filtering Logic
+    // Live Product/User Filtering Logic (Refactored)
     // ========================================
-    function setupProductFilter(inputId, tableId, noResultsId) {
+    function setupLiveFilter(inputId, tableId, noResultsId, rowSelector) {
         const filterInput = document.getElementById(inputId);
-        const productTable = document.getElementById(tableId);
+        const table = document.getElementById(tableId);
         const noResultsRow = document.getElementById(noResultsId);
 
-        if (filterInput && productTable && noResultsRow) {
-            const tableBody = productTable.querySelector('tbody');
+        if (filterInput && table && noResultsRow) {
+            const tableBody = table.querySelector('tbody');
             if (!tableBody) return;
 
             filterInput.addEventListener('input', () => {
                 const filterValue = filterInput.value.trim().toLowerCase();
-                const rows = tableBody.querySelectorAll('tr.product-row');
+                const rows = tableBody.querySelectorAll(rowSelector); // Use the specific row selector
                 let matchFound = false;
 
                 rows.forEach(row => {
                     const rowText = row.textContent.toLowerCase();
                     if (filterValue === '' || rowText.includes(filterValue)) {
-                        row.style.display = '';
+                        row.style.display = ''; // Use default display (usually 'table-row')
                         matchFound = true;
                     } else {
                         row.style.display = 'none';
                     }
                 });
 
+                // Toggle visibility of the "no results" row
                 if (!matchFound && rows.length > 0) {
                     noResultsRow.classList.remove('hidden');
-                    noResultsRow.style.display = '';
+                    noResultsRow.style.display = ''; // Use default display
                 } else {
                     noResultsRow.classList.add('hidden');
                     noResultsRow.style.display = 'none';
@@ -908,10 +909,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     }
-    setupProductFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found');
-    setupProductFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found');
+    // Apply the filter to different tables
+    setupLiveFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found', 'tr.product-row');
+    setupLiveFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found', 'tr.product-row');
+    setupLiveFilter('user-filter-input', 'admin-user-table', 'no-admin-users-found', 'tr.user-row');
     // ========================================
-    // End Live Product Filtering Logic
+    // End Live Filtering Logic
     // ========================================
 
 
@@ -991,6 +994,98 @@ document.addEventListener('DOMContentLoaded', () => {
     // End Product Image Slider Logic
     // ========================================
 
+    // ========================================
+    // --- ADDED: Password Visibility Toggle ---
+    // ========================================
+    document.querySelectorAll('.password-toggle-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            const passwordInput = button.previousElementSibling; // Assumes input is directly before button
+            if (passwordInput && (passwordInput.type === 'password' || passwordInput.type === 'text')) {
+                // Toggle input type
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+
+                // Toggle icon
+                const icon = button.querySelector('i');
+                if (icon) {
+                    icon.classList.toggle('fa-eye', !isPassword);
+                    icon.classList.toggle('fa-eye-slash', isPassword);
+                }
+            }
+        });
+    });
+    // ========================================
+    // --- End: Password Visibility Toggle ---
+    // ========================================
+
+
+    // ========================================
+    // --- ADDED: AJAX Add to Cart (Index Page) ---
+    // ========================================
+    document.querySelectorAll('.btn-ajax-add-to-cart').forEach(button => {
+        const originalHtml = button.innerHTML; // Store original button content
+        const loadingHtml = '<i class="fas fa-spinner fa-spin"></i>';
+        const successHtml = '<i class="fas fa-check"></i> Added';
+
+        button.addEventListener('click', async () => {
+            const productId = button.dataset.productId;
+            if (!productId) {
+                console.error('Product ID not found on button');
+                showToast('Could not add item (missing ID).', 'danger');
+                return;
+            }
+            const quantity = 1; // Always add 1 from index page
+
+            // Set loading state
+            button.disabled = true;
+            button.classList.add('loading');
+            button.innerHTML = loadingHtml;
+
+            try {
+                const response = await fetch('/user/cart/add-ajax', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ productId, quantity })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || `Failed to add item (${response.status})`);
+                }
+
+                // Success State
+                showToast(data.message || 'Item added to cart!', 'success');
+                updateCartBadge(data.cartItemCount);
+
+                // Temporary success indication on button
+                button.classList.remove('loading');
+                button.classList.add('success');
+                button.innerHTML = successHtml;
+
+                // Revert button after a delay
+                setTimeout(() => {
+                    button.disabled = false;
+                    button.classList.remove('success');
+                    button.innerHTML = originalHtml;
+                }, 1500); // Revert after 1.5 seconds
+
+            } catch (error) {
+                console.error("AJAX Add to Cart error:", error);
+                showToast(error.message || 'Could not add item to cart.', 'danger');
+                // Revert button immediately on error
+                button.disabled = false;
+                button.classList.remove('loading');
+                button.innerHTML = originalHtml;
+            }
+        });
+    });
+    // ========================================
+    // --- End: AJAX Add to Cart (Index Page) ---
+    // ========================================
+
 
 }); // End DOMContentLoaded
 
@@ -999,7 +1094,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Add';
+     const originalButtonText = 'Add'; // Consider changing this if needed
      const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
      const cartItemDiv = buttonElement.closest('.cart-item');
 
@@ -1029,7 +1124,9 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                     cartItemDiv.style.borderWidth = '0';
                      setTimeout(() => {
                          if (cartItemDiv.parentNode) cartItemDiv.remove();
-                         updateCartTotalAndBadge(data.cartTotal);
+                         // --- UPDATED: Call updateCartBadge only ---
+                         updateCartBadgeOnly();
+                         // --- END UPDATE ---
                          handleEmptyCartDisplay();
                      }, 300);
                      return; // Exit after starting removal animation
@@ -1055,7 +1152,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                         if (cartItemDiv.parentNode) {
                            cartItemDiv.remove();
                         }
-                        updateCartTotalAndBadge(data.cartTotal);
+                        updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
                         handleEmptyCartDisplay();
                         showToast('Item removed from cart.', 'success');
                     }, 300);
@@ -1066,7 +1163,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
                  if(quantityInputElement) quantityInputElement.value = data.newQuantity;
-                 updateCartTotalAndBadge(data.cartTotal);
+                 updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
              }
          } else {
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
@@ -1149,30 +1246,54 @@ function showToast(message, type = 'info') {
 
 
 // --- Helper Functions for Cart Badge and Empty Display ---
+
+// Updates BOTH cart total display (on cart page) and header badge
 function updateCartTotalAndBadge(newCartTotal) {
      const cartTotalSpan = document.getElementById('cart-total-value');
      if (cartTotalSpan) cartTotalSpan.textContent = (newCartTotal !== undefined ? newCartTotal : 0).toFixed(2);
 
-     const newCartItemCount = calculateNewCartCount();
-     const cartBadge = document.querySelector('.cart-badge');
-     if (cartBadge) {
-         if (newCartItemCount > 0) {
-             cartBadge.textContent = newCartItemCount;
-             cartBadge.classList.remove('hide');
-         } else {
-            cartBadge.textContent = '0';
-            cartBadge.classList.add('hide');
-         }
-     }
+     // --- UPDATED: Call the badge-specific update function ---
+     updateCartBadgeOnly();
 }
 
+// --- ADDED: Function to ONLY update the header cart badge ---
+// (Used by AJAX add-to-cart and can be called directly if needed)
+function updateCartBadge(newCount) {
+    const cartBadge = document.querySelector('.cart-badge');
+    if (cartBadge) {
+        if (newCount > 0) {
+            cartBadge.textContent = newCount;
+            cartBadge.classList.remove('hide');
+        } else {
+            cartBadge.textContent = '0';
+            cartBadge.classList.add('hide');
+        }
+    }
+}
+
+// --- ADDED: Helper to update badge by recalculating from cart page elements ---
+// (Used by updateCartItemQuantityAJAX after removing item)
+function updateCartBadgeOnly() {
+     const newCartItemCount = calculateNewCartCount();
+     updateCartBadge(newCartItemCount);
+}
+
+
 function calculateNewCartCount() {
+    // This calculation might be slightly off if called during the removal animation.
+    // A more robust way is to get the count from the server response (as done in addToCartAjax).
     const cartItems = document.querySelectorAll('.cart-item');
     let count = 0;
     cartItems.forEach(item => {
         const style = window.getComputedStyle(item);
+        // Check if item is visually present (not display:none and not faded out)
         if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
-            count++;
+             const qtyInput = item.querySelector('.quantity-input');
+             if (qtyInput) {
+                 count += parseInt(qtyInput.value, 10) || 0; // Sum quantities
+             } else {
+                 count++; // Fallback if quantity input isn't found (less accurate)
+             }
         }
     });
     return count;
@@ -1184,6 +1305,7 @@ function handleEmptyCartDisplay() {
      const cartSummary = document.querySelector('.cart-summary');
 
      if (cartItemsContainer && cartContainer) {
+         // Check based on actual elements remaining, not just the count from calculation
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
              return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
@@ -1191,7 +1313,7 @@ function handleEmptyCartDisplay() {
 
          if (visibleItems.length === 0) {
              if (!cartContainer.querySelector('.alert-info')) {
-                 cartItemsContainer.innerHTML = '';
+                 cartItemsContainer.innerHTML = ''; // Clear the container definitively
                  if(cartSummary) cartSummary.remove();
                  const emptyCartHTML = `
                     <h1>Your Shopping Cart</h1>
@@ -1202,6 +1324,7 @@ function handleEmptyCartDisplay() {
                   if (h1) {
                       h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
                   } else {
+                      // If h1 somehow got removed, replace container content
                       cartContainer.innerHTML = emptyCartHTML;
                   }
              }

@@ -194,6 +194,11 @@ label.form-label-inline {
     font-weight: normal;
 }
 
+/* --- ADDED: Position relative for password wrapper --- */
+.password-wrapper {
+    position: relative;
+}
+
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -213,6 +218,15 @@ select {
   color: var(--text-color);
   transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
+
+/* --- ADDED: Padding-right for password input when toggle is present --- */
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+    /* Adjust padding-right to make space for the icon */
+    padding-right: calc(var(--spacing-unit) * 2.5) !important;
+}
+
+
 .form-control {
     display: block;
     width: 100%;
@@ -227,6 +241,14 @@ select {
     appearance: none;
     border-radius: var(--border-radius);
     transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+/* Helper text style */
+.form-text {
+    display: block;
+    margin-top: .25rem;
+    font-size: .8em; /* Smaller font size */
+    color: var(--secondary-color); /* Muted color */
 }
 
 
@@ -266,6 +288,33 @@ select.form-control-sm {
   height: calc(1.8125rem + 2px);
 }
 
+/* --- ADDED: Password Toggle Icon Button --- */
+.password-toggle-btn {
+    position: absolute;
+    right: 10px; /* Adjust as needed */
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--secondary-color); /* Icon color */
+    font-size: 1rem; /* Adjust icon size */
+    line-height: 1;
+    z-index: 10; /* Ensure it's clickable */
+}
+.password-toggle-btn:hover,
+.password-toggle-btn:focus {
+    color: var(--primary-color);
+    outline: none;
+}
+.password-toggle-btn i {
+    display: block; /* Helps with vertical alignment if needed */
+    width: 1em; /* Ensure consistent width for icon change */
+    text-align: center;
+}
+
+
 /* Buttons */
 .btn {
   display: inline-block;
@@ -281,7 +330,7 @@ select.form-control-sm {
   font-size: 1rem;
   line-height: 1.5;
   border-radius: var(--border-radius);
-  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out, opacity 0.15s ease-in-out; /* Added opacity transition */
   text-transform: capitalize;
 }
 
@@ -306,6 +355,19 @@ select.form-control-sm {
     opacity: 0.75;
     cursor: wait;
     pointer-events: none;
+}
+
+/* --- ADDED: AJAX Add to Cart Button States --- */
+.btn-ajax-add-to-cart.loading {
+    opacity: 0.7;
+    cursor: wait;
+    pointer-events: none;
+}
+.btn-ajax-add-to-cart.success {
+    background-color: var(--success-color);
+    border-color: var(--success-color);
+    color: white;
+    pointer-events: none; /* Optionally disable clicks while showing success */
 }
 
 
@@ -843,13 +905,22 @@ select.form-control-sm {
 .product-rating .fa-star, .product-rating .fa-star-half-alt { color: #f8d347; }
 .product-rating .fa-star-regular { color: #e4e5e9; }
 
-.add-to-cart-form { padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6); }
-.btn-add-to-cart {
+/* --- UPDATED: Add to Cart Form (AJAX) Container --- */
+.product-card-actions {
+    padding: 0 calc(var(--spacing-unit) * 0.6) calc(var(--spacing-unit) * 0.6);
+}
+/* --- UPDATED: Styling for AJAX Add Button --- */
+.btn-ajax-add-to-cart {
   width: 100%;
   padding: calc(var(--spacing-unit) * 0.5);
   font-size: 0.9rem;
 }
-.btn-add-to-cart i { margin-right: calc(var(--spacing-unit) * 0.25); }
+.btn-ajax-add-to-cart i {
+    margin-right: calc(var(--spacing-unit) * 0.25);
+    /* Ensure spinner aligns well */
+    vertical-align: middle;
+}
+
 
 /* Product Detail */
 .product-detail-container {
@@ -1533,7 +1604,7 @@ select.form-control-sm {
 }
 
 /* ============================ */
-/* **** NEW: Pincode Lookup Styles **** */
+/* **** Pincode Lookup Styles **** */
 /* ============================ */
 
 /* Style for the container holding auto-filled fields */
@@ -1643,8 +1714,7 @@ select.form-control-sm {
   .product-name { height: auto; white-space: normal; display: block; -webkit-line-clamp: unset; -webkit-box-orient: unset; }
   .product-detail-main { flex-direction: row; align-items: flex-start; }
   .product-detail-info { flex: 1 1 60%; }
-  /* .product-detail-image { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } */ /* Moved to image section */
-  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; } /* Apply flex to the section */
+  .product-detail-image-section { flex: 1 1 40%; width: auto; max-width: none; margin: 0; }
   .product-actions { flex-direction: row; align-items: center; }
   .product-actions .btn { width: auto; }
   .quantity-selector { max-width: 120px; margin-bottom: 0; }
@@ -1799,7 +1869,10 @@ select.form-control-sm {
 
 /* Style for the "no results" row */
 #no-admin-orders-found td,
-#no-seller-orders-found td {
+#no-seller-orders-found td,
+#no-admin-products-found td,
+#no-seller-products-found td,
+#no-admin-users-found td {
     text-align: center;
     padding: var(--spacing-unit);
     color: var(--secondary-color);
@@ -1945,24 +2018,3 @@ tr.hidden {
 }
 
 /* --- End Product Image Slider Styles --- */
-
-/* Add this rule or adjust existing margins */
-.admin-manage-container .form-group.mb-3 { /* Target the specific filter group */
-  margin-bottom: var(--spacing-unit) !important; /* Ensure space below filter */
-}
-
-/* Style for the "no results" row */
-#no-admin-orders-found td,
-#no-seller-orders-found td,
-#no-admin-products-found td,  /* <<< ADDED for admin products */
-#no-seller-products-found td { /* <<< ADDED for seller products */
-    text-align: center;
-    padding: var(--spacing-unit);
-    color: var(--secondary-color);
-    font-style: italic;
-}
-
-/* Ensure hidden rows are truly hidden */
-tr.hidden {
-    display: none !important;
-}

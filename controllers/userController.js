@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 
 // ===================================================
-// Existing functions (getUserProfilePage, updateUserName - NO CHANGES needed)
+// Existing functions (getUserProfilePage, updateUserName - NO CHANGES)
 // ===================================================
 exports.getUserProfilePage = async (req, res, next) => {
     try {
@@ -148,7 +148,7 @@ exports.saveAddress = async (req, res, next) => {
 };
 
 // ===================================================
-// Existing Cart/Checkout functions (NO CHANGES needed)
+// Cart/Checkout functions
 // ===================================================
 exports.getCart = async (req, res, next) => {
     try {
@@ -213,6 +213,7 @@ exports.getCart = async (req, res, next) => {
       }
 };
 
+// Handles 'Add to Cart' from forms (e.g., Product Detail Page)
 exports.addToCart = async (req, res, next) => {
     const { productId, quantity = 1 } = req.body;
     const userId = req.session.user._id;
@@ -255,12 +256,14 @@ exports.addToCart = async (req, res, next) => {
            const newQuantity = existingQuantity + numQuantity;
             if (product.stock < newQuantity) {
                req.flash('error_msg', `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total (you have ${existingQuantity} in cart).`);
+                // Redirect back to product page if adding too many from detail page
                 return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
            }
             user.cart[existingCartItemIndex].quantity = newQuantity;
        } else {
            if (product.stock < numQuantity) {
                req.flash('error_msg', `Insufficient stock for ${product.name}. Only ${product.stock} available.`);
+               // Redirect back to product page if adding too many from detail page
                 return res.redirect(req.headers.referer?.includes(`/products/${productId}`) ? `/products/${productId}` : '/');
            }
            user.cart.push({ productId, quantity: numQuantity });
@@ -273,10 +276,16 @@ exports.addToCart = async (req, res, next) => {
 
         req.flash('success_msg', `${product.name} added to cart!`);
 
-        if(req.query.redirectTo === 'checkout') {
+       // --- MODIFIED REDIRECT LOGIC ---
+       if(req.query.redirectTo === 'checkout') {
+           // This is for the "Buy Now" button functionality
            return res.redirect('/user/checkout');
+       } else {
+           // For the standard "Add to Cart" button (e.g., from product detail page),
+           // redirect to the cart page.
+           return res.redirect('/user/cart'); // <<<<<<<<<<< THIS IS THE CHANGE
        }
-        res.redirect('/user/cart');
+       // --- END MODIFIED REDIRECT LOGIC ---
 
     } catch (error) {
          if (error.name === 'CastError') {
@@ -285,6 +294,88 @@ exports.addToCart = async (req, res, next) => {
          }
          console.error("Add to Cart Error:", error);
         next(error);
+    }
+};
+
+// Handles 'Add to Cart' from AJAX requests (e.g., Product Index Page)
+exports.addToCartAjax = async (req, res, next) => {
+    const { productId, quantity = 1 } = req.body;
+    const userId = req.session.user._id;
+    const numQuantity = parseInt(quantity, 10);
+
+    // Basic Validation
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId)) {
+        return res.status(400).json({ success: false, message: 'Invalid product ID.' });
+    }
+    if (isNaN(numQuantity) || numQuantity < 1) {
+        return res.status(400).json({ success: false, message: 'Invalid quantity.' });
+    }
+
+    try {
+        const [user, product] = await Promise.all([
+            User.findById(userId),
+            Product.findById(productId).select('name stock reviewStatus')
+        ]);
+
+        if (!user) { // Should not happen if isAuthenticated is used
+            return res.status(401).json({ success: false, message: 'User session error. Please log in again.' });
+        }
+        if (!product) {
+            return res.status(404).json({ success: false, message: 'Product not found.' });
+        }
+
+        if (product.reviewStatus !== 'approved') {
+            return res.status(400).json({ success: false, message: `Sorry, "${product.name}" is currently unavailable.` });
+        }
+
+        if (product.stock <= 0) {
+            return res.status(400).json({ success: false, message: `${product.name} is currently out of stock.` });
+        }
+
+        const existingCartItemIndex = user.cart.findIndex(item => item.productId.toString() === productId.toString());
+
+        let finalQuantityInCart = 0;
+
+        if (existingCartItemIndex > -1) {
+            const existingQuantity = user.cart[existingCartItemIndex].quantity;
+            const newQuantity = existingQuantity + numQuantity;
+            if (product.stock < newQuantity) {
+                return res.status(400).json({ success: false, message: `Cannot add ${numQuantity} more ${product.name}. Only ${product.stock} available in total (you have ${existingQuantity} in cart).` });
+            }
+            user.cart[existingCartItemIndex].quantity = newQuantity;
+            finalQuantityInCart = newQuantity;
+        } else {
+            if (product.stock < numQuantity) {
+                return res.status(400).json({ success: false, message: `Insufficient stock for ${product.name}. Only ${product.stock} available.` });
+            }
+            user.cart.push({ productId, quantity: numQuantity });
+            finalQuantityInCart = numQuantity;
+        }
+
+        await user.save();
+
+        // Update session cart
+        req.session.user.cart = user.cart.map(item => ({ productId: item.productId, quantity: item.quantity }));
+        await req.session.save();
+
+        // Calculate updated cart item count for the response
+        const updatedCartItemCount = user.cart.reduce((count, item) => count + (item.quantity || 0), 0);
+
+        return res.status(200).json({
+            success: true,
+            message: `${product.name} added to cart!`,
+            cartItemCount: updatedCartItemCount // Send back the updated count
+        });
+
+    } catch (error) {
+        console.error("AJAX Add to Cart Error:", error);
+        let statusCode = 500;
+        let message = 'Error adding item to cart.';
+        if (error.name === 'CastError') {
+            statusCode = 400;
+            message = 'Invalid product ID format.';
+        }
+        return res.status(statusCode).json({ success: false, message: message });
     }
 };
 
@@ -512,7 +603,7 @@ exports.getCheckoutPage = async (req, res, next) => {
 };
 
 // ============================================================
-// *** UPDATED Pincode Lookup using api.postalpincode.in ***
+// Pincode Lookup
 // ============================================================
 exports.lookupPincode = async (req, res) => {
     const pincode = req.params.pincode;
@@ -558,7 +649,6 @@ exports.lookupPincode = async (req, res) => {
                     localities: [] // Return empty array
                 }
             });
-            // OR: return res.status(404).json({ success: false, message: 'Pincode found, but no location details available.' });
         }
 
         // --- Extract and Map Data ---
@@ -582,7 +672,6 @@ exports.lookupPincode = async (req, res) => {
                                 : firstPO.Division || ''),
             districtName: firstPO.District || '',
             stateName: firstPO.State || '',
-            // --- Add localities array ---
             localities: uniqueLocalities
         };
 
@@ -608,6 +697,3 @@ exports.lookupPincode = async (req, res) => {
         res.status(statusCode).json({ success: false, message: message });
     }
 };
-// ============================================================
-// End Updated Pincode Lookup
-// ============================================================
