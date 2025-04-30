@@ -745,7 +745,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             containerDiv.style.display = 'block';
             const firstLocality = location.localities && location.localities.length > 0 ? location.localities[0] : 'Area';
-            pincodeStatusElement.textContent = `✓ Location found (${firstLocality})`;
+            pincodeStatusElement.textContent = `✓ Location found `;
             pincodeStatusElement.className = 'pincode-status text-success';
 
         } catch (error) {
@@ -995,7 +995,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // --- ADDED: Password Visibility Toggle ---
+    // Password Visibility Toggle
     // ========================================
     document.querySelectorAll('.password-toggle-btn').forEach(button => {
         button.addEventListener('click', () => {
@@ -1015,12 +1015,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     // ========================================
-    // --- End: Password Visibility Toggle ---
+    // End: Password Visibility Toggle
     // ========================================
 
 
     // ========================================
-    // --- ADDED: AJAX Add to Cart (Index Page) ---
+    // AJAX Add to Cart (Index Page) - MODIFIED
     // ========================================
     document.querySelectorAll('.btn-ajax-add-to-cart').forEach(button => {
         const originalHtml = button.innerHTML; // Store original button content
@@ -1028,6 +1028,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const successHtml = '<i class="fas fa-check"></i> Added';
 
         button.addEventListener('click', async () => {
+            // *** NEW: Check authentication status ***
+            const isAuthenticated = document.body.dataset.isAuthenticated === 'true';
+
+            if (!isAuthenticated) {
+                // Store a flag in sessionStorage to indicate the reason for redirection
+                sessionStorage.setItem('showLoginRedirectToast', 'true');
+                // Redirect to login page, preserving the current path as returnTo
+                window.location.href = `/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                return; // Stop further execution
+            }
+            // *** END: Check authentication status ***
+
+            // --- Existing Logic (Runs only if authenticated) ---
             const productId = button.dataset.productId;
             if (!productId) {
                 console.error('Product ID not found on button');
@@ -1046,6 +1059,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        // Add CSRF token header if needed
                     },
                     body: JSON.stringify({ productId, quantity })
                 });
@@ -1067,25 +1081,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Revert button after a delay
                 setTimeout(() => {
-                    button.disabled = false;
-                    button.classList.remove('success');
-                    button.innerHTML = originalHtml;
+                    // Check if the button still exists before trying to modify it
+                    if (document.body.contains(button)) {
+                        button.disabled = false;
+                        button.classList.remove('success');
+                        button.innerHTML = originalHtml;
+                    }
                 }, 1500); // Revert after 1.5 seconds
 
             } catch (error) {
                 console.error("AJAX Add to Cart error:", error);
                 showToast(error.message || 'Could not add item to cart.', 'danger');
                 // Revert button immediately on error
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.innerHTML = originalHtml;
+                 // Check if the button still exists before trying to modify it
+                 if (document.body.contains(button)) {
+                    button.disabled = false;
+                    button.classList.remove('loading');
+                    button.innerHTML = originalHtml;
+                 }
             }
+            // --- End Existing Logic ---
         });
     });
     // ========================================
-    // --- End: AJAX Add to Cart (Index Page) ---
+    // End: AJAX Add to Cart (Index Page)
     // ========================================
 
+    // ========================================
+    // Check for Login Redirect Toast on Page Load
+    // ========================================
+    if (window.location.pathname === '/auth/login') {
+        const showToastFlag = sessionStorage.getItem('showLoginRedirectToast');
+        if (showToastFlag === 'true') {
+            showToast('Please log in to add items to your cart.', 'info');
+            // Remove the flag so it doesn't show again on refresh
+            sessionStorage.removeItem('showLoginRedirectToast');
+        }
+    }
+    // ========================================
+    // End: Check for Login Redirect Toast
+    // ========================================
 
 }); // End DOMContentLoaded
 

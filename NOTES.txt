@@ -6553,7 +6553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             containerDiv.style.display = 'block';
             const firstLocality = location.localities && location.localities.length > 0 ? location.localities[0] : 'Area';
-            pincodeStatusElement.textContent = `✓ Location found (${firstLocality})`;
+            pincodeStatusElement.textContent = `✓ Location found `;
             pincodeStatusElement.className = 'pincode-status text-success';
 
         } catch (error) {
@@ -6803,7 +6803,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // --- ADDED: Password Visibility Toggle ---
+    // Password Visibility Toggle
     // ========================================
     document.querySelectorAll('.password-toggle-btn').forEach(button => {
         button.addEventListener('click', () => {
@@ -6823,12 +6823,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     // ========================================
-    // --- End: Password Visibility Toggle ---
+    // End: Password Visibility Toggle
     // ========================================
 
 
     // ========================================
-    // --- ADDED: AJAX Add to Cart (Index Page) ---
+    // AJAX Add to Cart (Index Page) - MODIFIED
     // ========================================
     document.querySelectorAll('.btn-ajax-add-to-cart').forEach(button => {
         const originalHtml = button.innerHTML; // Store original button content
@@ -6836,6 +6836,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const successHtml = '<i class="fas fa-check"></i> Added';
 
         button.addEventListener('click', async () => {
+            // *** NEW: Check authentication status ***
+            const isAuthenticated = document.body.dataset.isAuthenticated === 'true';
+
+            if (!isAuthenticated) {
+                // Store a flag in sessionStorage to indicate the reason for redirection
+                sessionStorage.setItem('showLoginRedirectToast', 'true');
+                // Redirect to login page, preserving the current path as returnTo
+                window.location.href = `/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                return; // Stop further execution
+            }
+            // *** END: Check authentication status ***
+
+            // --- Existing Logic (Runs only if authenticated) ---
             const productId = button.dataset.productId;
             if (!productId) {
                 console.error('Product ID not found on button');
@@ -6854,6 +6867,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        // Add CSRF token header if needed
                     },
                     body: JSON.stringify({ productId, quantity })
                 });
@@ -6875,25 +6889,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Revert button after a delay
                 setTimeout(() => {
-                    button.disabled = false;
-                    button.classList.remove('success');
-                    button.innerHTML = originalHtml;
+                    // Check if the button still exists before trying to modify it
+                    if (document.body.contains(button)) {
+                        button.disabled = false;
+                        button.classList.remove('success');
+                        button.innerHTML = originalHtml;
+                    }
                 }, 1500); // Revert after 1.5 seconds
 
             } catch (error) {
                 console.error("AJAX Add to Cart error:", error);
                 showToast(error.message || 'Could not add item to cart.', 'danger');
                 // Revert button immediately on error
-                button.disabled = false;
-                button.classList.remove('loading');
-                button.innerHTML = originalHtml;
+                 // Check if the button still exists before trying to modify it
+                 if (document.body.contains(button)) {
+                    button.disabled = false;
+                    button.classList.remove('loading');
+                    button.innerHTML = originalHtml;
+                 }
             }
+            // --- End Existing Logic ---
         });
     });
     // ========================================
-    // --- End: AJAX Add to Cart (Index Page) ---
+    // End: AJAX Add to Cart (Index Page)
     // ========================================
 
+    // ========================================
+    // Check for Login Redirect Toast on Page Load
+    // ========================================
+    if (window.location.pathname === '/auth/login') {
+        const showToastFlag = sessionStorage.getItem('showLoginRedirectToast');
+        if (showToastFlag === 'true') {
+            showToast('Please log in to add items to your cart.', 'info');
+            // Remove the flag so it doesn't show again on refresh
+            sessionStorage.removeItem('showLoginRedirectToast');
+        }
+    }
+    // ========================================
+    // End: Check for Login Redirect Toast
+    // ========================================
 
 }); // End DOMContentLoaded
 
@@ -8454,7 +8489,8 @@ views/partials/header.ejs:
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
+<%# --- MODIFIED: Added data-is-authenticated attribute --- %>
+<body data-is-authenticated="<%= currentUser ? 'true' : 'false' %>">
   <header class="app-header">
     <nav class="navbar">
       <div class="nav-left">
@@ -8469,7 +8505,7 @@ views/partials/header.ejs:
               <input type="search"
                      id="search-input-dynamic"
                      name="search"
-                     placeholder="Search products..." <%# Already had placeholder %>
+                     placeholder="Search products..."
                      aria-label="Search Products"
                      autocomplete="off">
               <button type="submit" class="search-submit-btn-dynamic" aria-label="Submit Search">
@@ -8652,14 +8688,12 @@ views/products/detail.ejs:
            <%# --- Conditional Purchase Actions START --- %>
            <% if (isApproved) { %>
                <div class="product-actions mt-3"> <%# Added margin-top %>
-                   <%# --- WRAP actions in a flex container --- %>
-                   <div class="d-flex flex-wrap align-items-center gap-2"> <%# flex-wrap allows buttons to stack on small screens if needed %>
+                   <div class="d-flex flex-wrap align-items-center gap-2">
 
-                       <%# Add to Cart Form (remains mostly the same, but button is moved out) %>
+                       <%# Add to Cart Form (Target for JS) %>
                        <form action="/user/cart/add" method="POST" id="add-to-cart-form-<%= product._id %>" class="form-submit-spinner">
                           <input type="hidden" name="productId" value="<%= product._id %>">
-                           <%# Quantity selector now inside the flex container %>
-                           <div class="quantity-selector d-inline-flex align-items-center me-2"> <%# Added display: inline-flex %>
+                           <div class="quantity-selector d-inline-flex align-items-center me-2">
                                <label for="quantity-<%= product._id %>" class="me-1 mb-0 text-muted small">Qty:</label>
                                <input type="number"
                                       id="quantity-<%= product._id %>"
@@ -8674,36 +8708,39 @@ views/products/detail.ejs:
                            </div>
                        </form>
 
-                       <%# Add to Cart Button (associated with the form above) %>
+                       <%# Add to Cart Button (Target for JS) %>
                        <button type="submit"
-                               form="add-to-cart-form-<%= product._id %>" <%# Associate with form %>
-                               class="btn btn-primary btn-sm btn-action" <%# Added common class btn-action %>
+                               id="btn-add-to-cart-<%= product._id %>" <%# *** ADDED ID *** %>
+                               form="add-to-cart-form-<%= product._id %>"
+                               class="btn btn-primary btn-sm btn-action"
                                <%= product.stock <= 0 ? 'disabled' : '' %>>
                            <i class="fas fa-cart-plus"></i> <%= product.stock <= 0 ? 'Out of Stock' : 'Add to Cart' %>
                        </button>
 
-                        <%# Buy Now Form (remains mostly the same, but button is moved out) %>
+                        <%# Buy Now Form (Target for JS) %>
                         <% if (product.stock > 0) { %>
                         <form action="/user/cart/add?redirectTo=checkout" method="POST" id="buy-now-form-<%= product._id %>" class="form-submit-spinner">
                               <input type="hidden" name="productId" value="<%= product._id %>">
-                              <input type="hidden" name="quantity" value="1"> <%# Default Buy Now to 1 %>
+                              <%# Ensure quantity for Buy Now is consistent with Add to Cart selection %>
+                              <input type="hidden" name="quantity" id="buy-now-quantity-<%= product._id %>" value="1">
                            </form>
-                            <%# Buy Now Button (associated with the form above) %>
+                            <%# Buy Now Button (Target for JS) %>
                            <button type="submit"
-                                   form="buy-now-form-<%= product._id %>" <%# Associate with form %>
-                                   class="btn btn-success btn-sm btn-action"> <%# Added common class btn-action %>
+                                   id="btn-buy-now-<%= product._id %>" <%# *** ADDED ID *** %>
+                                   form="buy-now-form-<%= product._id %>"
+                                   class="btn btn-success btn-sm btn-action">
                                    Buy Now
                            </button>
                         <% } else {%>
-                          <button class="btn btn-success btn-sm btn-action" disabled>Buy Now</button> <%# Added common class btn-action %>
+                          <button class="btn btn-success btn-sm btn-action" disabled>Buy Now</button>
                         <% } %>
 
-                   </div> <%# --- End flex container --- %>
+                   </div>
                </div>
             <% } else { %>
                 <%# Unavailable state buttons %>
-                <div class="product-actions mt-3"> <%# Added margin-top %>
-                     <div class="d-flex flex-wrap align-items-center gap-2"> <%# Use flex container here too for consistency %>
+                <div class="product-actions mt-3">
+                     <div class="d-flex flex-wrap align-items-center gap-2">
                          <button class="btn btn-primary btn-sm btn-action" disabled><i class="fas fa-cart-plus"></i> Add to Cart</button>
                          <button class="btn btn-success btn-sm btn-action" disabled>Buy Now</button>
                      </div>
@@ -8723,7 +8760,7 @@ views/products/detail.ejs:
             <p class="small text-muted mt-3">Seller Info : <%= product.sellerEmail || 'Unknown Seller' %></p>
 
             <%# Rating Display %>
-            <div class="mb-3 mt-2"> <%# Adjusted margin slightly %>
+            <div class="mb-3 mt-2">
                  <% if (product.numReviews > 0) { %>
                      <p class="detail-rating">
                          Rating:
@@ -8791,8 +8828,57 @@ views/products/detail.ejs:
 </div> <%# End product-detail-container %>
 
 
+<%# --- INLINE SCRIPT FOR DETAIL PAGE AUTH CHECK --- %>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Get authentication status from body tag (set in header.ejs)
+    const isAuthenticated = document.body.dataset.isAuthenticated === 'true';
+
+    // Helper function for redirection
+    const redirectToLogin = (returnUrl) => {
+        sessionStorage.setItem('showLoginRedirectToast', 'true');
+        window.location.href = `/auth/login?returnTo=${encodeURIComponent(returnUrl)}`;
+    };
+
+    // *** Add to Cart Button Listener ***
+    const addToCartBtn = document.getElementById('btn-add-to-cart-<%= product._id %>');
+    if (addToCartBtn) {
+        addToCartBtn.addEventListener('click', (event) => {
+            if (!isAuthenticated) {
+                event.preventDefault(); // Prevent form submission
+                redirectToLogin(window.location.pathname + window.location.search);
+            }
+            // If authenticated, the default form submission will proceed
+        });
+    }
+
+    // *** Buy Now Button Listener ***
+    const buyNowBtn = document.getElementById('btn-buy-now-<%= product._id %>');
+    const quantityInput = document.getElementById('quantity-<%= product._id %>'); // Get the quantity input
+    const buyNowQuantityInput = document.getElementById('buy-now-quantity-<%= product._id %>'); // Get the hidden input for buy now
+
+    if (buyNowBtn) {
+        buyNowBtn.addEventListener('click', (event) => {
+            if (!isAuthenticated) {
+                event.preventDefault(); // Prevent form submission
+                redirectToLogin(window.location.pathname + window.location.search);
+            } else {
+                 // *** NEW: Update hidden quantity for Buy Now ***
+                 if (quantityInput && buyNowQuantityInput) {
+                    buyNowQuantityInput.value = quantityInput.value || '1'; // Use selected qty or default to 1
+                 }
+                 // Allow form submission to proceed (including spinner logic if attached)
+            }
+        });
+    }
+});
+</script>
+<%# --- END INLINE SCRIPT --- %>
+
+
 <script>
     // --- Image Slider JS ---
+    // ... (Existing Image Slider JS - Keep As Is) ...
     const imageSlider = document.querySelector('[data-product-image-slider]');
     if (imageSlider) {
         const slides = imageSlider.querySelectorAll('[data-product-slide]');
@@ -8843,6 +8929,7 @@ views/products/detail.ejs:
     // --- END Image Slider JS ---
 
     // --- Rating Bar Animation JS ---
+    // ... (Existing Rating Bar JS - Keep As Is) ...
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
             var width = el.getAttribute('data-width');

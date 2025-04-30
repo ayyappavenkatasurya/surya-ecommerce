@@ -31,7 +31,8 @@
   <link rel="icon" href="/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
+<%# --- MODIFIED: Added data-is-authenticated attribute --- %>
+<body data-is-authenticated="<%= currentUser ? 'true' : 'false' %>">
   <header class="app-header">
     <nav class="navbar">
       <div class="nav-left">
@@ -46,7 +47,7 @@
               <input type="search"
                      id="search-input-dynamic"
                      name="search"
-                     placeholder="Search products..." <%# Already had placeholder %>
+                     placeholder="Search products..."
                      aria-label="Search Products"
                      autocomplete="off">
               <button type="submit" class="search-submit-btn-dynamic" aria-label="Submit Search">
