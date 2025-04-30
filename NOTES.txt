@@ -105,13 +105,14 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
 } = require('./orderController');
 const mongoose = require('mongoose');
-// *** Import categories and names ***
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
@@ -123,68 +124,54 @@ const cancellationReasons = [
     "❓ Other (Admin)",
 ];
 
-// --- Admin Dashboard ---
 exports.getAdminDashboard = (req, res) => {
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
 
-// --- Admin Product Upload Page ---
 exports.getUploadProductPage = (req, res) => {
-    // *** Pass categories to the view ***
     res.render('admin/upload-product', {
         title: 'Admin: Upload New Product',
         product: {},
-        categories: categories // Pass the full list
+        categories: categories
     });
 };
 
-// --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
-    // --- END UPDATED ---
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
-    // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
-        // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
-    // *** Add Category Validation ***
     if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
-    // Optional: Add validation for imageUrl2 if needed (e.g., check URL format if provided)
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(), // Category is now validated
+            category: category.trim(),
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
-            // --- UPDATED: Assign imageUrl2 ---
             imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
-            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: adminUserId,
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
 
-        await newProduct.save(); // This will trigger enum validation
+        await newProduct.save();
         console.log(`Product ${newProduct._id} saved initially by ADMIN ${adminUserEmail}.`);
 
-        // Send for Gemini Review (Asynchronous - keep existing)
         reviewProductWithGemini(newProduct).then(async reviewResult => {
             try {
                 const productToUpdate = await Product.findById(newProduct._id);
@@ -209,7 +196,6 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           // *** Pass categories back on error ***
            return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product by Admin:", error);
@@ -217,7 +203,6 @@ exports.uploadProduct = async (req, res, next) => {
     }
 };
 
-// --- Manage Products (Admin sees ALL) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({})
@@ -233,7 +218,6 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product (Admin edits ANY) ---
 exports.getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id)
@@ -243,12 +227,11 @@ exports.getEditProductPage = async (req, res, next) => {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
-        // *** Pass categories to the view ***
         res.render('admin/edit-product', {
             title: `Admin Edit: ${product.name}`,
             product: product,
             isAdminView: true,
-            categories: categories // Pass the full list
+            categories: categories
         });
     } catch (error) {
         if (error.name === 'CastError') {
@@ -259,15 +242,11 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
-    // --- END UPDATED ---
-    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
+    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories };
 
-    // Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         return res.render('admin/edit-product', renderOptions);
@@ -276,7 +255,6 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
          return res.render('admin/edit-product', renderOptions);
     }
-    // *** Add Category Validation ***
     if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
          return res.render('admin/edit-product', renderOptions);
@@ -290,24 +268,21 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
         return res.render('admin/edit-product', renderOptions);
     }
-    // Optional: Validate imageUrl2 format if present
 
     try {
-        const product = await Product.findById(productId); // Fetch non-lean for saving
+        const product = await Product.findById(productId);
         if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.status(404).redirect('/admin/manage-products');
         }
 
         product.name = name.trim();
-        product.category = category.trim(); // Category validated
+        product.category = category.trim();
         product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
-        // --- UPDATED: Update imageUrl2 ---
         product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
-        // --- END UPDATED ---
         product.specifications = specifications ? specifications.trim() : '';
 
         if (reviewStatus && allowedStatus.includes(reviewStatus)) {
@@ -315,7 +290,7 @@ exports.updateProduct = async (req, res, next) => {
             product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined;
         }
 
-        await product.save(); // Will trigger enum validation
+        await product.save();
         req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
         res.redirect('/admin/manage-products');
 
@@ -325,10 +300,9 @@ exports.updateProduct = async (req, res, next) => {
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
              try {
                  const originalProduct = await Product.findById(productId).lean();
-                 renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data
+                 renderOptions.product = { ...originalProduct, ...req.body };
              } catch (fetchErr) {
                  console.error("Error refetching product on update validation fail:", fetchErr);
-                 // Use req.body as fallback
              }
              return res.render('admin/edit-product', renderOptions);
         }
@@ -341,8 +315,6 @@ exports.updateProduct = async (req, res, next) => {
     }
 };
 
-
-// --- Remove Product (Admin removes ANY - keep existing) ---
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     try {
@@ -363,8 +335,6 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-
-// --- Manage Orders (Admin sees ALL - keep existing) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -402,8 +372,6 @@ exports.getManageOrdersPage = async (req, res, next) => {
     }
 };
 
-
-// --- Admin Order Actions (keep existing) ---
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -449,7 +417,8 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
     try {
         const order = await Order.findById(orderId)
                                 .populate('products.productId', 'name _id')
-                                .populate('userId', 'email')
+                                // *** Populate user name for email ***
+                                .populate('userId', 'email name')
                                 .session(sessionDB);
 
         if (!order) {
@@ -463,7 +432,6 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
         }
 
-        // Restore Stock
         const productStockRestorePromises = order.products.map(item => {
             const quantityToRestore = Number(item.quantity);
             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -481,22 +449,39 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
 
         order.status = 'Cancelled';
-        order.cancellationReason = reason;
+        order.cancellationReason = reason; // Admin reason selected from dropdown
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // Send Email Notification
+        // *** UPDATED: Send Email Notification using template ***
         try {
             const customerEmail = order.userEmail || order.userId?.email;
+            // *** Use populated name or fallback ***
+            const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
-                const htmlCust = `<p>Your order (${order._id}) has been cancelled by administration.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>Contact support for questions.</p>`;
-                await sendEmail(customerEmail, subjectCust, `Order ${order._id} cancelled. Reason: ${order.cancellationReason}`, htmlCust);
+                const subjectCust = `Update on Your miniapp Order #${order._id}`;
+                const textCust = `Your order (${order._id}) has been cancelled by administration. Reason: ${order.cancellationReason}. Contact support for questions.`;
+                const htmlCust = generateEmailHtml({
+                    recipientName: customerName,
+                    subject: subjectCust,
+                    greeting: `Regarding Your Order #${order._id}`,
+                    bodyLines: [
+                        `We are writing to inform you that your order (#${order._id}) has been cancelled by our administration team.`,
+                        `<strong>Reason for Cancellation:</strong> ${order.cancellationReason}`, // Use the admin reason
+                        `If any payment was made, a refund will be processed shortly according to our policy.`,
+                        `We apologize for any inconvenience this may cause. Please contact our support team if you have any questions.`
+                    ],
+                     buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
+                     buttonText: 'View My Orders',
+                     companyName: 'miniapp'
+                });
+                await sendEmail(customerEmail, subjectCust, textCust, htmlCust);
             }
         } catch (emailError) {
             console.error(`Failed sending cancellation email for order ${order._id}:`, emailError);
         }
+        // *** END UPDATE ***
 
         req.flash('success_msg', `Order ${orderId} cancelled by admin. Reason: ${reason}.`);
         res.redirect('/admin/manage-orders');
@@ -507,12 +492,12 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         req.flash('error_msg', 'Failed to cancel order due to an internal error.');
         res.redirect('/admin/manage-orders');
     } finally {
-        sessionDB.endSession();
+        if (sessionDB && sessionDB.endSession) {
+             sessionDB.endSession();
+        }
     }
 };
 
-
-// --- Manage Users (Admin - keep existing) ---
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -587,6 +572,8 @@ exports.removeUser = async (req, res, next) => {
             }
         }
 
+        // Consider implications: Should deleting a user cascade to products/orders?
+        // For now, just delete the user document.
         await User.deleteOne({ _id: userId });
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
@@ -602,8 +589,6 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-
-// --- Banner Management Controllers ---
 exports.getManageBannersPage = async (req, res, next) => {
     try {
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
@@ -659,6 +644,10 @@ exports.updateBanners = async (req, res, next) => {
                      title: trimmedTitle || undefined
                  });
              }
+        } else if (trimmedLinkUrl || trimmedTitle) {
+             // Ensure if Link or Title is provided, Image URL is also required
+             req.flash('error_msg', `Banner ${i + 1}: Image URL is required if Link URL or Title is provided.`);
+             validationError = true;
         }
     }
 
@@ -703,7 +692,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 const { sendEmail } = require('../config/mailer');
-// *** Import categories and names ***
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
@@ -711,30 +701,26 @@ const { categoryNames } = require('../config/categories');
 const uppercaseRegex = /[A-Z]/;
 const lowercaseRegex = /[a-z]/;
 const numberRegex = /[0-9]/;
-// Define allowed special characters (escape regex special chars like - \ [ ] /)
 const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/;
-const minPasswordLength = 8; // INCREASED MINIMUM LENGTH
+const minPasswordLength = 8;
 
-// Generic Password Format Error Message
 const passwordFormatErrorMsg = "password doesn't match requested format";
 
 
-// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. ---
 exports.getLoginPage = (req, res) => {
     if (req.session.user) {
-         return res.redirect('/'); // Redirect if already logged in
+         return res.redirect('/');
     }
     res.render('auth/login', { title: 'Login' });
 };
 
 exports.getRegisterPage = (req, res) => {
     if (req.session.user) {
-        return res.redirect('/'); // Redirect if already logged in
+        return res.redirect('/');
    }
-   // Pass back potential form data from failed validation
     res.render('auth/register', {
         title: 'Register',
-        name: req.flash('form_name')[0] || '', // Get flashed data if exists
+        name: req.flash('form_name')[0] || '',
         email: req.flash('form_email')[0] || ''
     });
 };
@@ -745,7 +731,7 @@ exports.getVerifyOtpPage = (req, res) => {
         req.flash('error_msg', 'Email required for OTP verification.');
         return res.redirect('/auth/register');
     }
-     if (req.session.user) { // Redirect if already logged in
+     if (req.session.user) {
         return res.redirect('/');
    }
     res.render('auth/verify-otp', { title: 'Verify Email', email });
@@ -753,7 +739,7 @@ exports.getVerifyOtpPage = (req, res) => {
 
 exports.getForgotPasswordPage = (req, res) => {
      if (req.session.user) {
-         return res.redirect('/'); // Redirect if already logged in
+         return res.redirect('/');
     }
     res.render('auth/forgot-password', { title: 'Forgot Password' });
 };
@@ -779,7 +765,6 @@ exports.getResetPasswordPage = async (req, res, next) => {
     }
 };
 
-// --- UPDATED registerUser ---
 exports.registerUser = async (req, res, next) => {
      if (req.session.user) {
         return res.redirect('/');
@@ -791,8 +776,7 @@ exports.registerUser = async (req, res, next) => {
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { errors.push('Please enter a valid email address.'); }
 
-    // --- MODIFIED Password Complexity Validation ---
-    let passwordComplexityFailed = false; // Flag to track if any complexity rule failed
+    let passwordComplexityFailed = false;
     if (password) {
         if (
             password.length < minPasswordLength ||
@@ -801,27 +785,23 @@ exports.registerUser = async (req, res, next) => {
             !numberRegex.test(password) ||
             !specialCharRegex.test(password)
         ) {
-            passwordComplexityFailed = true; // Set flag if any rule fails
+            passwordComplexityFailed = true;
         }
     } else {
-        // If password field itself is empty, it's caught by the initial check above
+        // Caught by initial check
     }
 
-    // Add the generic error message ONCE if any complexity rule failed
     if (passwordComplexityFailed) {
-        // Check if the generic message is already added to avoid duplicates
         if (!errors.includes(passwordFormatErrorMsg)) {
              errors.push(passwordFormatErrorMsg);
         }
     }
-    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        // Flash form data to repopulate
         req.flash('form_name', name);
         req.flash('form_email', email);
-        return res.redirect('/auth/register'); // Redirect back to GET route
+        return res.redirect('/auth/register');
     }
 
     try {
@@ -837,26 +817,38 @@ exports.registerUser = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
 
         if (user && !user.isVerified) {
-            // Update existing unverified user
             user.name = name;
-            if (password) { user.password = password; } // Hashing happens in pre-save
+            if (password) { user.password = password; }
             user.otp = otp;
             user.otpExpires = otpExpires;
             user.isVerified = false;
-            await user.save({ validateBeforeSave: true }); // Let Mongoose run its validators too
+            await user.save({ validateBeforeSave: true });
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
-            // Create new user
             user = new User({ name, email: lowerCaseEmail, password, otp, otpExpires, isVerified: false });
             await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
-        // Send OTP Email (keep existing logic)
+        // *** UPDATED: Send OTP Email using template ***
         const subject = 'Verify Your Email Address';
-        const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
-        const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes. Welcome to miniapp!`; // Simple text version
+        const html = generateEmailHtml({
+            recipientName: user.name,
+            subject: subject,
+            greeting: `Welcome to miniapp, ${user.name}!`,
+            bodyLines: [
+                `Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:`,
+                // Use inline styles for better compatibility
+                `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                `This OTP will expire in 10 minutes.`,
+                `If you didn't request this, you can safely ignore this email.`
+            ],
+            companyName: 'miniapp' // Pass your app name
+            // No button needed for OTP verification usually
+        });
         const emailSent = await sendEmail(user.email, subject, text, html);
+        // *** END UPDATE ***
 
         if (emailSent) {
             req.flash('success_msg', `An OTP has been sent to ${user.email}. Please check your inbox and verify.`);
@@ -872,33 +864,28 @@ exports.registerUser = async (req, res, next) => {
             res.redirect('/auth/register');
         }
     } catch (error) {
-        if (error.code === 11000) { // Duplicate email
+        if (error.code === 11000) {
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-             req.flash('form_name', name); // Flash values back
+             req.flash('form_name', name);
              req.flash('form_email', email);
             return res.redirect('/auth/register');
         }
         if (error.name === 'ValidationError') {
-           // Mongoose validation errors
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            // If Mongoose minlength error exists, ensure our generic format message is shown instead or alongside
             if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
                  if (!errors.includes(passwordFormatErrorMsg)) {
                     errors.push(passwordFormatErrorMsg);
                  }
-                 // Filter out the specific mongoose length error if we added the generic one
                  validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
             }
-            // Combine remaining Mongoose errors with our custom ones
-            const finalErrors = [...new Set([...errors, ...validationErrors])]; // Use Set to avoid duplicates
+            const finalErrors = [...new Set([...errors, ...validationErrors])];
             req.flash('error_msg', finalErrors.join(' '));
             req.flash('form_name', name);
             req.flash('form_email', email);
             return res.redirect('/auth/register');
        }
-        // Catch other errors
         console.error("Registration Error:", error);
-        next(error); // Pass to global error handler
+        next(error);
     }
 };
 
@@ -936,12 +923,13 @@ exports.verifyOtp = async (req, res, next) => {
          user.otpExpires = undefined;
 
          if (isPasswordReset) {
-             await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for reset
+             // Don't clear reset token here, clear it in resetPassword controller
+             await user.save({ validateBeforeSave: false });
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
          else {
-            await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for registration
+            await user.save({ validateBeforeSave: false });
              req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
@@ -995,18 +983,41 @@ exports.resendOtp = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
         user.otp = otp;
         user.otpExpires = otpExpires;
-        await user.save({ validateBeforeSave: false }); // Skip validation for OTP resend
+        await user.save({ validateBeforeSave: false });
 
-        let subject, text, html;
+        // *** UPDATED: Send OTP Email using template ***
+        let subject, greeting, bodyLines;
+        const textOtpLine = `Your OTP is: ${otp}. It will expire in 10 minutes.`;
+
         if (isForReset) {
             subject = 'Your New Password Reset OTP';
-            text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
-            html = `<p>Your new password reset OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
+            greeting = `Password Reset Request`;
+            bodyLines = [
+                `Here is your new One-Time Password (OTP) for your password reset request:`,
+                `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                `This OTP will expire in 10 minutes.`,
+                `If you didn't request a password reset, please ignore this email.`
+            ];
         } else {
              subject = 'Your New Verification OTP';
-             text = `Your new verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
-            html = `<p>Your new verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+             greeting = `Verify Your Email`;
+             bodyLines = [
+                 `Here is your new One-Time Password (OTP) to verify your email address:`,
+                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                 `This OTP will expire in 10 minutes.`,
+                 `If you didn't request this, please ignore this email.`
+             ];
         }
+
+        const text = `${subject}\n${textOtpLine}\nIf you didn't request this, please ignore this email.`;
+        const html = generateEmailHtml({
+             recipientName: user.name,
+             subject: subject,
+             greeting: greeting,
+             bodyLines: bodyLines,
+             companyName: 'miniapp'
+        });
+        // *** END UPDATE ***
 
         const emailSent = await sendEmail(user.email, subject, text, html);
         const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
@@ -1032,7 +1043,6 @@ exports.loginUser = async (req, res, next) => {
     }
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Select password explicitly for comparison
         const user = await User.findOne({ email: lowerCaseEmail }).select('+password').populate('cart.productId', 'name price imageUrl');
 
         if (!user) {
@@ -1043,28 +1053,23 @@ exports.loginUser = async (req, res, next) => {
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
-        // Match password using the instance method
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
-         // Regenerate session upon successful login
          req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
-            // Set user data in the new session
             req.session.user = {
                 _id: user._id, name: user.name, email: user.email, role: user.role,
                 address: user.address ? user.address.toObject() : undefined,
-                // Ensure cart items are properly mapped for session storage
                 cart: user.cart ? user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
              };
-             // Save the session before redirecting
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -1073,7 +1078,7 @@ exports.loginUser = async (req, res, next) => {
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo; // Clear the returnTo path
+                 delete req.session.returnTo;
                  res.redirect(returnTo);
             });
         });
@@ -1082,25 +1087,19 @@ exports.loginUser = async (req, res, next) => {
     }
 };
 
-// --- REFINED logoutUser ---
 exports.logoutUser = (req, res, next) => {
-    const sessionUserEmail = req.session?.user?.email || 'User'; // Safely get email before potential destruction
+    const sessionUserEmail = req.session?.user?.email || 'User';
 
-    // 1. Set the flash message BEFORE destroying the session
     req.flash('success_msg', 'You have been logged out successfully.');
 
-    // 2. Clear the user data from the current session object
     if (req.session) {
         req.session.user = null;
     }
 
-    // 3. Clear the session cookie on the client side
     const cookieName = req.app.get('session cookie name') || 'connect.sid';
     res.clearCookie(cookieName);
     console.log(`${sessionUserEmail} - Cleared session cookie: ${cookieName}`);
 
-    // 4. Initiate the session destruction in the store (asynchronously)
-    // Log any errors but don't wait for it to complete before redirecting
     if (req.session) {
         req.session.destroy(err => {
             if (err) {
@@ -1108,13 +1107,10 @@ exports.logoutUser = (req, res, next) => {
             } else {
                 console.log(`${sessionUserEmail} - Session destroyed successfully in store.`);
             }
-            // **DO NOT redirect inside this callback**
         });
     } else {
         console.log(`${sessionUserEmail} - No active session found to destroy.`);
     }
-
-    // 5. Redirect the user immediately after clearing the cookie and initiating destruction
     return res.redirect('/auth/login');
 };
 
@@ -1129,42 +1125,50 @@ exports.forgotPassword = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage); // Use info_msg for neutral feedback
+        req.flash('info_msg', genericMessage);
 
-        // Send generic message even if user not found or not verified for security
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
             return res.redirect('/auth/forgot-password');
         }
 
-         // Generate OTP and Reset Token
          const otp = generateOTP();
          const resetToken = crypto.randomBytes(20).toString('hex');
-        const otpExpires = setOTPExpiration(10); // OTP expiry (short)
-        const resetExpires = setOTPExpiration(60); // Token expiry (longer)
+        const otpExpires = setOTPExpiration(10);
+        const resetExpires = setOTPExpiration(60);
 
-        // Update user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false }); // Skip validation for setting tokens/OTP
+        await user.save({ validateBeforeSave: false });
 
-        // Send Email
+        // *** UPDATED: Send Email using template ***
         const subject = 'Password Reset Request - Verify OTP';
-        const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
-        const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
-         const emailSent = await sendEmail(user.email, subject, text, html);
+        const text = `You requested a password reset. Your OTP is: ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`;
+        const html = generateEmailHtml({
+            recipientName: user.name,
+            subject: subject,
+            greeting: `Password Reset Request`,
+            bodyLines: [
+                 `We received a request to reset the password for your account associated with ${user.email}.`,
+                 `Please use the following One-Time Password (OTP) to verify your identity:`,
+                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                 `This OTP is valid for 10 minutes.`,
+                 `You will be prompted to enter this OTP on the verification page. After verification, you can set a new password.`,
+                 `If you did not request a password reset, please ignore this email. Your password will remain unchanged.`
+            ],
+            companyName: 'miniapp'
+            // No button needed here, user enters OTP on site
+        });
+        const emailSent = await sendEmail(user.email, subject, text, html);
+        // *** END UPDATE ***
 
-        // Redirect user to OTP verification page
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
-             // Redirect to verify OTP page, indicating it's for reset
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
-            // Handle email failure (keep generic message flashed)
             console.error(`Failed to send password reset OTP email to ${user.email}`);
-            // Don't reveal email failure to user, redirect back
             res.redirect('/auth/forgot-password');
         }
     } catch (error) {
@@ -1174,7 +1178,6 @@ exports.forgotPassword = async (req, res, next) => {
     }
 };
 
-// --- UPDATED resetPassword ---
 exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
@@ -1183,8 +1186,7 @@ exports.resetPassword = async (req, res, next) => {
     if (!password || !confirmPassword) { errors.push('Please enter and confirm your new password.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
 
-    // --- MODIFIED Password Complexity Validation ---
-    let passwordComplexityFailed = false; // Flag
+    let passwordComplexityFailed = false;
     if (password) {
         if (
             password.length < minPasswordLength ||
@@ -1193,25 +1195,22 @@ exports.resetPassword = async (req, res, next) => {
             !numberRegex.test(password) ||
             !specialCharRegex.test(password)
         ) {
-            passwordComplexityFailed = true; // Set flag
+            passwordComplexityFailed = true;
         }
     }
 
-    // Add the generic error message ONCE if needed
     if (passwordComplexityFailed) {
          if (!errors.includes(passwordFormatErrorMsg)) {
             errors.push(passwordFormatErrorMsg);
          }
     }
-    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         return res.redirect(`/auth/reset-password/${token}`); // Redirect back to the form
+         return res.redirect(`/auth/reset-password/${token}`);
     }
 
     try {
-        // Find user by valid token and expiry, select password for pre-save hook
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() },
@@ -1222,34 +1221,51 @@ exports.resetPassword = async (req, res, next) => {
             return res.redirect('/auth/forgot-password');
         }
 
-        // Assign the new password (bcrypt hashing is handled by the pre-save hook in User model)
         user.password = password;
 
-        // Clear reset and OTP fields
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true; // Ensure user is marked as verified
+        user.isVerified = true;
 
-        // Save the user (will trigger pre-save hook for hashing)
         await user.save();
 
-        // Log the user in after successful password reset
+        // Optional: Send password change confirmation email
+        try {
+             const subject = 'Your Password Has Been Changed';
+             const text = `The password for your miniapp account associated with ${user.email} was successfully changed. If you did not make this change, please contact support immediately.`;
+             const html = generateEmailHtml({
+                 recipientName: user.name,
+                 subject: subject,
+                 greeting: 'Password Successfully Reset',
+                 bodyLines: [
+                     `This email confirms that the password for your miniapp account has been successfully changed.`,
+                     `If you made this change, no further action is required.`,
+                     `If you did not initiate this password reset, please contact our support team immediately.`
+                 ],
+                 companyName: 'miniapp',
+                 // Optional button to login
+                 buttonUrl: `${req.protocol}://${req.get('host')}/auth/login`,
+                 buttonText: 'Login to Your Account'
+             });
+             await sendEmail(user.email, subject, text, html);
+        } catch (emailError) {
+             console.error("Error sending password change confirmation email:", emailError);
+        }
+
+
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
-              // Populate session data
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
-                  // Initialize cart as empty after reset login.
                   cart: []
               };
-            // Save session before redirecting
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
@@ -1257,14 +1273,12 @@ exports.resetPassword = async (req, res, next) => {
                     return res.redirect('/auth/login');
                  }
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                res.redirect('/'); // Redirect to homepage
+                res.redirect('/');
              });
          });
     } catch (error) {
         if (error.name === 'ValidationError') {
-           // Handle Mongoose validation errors during save (e.g., if minlength check fails again)
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            // Similar logic to handle Mongoose length error vs our generic one
              if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
                  if (!errors.includes(passwordFormatErrorMsg)) {
                     errors.push(passwordFormatErrorMsg);
@@ -1275,14 +1289,12 @@ exports.resetPassword = async (req, res, next) => {
             req.flash('error_msg', finalErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        // Handle other errors
         console.error("Reset Password Error:", error);
-        next(error); // Pass to global error handler
+        next(error);
     }
 };
 
 
-// --- getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
@@ -1294,7 +1306,6 @@ exports.getHomePage = async (req, res, next) => {
     };
 
     if (searchTerm) {
-         // Using MongoDB's text index for searching
          query.$text = { $search: searchTerm };
     }
     if (categoryFilter && categoryNames.includes(categoryFilter)) {
@@ -1303,21 +1314,17 @@ exports.getHomePage = async (req, res, next) => {
         console.warn(`Invalid category filter attempted: ${categoryFilter}`);
     }
 
-     // Define projection and sort based on whether a search term is present
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
-    // Fetch Products, Banners concurrently
     const [products, bannerConfig] = await Promise.all([
         Product.find(query, projection).sort(sort).lean(),
         BannerConfig.findOne({ configKey: 'mainBanners' }).lean()
     ]);
 
-    // Extract banner URLs
     const banners = bannerConfig?.banners || [];
     const validBanners = banners.filter(banner => banner.imageUrl);
 
-    // Determine page title based on filters
     let pageTitle = 'Home';
     if (searchTerm) {
         pageTitle = `Search Results for "${searchTerm}"`;
@@ -1347,18 +1354,18 @@ const Product = require('../models/Product');
 const { sendEmail } = require('../config/mailer');
 const mongoose = require('mongoose');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 
-// --- UPDATE placeOrder to include sellerId and check approval/stock within transaction ---
 exports.placeOrder = async (req, res, next) => {
     const userId = req.session.user._id;
     const sessionDB = await mongoose.startSession();
-    sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } }); // Use snapshot isolation if possible
+    sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
 
     try {
         const user = await User.findById(userId)
-                              // Populate necessary cart product fields including status and seller
                               .populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId')
-                              .session(sessionDB); // Use session
+                              .session(sessionDB);
 
         if (!user) {
             await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -1370,8 +1377,7 @@ exports.placeOrder = async (req, res, next) => {
             req.flash('error_msg', 'Your cart is empty.');
             return res.redirect('/user/cart');
         }
-        // Ensure address exists
-        if (!user.address || !user.address.name || !user.address.phone || !user.address.pincode || !user.address.cityVillage) {
+        if (!user.address || !user.address.name || !user.address.phone || !user.address.pincode || !user.address.cityVillage || !user.address.locality) { // Added locality check
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', 'Please complete your shipping address before placing the order.');
             return res.redirect('/user/checkout');
@@ -1382,16 +1388,14 @@ exports.placeOrder = async (req, res, next) => {
         const productStockUpdates = [];
         let validationFailed = false;
         let validationErrorMessage = 'An issue occurred with your cart. Please review and try again.';
-        const itemsToRemoveFromCart = []; // Track items to remove due to issues
+        const itemsToRemoveFromCart = [];
 
-        // --- Validate Cart Items Within Transaction ---
         for (const item of user.cart) {
-            // Basic checks
             const itemQuantity = Number(item.quantity);
             if (isNaN(itemQuantity) || !Number.isInteger(itemQuantity) || itemQuantity <= 0) {
                 validationErrorMessage = `Invalid quantity found for an item. It has been removed.`;
                 itemsToRemoveFromCart.push(item._id);
-                validationFailed = true; continue; // Continue checking other items
+                validationFailed = true; continue;
             }
             if (!item.productId || !item.productId._id) {
                  validationErrorMessage = `An invalid product reference was found and removed.`;
@@ -1399,148 +1403,155 @@ exports.placeOrder = async (req, res, next) => {
                  validationFailed = true; continue;
             }
 
-            const currentProduct = item.productId; // Already populated
+            const currentProduct = item.productId;
 
-            // *** Check Approval Status ***
              if (currentProduct.reviewStatus !== 'approved') {
                 validationErrorMessage = `Product "${currentProduct.name}" is not available and has been removed from your cart.`;
                 itemsToRemoveFromCart.push(item._id);
                 validationFailed = true; continue;
             }
-            // *** Check Stock Availability ***
             if (currentProduct.stock < itemQuantity) {
-                // If stock issue, fail the whole order immediately, don't just remove item
                 validationErrorMessage = `Insufficient stock for "${currentProduct.name}". Available: ${currentProduct.stock}. Please update your cart quantity.`;
                 validationFailed = true;
-                break; // Stop processing on critical stock issue
+                break;
             }
 
-            // If valid, add to order and prepare update
             orderProducts.push({
                 productId: currentProduct._id,
                 name: currentProduct.name,
-                priceAtOrder: currentProduct.price, // Price at the time of order
+                priceAtOrder: currentProduct.price,
                 quantity: itemQuantity,
                 imageUrl: currentProduct.imageUrl,
-                sellerId: currentProduct.sellerId // *** Include Seller ID ***
+                sellerId: currentProduct.sellerId
             });
             totalAmount += currentProduct.price * itemQuantity;
             productStockUpdates.push({
                  productId: currentProduct._id,
                  quantityToDecrement: itemQuantity
              });
-        } // End cart loop
+        }
 
-        // --- Handle Validation Failures ---
         if (validationFailed) {
-             // If items needed removal, perform the removal update
              if (itemsToRemoveFromCart.length > 0) {
                  await User.updateOne(
                     { _id: userId },
                     { $pull: { cart: { _id: { $in: itemsToRemoveFromCart } } } }
-                 ).session(sessionDB); // Perform removal within session
+                 ).session(sessionDB);
                  console.log(`Removed ${itemsToRemoveFromCart.length} invalid items from cart for user ${userId}`);
              }
-            await sessionDB.abortTransaction(); sessionDB.endSession(); // Abort the transaction
+            await sessionDB.abortTransaction(); sessionDB.endSession();
 
-             // Refresh session cart AFTER DB update
              const updatedUser = await User.findById(userId).select('cart').populate('cart.productId').lean();
-             req.session.user.cart = updatedUser ? updatedUser.cart.filter(i => i.productId) : [];
+             req.session.user.cart = updatedUser ? updatedUser.cart.filter(i => i.productId).map(i => ({ productId: i.productId._id, quantity: i.quantity })) : [];
              await req.session.save();
 
              req.flash('error_msg', validationErrorMessage);
              return res.redirect('/user/cart');
          }
 
-        // --- Proceed with DB Updates if Validation Passed ---
-
-        // Decrement Stock and Increment Order Count
         for (const update of productStockUpdates) {
             const updateResult = await Product.updateOne(
-                { _id: update.productId, stock: { $gte: update.quantityToDecrement } }, // Check stock again
+                { _id: update.productId, stock: { $gte: update.quantityToDecrement } },
                 { $inc: { stock: -update.quantityToDecrement, orderCount: 1 } },
                 { session: sessionDB }
             );
-            if (updateResult.modifiedCount === 0) { // Handle concurrent update failure
+            if (updateResult.modifiedCount === 0) {
                  await sessionDB.abortTransaction(); sessionDB.endSession();
                  req.flash('error_msg', `Checkout failed: Stock changed for a product during checkout. Please try again.`);
-                 // Don't remove items here, let user review cart again
                  return res.redirect('/user/cart');
              }
         }
 
-        // Create the Order document
         const order = new Order({
             userId: userId,
             userEmail: user.email,
-            products: orderProducts, // Includes sellerId
+            products: orderProducts,
             totalAmount: totalAmount,
             shippingAddress: user.address,
-            paymentMethod: 'COD', // Or from request body if multiple methods allowed
+            paymentMethod: 'COD',
             status: 'Pending',
-            // cancellationAllowedUntil is set by pre-save hook
         });
         await order.save({ session: sessionDB });
 
-        // Clear User's Cart
         user.cart = [];
         await user.save({ session: sessionDB });
 
-        // --- Commit Transaction ---
         await sessionDB.commitTransaction();
 
-        // Update session cart AFTER successful commit
         req.session.user.cart = [];
         await req.session.save();
 
-        // --- Send Confirmation Email (Outside Transaction) ---
+        // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = 'Your Order Has Been Placed!';
-            let productListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
-            const formattedOrderDate = res.locals.formatDateIST(order.orderDate);
-            const html = `<h2>Thank you for your order!</h2><p>Your Order ID: ${order._id}</p><p>Order Placed: ${formattedOrderDate}</p><p>Total Amount: ₹${order.totalAmount.toFixed(2)}</p><p>Shipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}</p><h3>Items:</h3><ul>${productListHTML}</ul><p>You can track your order status in the 'My Orders' section.</p>`;
-            await sendEmail(user.email, subject, `Your order ${order._id} has been placed. Total: ₹${totalAmount.toFixed(2)}`, html);
+            const subject = `Your miniapp Order #${order._id} Has Been Placed!`;
+            // Create a more detailed text fallback
+            const productListText = order.products.map(p => `- ${p.name} (Qty: ${p.quantity}) @ ₹${p.priceAtOrder.toFixed(2)}`).join('\n');
+            const text = `Thank you for your order!\nOrder ID: ${order._id}\nTotal: ₹${order.totalAmount.toFixed(2)}\n\nItems:\n${productListText}\n\nShipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.pincode}\n\nWe'll notify you when it ships. You can view status here: ${req.protocol}://${req.get('host')}/orders/my-orders`;
+
+            // Generate HTML using the template
+            const productListHTML = order.products.map(p => `<li style="margin-bottom: 5px; padding-left: 0;">${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
+            const html = generateEmailHtml({
+                recipientName: user.name,
+                subject: subject,
+                greeting: `Order Confirmation #${order._id}`,
+                bodyLines: [
+                    `Thank you for your purchase! Your order has been successfully placed and is being processed.`,
+                    `<strong>Order ID:</strong> ${order._id}`,
+                    `<strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}`,
+                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, // Added locality
+                    `<h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Order Summary:</h3>
+                     <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">${productListHTML}</ul>`, // Added bottom margin to ul
+                    `We'll send you another email once your order has shipped.`
+                ],
+                buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
+                buttonText: 'View Order Status',
+                companyName: 'miniapp'
+            });
+
+            await sendEmail(user.email, subject, text, html); // Send both text and html
         } catch (emailError) {
             console.error(`Failed sending order confirmation email for order ${order._id}:`, emailError);
-            // Don't fail the request if email fails
         }
+        // *** END UPDATE ***
 
         req.flash('success_msg', 'Order placed successfully!');
-        res.redirect('/orders/my-orders'); // Redirect to user's order history
+        res.redirect('/orders/my-orders');
 
     } catch (error) {
-        // Ensure transaction is aborted on any unexpected error
         if (sessionDB.inTransaction()) {
              await sessionDB.abortTransaction();
         }
         console.error("Order Placement Transaction Error:", error);
-        req.flash('error_msg', `Order placement failed due to a server error. Please review your cart and try again.`);
-        res.redirect('/user/cart'); // Redirect to cart
+        // Provide a slightly more informative error message
+        let userErrorMessage = 'Order placement failed due to a server error. Please try again.';
+        if (error.message && error.message.includes('Stock changed')) {
+            userErrorMessage = error.message; // Use the specific stock error message
+        }
+        req.flash('error_msg', userErrorMessage);
+        res.redirect('/user/cart');
     } finally {
-        // Always end the session
-        if (sessionDB.id) { // Check if session exists before ending
+        if (sessionDB && sessionDB.endSession) {
              await sessionDB.endSession();
         }
     }
 };
 
-// --- UPDATE cancelOrder (Uses Transaction) ---
 exports.cancelOrder = async (req, res, next) => {
     const orderId = req.params.id;
     const userId = req.session.user._id;
     const sessionDB = await mongoose.startSession();
-    sessionDB.startTransaction({ writeConcern: { w: 'majority' }}); // Ensure durability
+    sessionDB.startTransaction({ writeConcern: { w: 'majority' }});
 
     try {
-        // Find the order: Must belong to the user, be 'Pending', and within cancellation window
         const order = await Order.findOne({
              _id: orderId,
-             userId: userId, // Belongs to logged-in user
-             status: 'Pending', // Only pending orders
-             cancellationAllowedUntil: { $gt: Date.now() } // Within allowed time
+             userId: userId,
+             status: 'Pending',
+             cancellationAllowedUntil: { $gt: Date.now() }
         })
-        .populate('products.productId', '_id name') // Need _id for update
-        .session(sessionDB); // Use the transaction session
+        .populate('products.productId', '_id name')
+        .populate('userId', 'name') // Populate user name for email
+        .session(sessionDB);
 
         if (!order) {
              await sessionDB.abortTransaction(); sessionDB.endSession();
@@ -1549,24 +1560,20 @@ exports.cancelOrder = async (req, res, next) => {
         }
 
         console.log(`User Cancellation: Restoring stock/orderCount for order ${orderId}.`);
-        // Restore stock and decrement orderCount for each valid product item
         const productUpdatePromises = order.products.map(item => {
             const quantityToRestore = Number(item.quantity);
             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
                  console.warn(`User Cancel: Invalid item P.ID ${item.productId?._id} or Qty ${item.quantity} in O.ID ${orderId}. Skipping stock restore.`);
-                return Promise.resolve(); // Skip invalid items gracefully
+                return Promise.resolve();
              }
-            // Update the Product: Increment stock, decrement orderCount
              return Product.updateOne(
                  { _id: item.productId._id },
                  { $inc: { stock: quantityToRestore, orderCount: -1 } },
-                 { session: sessionDB } // Use transaction session
+                 { session: sessionDB }
              ).catch(err => {
-                // Log error, but allow cancellation to continue for the order itself
                 console.error(`User Cancel: Failed stock/orderCount restore for P.ID ${item.productId._id} on O.ID ${orderId}: ${err.message}`);
              });
         });
-        // Wait for all stock updates to attempt (use allSettled)
         const results = await Promise.allSettled(productUpdatePromises);
         results.forEach((result, index) => {
             if (result.status === 'rejected') {
@@ -1575,30 +1582,39 @@ exports.cancelOrder = async (req, res, next) => {
         });
         console.log(`User Cancel: Stock/OrderCount restoration process completed for order ${orderId}.`);
 
-
-        // Update the Order status
         order.status = 'Cancelled';
         order.cancellationReason = "Cancelled by customer";
-        // OTP fields etc., should be cleared by the pre-save hook in Order model
         await order.save({ session: sessionDB });
 
-        // --- Commit Transaction ---
         await sessionDB.commitTransaction();
 
-        // Send email confirmation (outside transaction)
+        // *** UPDATED: Send email confirmation using template ***
          try{
-             const subject = 'Your Order Has Been Cancelled';
-             const html = `<p>Your order (${order._id}) has been successfully cancelled as requested.</p>`;
-            await sendEmail(order.userEmail, subject, `Order ${order._id} cancelled.`, html);
+             const subject = `Your miniapp Order #${order._id} Has Been Cancelled`;
+             const text = `Your order (${order._id}) has been successfully cancelled as requested. Any applicable refund will be processed shortly.`;
+             const html = generateEmailHtml({
+                  recipientName: order.userId?.name || req.session.user.name, // Use populated name or session name
+                  subject: subject,
+                  greeting: `Order Cancellation Confirmation`,
+                  bodyLines: [
+                      `Your order (#${order._id}) has been successfully cancelled as per your request.`,
+                      `If any payment was made, a refund will be processed according to our policy. Please allow a few business days for it to reflect in your account.`,
+                      `We're sorry to see this order go. We hope to serve you again soon!`
+                  ],
+                  buttonUrl: `${req.protocol}://${req.get('host')}/`,
+                  buttonText: 'Continue Shopping',
+                  companyName: 'miniapp'
+             });
+            await sendEmail(order.userEmail, subject, text, html);
          } catch (emailError){
              console.error(`Failed sending cancellation confirmation email for order ${order._id}:`, emailError);
          }
+        // *** END UPDATE ***
 
         req.flash('success_msg', 'Order cancelled successfully.');
         res.redirect('/orders/my-orders');
 
     } catch (error) {
-         // Abort transaction on error
          if (sessionDB.inTransaction()) {
              await sessionDB.abortTransaction();
          }
@@ -1606,47 +1622,37 @@ exports.cancelOrder = async (req, res, next) => {
          req.flash('error_msg', 'Failed to cancel the order due to an internal error.');
          res.redirect('/orders/my-orders');
     } finally {
-        // Always end the session
-        if (sessionDB.id) { await sessionDB.endSession(); }
+        if (sessionDB && sessionDB.endSession) { await sessionDB.endSession(); }
     }
 };
 
-// --- Get My Orders (Includes OTP display logic) ---
 exports.getMyOrders = async (req, res, next) => {
     try {
         const orders = await Order.find({ userId: req.session.user._id })
-                                   .select('-__v') // Exclude version key for cleaner output
+                                   .select('-__v')
                                    .sort({ orderDate: -1 })
-                                   // Populate products for display
                                    .populate('products.productId', 'name imageUrl _id price')
-                                   .lean(); // Use lean for read-only access
+                                   .lean();
 
         const now = Date.now();
         orders.forEach(order => {
-            // Determine if customer can cancel
             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
-
-            // Determine if Delivery OTP should be shown
             order.showDeliveryOtp = order.status === 'Pending' &&
-                                    !!order.orderOTP &&          // OTP must exist
-                                    !!order.orderOTPExpires &&   // Expiry must exist
-                                    new Date(order.orderOTPExpires).getTime() > now; // Must not be expired
-
-            // Dates will be formatted in EJS using the formatDateIST helper
+                                    !!order.orderOTP &&
+                                    !!order.orderOTPExpires &&
+                                    new Date(order.orderOTPExpires).getTime() > now;
         });
 
         res.render('user/my-orders', {
             title: 'My Orders',
-            orders: orders // Pass orders to the view
-            // formatDateIST helper is available via res.locals
+            orders: orders
         });
     } catch (error) {
         console.error("Error fetching user orders:", error);
-        next(error); // Pass error to central handler
+        next(error);
     }
 };
 
-// --- Admin OTP Generation Logic (Remains Largely the Same) ---
 exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
     try {
         const order = await Order.findById(orderId);
@@ -1654,34 +1660,32 @@ exports.generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => {
         if (order.status !== 'Pending') throw new Error(`Cannot generate OTP for order status '${order.status}'. Must be 'Pending'.`);
 
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(5); // 5 minutes validity
+        const otpExpires = setOTPExpiration(5);
         order.orderOTP = otp;
         order.orderOTPExpires = otpExpires;
         await order.save();
 
-        const user = await User.findById(order.userId).select('email'); // Get user email for logging/potential notification
+        const user = await User.findById(order.userId).select('email');
         const userEmail = user ? user.email : '[User Account Missing]';
 
         console.log(`ADMIN generated Direct Delivery OTP for O.ID ${orderId}. OTP: ${otp}. (User: ${userEmail})`);
-        // Optional: Send email/SMS to user.email here if needed
+        // Optional: Could send an email to the user here if needed, using generateEmailHtml
 
         return { success: true, message: `OTP generated for order ${orderId}. It is visible on the customer's 'My Orders' page.` };
     } catch (error) {
         console.error(`Error in generateAndSendDirectDeliveryOTPByAdmin for O.ID ${orderId}:`, error);
-        throw error; // Re-throw for the calling controller
+        throw error;
     }
 };
 
-// --- Seller OTP Generation Logic (NEW) ---
 exports.generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => {
     try {
         const order = await Order.findById(orderId)
-                                .populate('products.productId', 'sellerId'); // Populate sellerId for verification
+                                .populate('products.productId', 'sellerId');
 
         if (!order) throw new Error('Order not found.');
         if (order.status !== 'Pending') throw new Error(`Cannot generate OTP for order status '${order.status}'. Must be 'Pending'.`);
 
-        // Security Check: Ensure the order contains at least one product from this seller
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
             console.warn(`Seller ${sellerId} attempted OTP generation for unrelated order ${orderId}.`);
@@ -1689,7 +1693,7 @@ exports.generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => 
         }
 
         const otp = generateOTP();
-        const otpExpires = setOTPExpiration(5); // 5 minutes validity
+        const otpExpires = setOTPExpiration(5);
         order.orderOTP = otp;
         order.orderOTPExpires = otpExpires;
         await order.save();
@@ -1698,16 +1702,15 @@ exports.generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => 
         const userEmail = user ? user.email : '[User Account Missing]';
 
         console.log(`SELLER (${sellerId}) generated OTP for O.ID ${orderId}. OTP: ${otp}. (User: ${userEmail})`);
-        // Optional: Send email/SMS notification
+        // Optional: Could send an email to the user here if needed, using generateEmailHtml
 
         return { success: true, message: `OTP generated for order ${orderId}. It is visible on the customer's 'My Orders' page.` };
     } catch (error) {
         console.error(`Error in generateAndSendDirectDeliveryOTPBySeller for O.ID ${orderId} by Seller ${sellerId}:`, error);
-        throw error; // Re-throw for the calling controller
+        throw error;
     }
 };
 
-// --- Admin Confirm Delivery Logic (Remains Largely the Same) ---
 exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper = null) => {
     try {
         const order = await Order.findOne({
@@ -1718,44 +1721,54 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
         });
 
         if (!order) {
-           // Check specific failure reason
            const checkOrder = await Order.findById(orderId).select('status orderOTP orderOTPExpires');
            if (!checkOrder) throw new Error('Order not found.');
            if (checkOrder.status !== 'Pending') throw new Error(`Order status is '${checkOrder.status}', cannot confirm delivery.`);
            if (checkOrder.orderOTP !== providedOtp) throw new Error('Invalid OTP.');
            if (!checkOrder.orderOTPExpires || checkOrder.orderOTPExpires <= Date.now()) throw new Error('Expired OTP.');
-           throw new Error('OTP verification failed.'); // Generic fallback
+           throw new Error('OTP verification failed.');
         }
 
-        // Update Order
         order.status = 'Delivered';
         order.receivedByDate = new Date();
-        // Clear OTP fields - Pre-save hook in Order model should handle this, but explicit clear is safe
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
-        order.cancellationAllowedUntil = undefined; // Disable cancellation
+        order.cancellationAllowedUntil = undefined;
         await order.save();
 
         console.log(`Order ${orderId} confirmed delivered by ADMIN ${adminUserId}`);
 
-        // Send Confirmation Email
+        // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = `Your Order Has Been Delivered!`;
+            const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
             const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-            const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by administration.</p><p>Received Date: ${formattedDeliveryDate}</p><p>Thank you for shopping with us!</p>`;
-           await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
+            const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Admin. Thank you for shopping!`;
+            const html = generateEmailHtml({
+                recipientName: order.shippingAddress.name,
+                subject: subject,
+                greeting: `Your Order Has Arrived!`,
+                bodyLines: [
+                    `Great news! Your order (#${order._id}) has been successfully delivered and confirmed by administration.`,
+                    `<strong>Delivered On:</strong> ${formattedDeliveryDate}`,
+                    `We hope you enjoy your purchase!`,
+                ],
+                buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`,
+                buttonText: 'View Order Details',
+                companyName: 'miniapp'
+            });
+           await sendEmail(order.userEmail, subject, text, html);
         } catch (emailError){
             console.error(`Admin Confirm: Failed sending delivery confirmation email for O.ID ${order._id}:`, emailError);
         }
+        // *** END UPDATE ***
 
         return { success: true, order: order };
     } catch (error) {
         console.error(`Error verifying ADMIN Direct Delivery OTP for O.ID ${orderId} by Admin ${adminUserId}:`, error);
-        throw error; // Re-throw
+        throw error;
    }
 };
 
-// --- Seller Confirm Delivery Logic (NEW) ---
 exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, resForHelper = null) => {
     try {
         const order = await Order.findOne({
@@ -1763,10 +1776,9 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
             status: 'Pending',
             orderOTP: providedOtp,
             orderOTPExpires: { $gt: Date.now() }
-        }).populate('products.productId', 'sellerId'); // Need sellerId for verification
+        }).populate('products.productId', 'sellerId');
 
         if (!order) {
-           // Check specific failure reason
            const checkOrder = await Order.findById(orderId).select('status orderOTP orderOTPExpires');
            if (!checkOrder) throw new Error('Order not found.');
            if (checkOrder.status !== 'Pending') throw new Error(`Order status is '${checkOrder.status}'.`);
@@ -1775,17 +1787,14 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
            throw new Error('OTP verification failed.');
         }
 
-        // Security Check: Verify order relevance to this seller
         const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
         if (!isRelevant) {
            console.warn(`Seller ${sellerId} attempted to confirm unrelated order ${orderId}.`);
            throw new Error('Permission Denied: Order does not contain your products.');
         }
 
-        // Update Order
         order.status = 'Delivered';
         order.receivedByDate = new Date();
-        // Clear OTP fields
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
         order.cancellationAllowedUntil = undefined;
@@ -1793,20 +1802,34 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
 
         console.log(`Order ${orderId} confirmed delivered by SELLER ${sellerId}`);
 
-        // Send Confirmation Email
+        // *** UPDATED: Send Confirmation Email using template ***
         try {
-           const subject = `Your Order Has Been Delivered!`;
+           const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
            const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-           const html = `<p>Great news! Your order (${order._id}) has been successfully delivered and confirmed by the seller.</p><p>Received Date: ${formattedDeliveryDate}</p><p>Thank you for shopping with us!</p>`;
-           await sendEmail(order.userEmail, subject, `Your order ${order._id} has been delivered.`, html);
+           const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Seller. Thank you for shopping!`;
+           const html = generateEmailHtml({
+               recipientName: order.shippingAddress.name,
+               subject: subject,
+               greeting: `Your Order Has Arrived!`,
+               bodyLines: [
+                   `Great news! Your order (#${order._id}) has been successfully delivered and confirmed by the seller.`,
+                   `<strong>Delivered On:</strong> ${formattedDeliveryDate}`,
+                   `We hope you enjoy your purchase!`,
+               ],
+               buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`,
+               buttonText: 'View Order Details',
+               companyName: 'miniapp'
+           });
+           await sendEmail(order.userEmail, subject, text, html);
         } catch (emailError){
             console.error(`Seller Confirm: Failed sending delivery confirmation email for O.ID ${order._id}:`, emailError);
         }
+        // *** END UPDATE ***
 
         return { success: true, order: order };
     } catch (error) {
         console.error(`Error verifying SELLER Direct Delivery OTP for O.ID ${orderId} by Seller ${sellerId}:`, error);
-        throw error; // Re-throw
+        throw error;
    }
 };
 
@@ -2729,13 +2752,14 @@ const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const { sendEmail } = require('../config/mailer');
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPBySeller,
     confirmDirectDeliveryBySeller
 } = require('./orderController');
 const mongoose = require('mongoose');
-// *** Import categories and names ***
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
@@ -2746,68 +2770,54 @@ const sellerCancellationReasons = [
     "❓ Other Reason",
 ];
 
-// Seller Dashboard
 exports.getSellerDashboard = (req, res) => {
     res.render('seller/dashboard', { title: 'Seller Dashboard' });
 };
 
-// Product Management Pages
 exports.getUploadProductPage = (req, res) => {
-    // *** Pass categories to the view ***
     res.render('seller/upload-product', {
         title: 'Upload New Product',
         product: {},
-        categories: categories // Pass the full list
+        categories: categories
     });
 };
 
-// --- Product Management Actions ---
 exports.uploadProduct = async (req, res, next) => {
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
-    // --- END UPDATED ---
     const sellerId = req.session.user._id;
     const sellerEmail = req.session.user.email;
 
-     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
-        // *** Pass categories back on error ***
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-         // *** Pass categories back on error ***
          return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
      }
-     // *** Add Category Validation ***
      if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
     }
-    // Optional: Validate imageUrl2 format if present
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(), // Category validated
+            category: category.trim(),
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
-            // --- UPDATED: Assign imageUrl2 ---
             imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
-            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: sellerId,
             sellerEmail: sellerEmail,
             reviewStatus: 'pending'
         });
 
-        await newProduct.save(); // Trigger enum validation
+        await newProduct.save();
         console.log(`Product ${newProduct._id} saved initially by seller ${sellerEmail}.`);
 
-        // Trigger Gemini review asynchronously
         reviewProductWithGemini(newProduct).then(async reviewResult => {
              try {
                  const productToUpdate = await Product.findById(newProduct._id);
@@ -2834,7 +2844,6 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-            // *** Pass categories back on error ***
            return res.render('seller/upload-product', { title: 'Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product:", error);
@@ -2842,8 +2851,6 @@ exports.uploadProduct = async (req, res, next) => {
     }
 };
 
-
-// --- Manage Products Page (Seller) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -2860,20 +2867,18 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product Page (Seller) ---
 exports.getEditProductPage = async (req, res, next) => {
      try {
-        const product = await Product.findById(req.params.id)
+        const product = await Product.findOne({ _id: req.params.id, sellerId: req.session.user._id }) // Ensure ownership
                                      .lean();
         if (!product) {
            req.flash('error_msg', 'Product not found or access denied.');
            return res.redirect('/seller/products');
        }
-       // *** Pass categories to the view ***
        res.render('seller/edit-product', {
            title: `Edit Product: ${product.name}`,
            product: product,
-           categories: categories // Pass the full list
+           categories: categories
        });
    } catch (error) {
         if (error.name === 'CastError') {
@@ -2884,17 +2889,12 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// --- Update Product Action (Seller) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
-    // --- END UPDATED ---
-    const renderOptions = { title: `Edit Product Error`, product: { _id: productId, ...req.body }, categories: categories }; // For re-rendering on error
+    const renderOptions = { title: `Edit Product Error`, product: { _id: productId, ...req.body }, categories: categories };
 
-
-     // Validation
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
@@ -2905,16 +2905,14 @@ exports.updateProduct = async (req, res, next) => {
          try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
          return res.render('seller/edit-product', renderOptions);
      }
-      // *** Add Category Validation ***
      if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
          try { const originalProduct = await Product.findOne({ _id: productId, sellerId: sellerId }).lean(); renderOptions.product = { ...originalProduct, ...req.body }; } catch (fetchErr) { console.error("Error refetching product on update validation fail:", fetchErr); }
         return res.render('seller/edit-product', renderOptions);
     }
-    // Optional: Validate imageUrl2 format if present
 
     try {
-        const product = await Product.findOne({ _id: productId, sellerId: sellerId }); // Fetch non-lean
+        const product = await Product.findOne({ _id: productId, sellerId: sellerId });
 
         if (!product) {
             req.flash('error_msg', 'Product not found or access denied.');
@@ -2922,22 +2920,19 @@ exports.updateProduct = async (req, res, next) => {
          }
 
          product.name = name.trim();
-         product.category = category.trim(); // Category validated
+         product.category = category.trim();
          product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
          product.price = Number(price);
          product.stock = Number(stock);
          product.imageUrl = imageUrl.trim();
-         // --- UPDATED: Update imageUrl2 ---
          product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
-         // --- END UPDATED ---
          product.specifications = specifications ? specifications.trim() : '';
-         product.reviewStatus = 'pending'; // Reset status on update
+         product.reviewStatus = 'pending';
          product.rejectionReason = undefined;
 
-         await product.save(); // Trigger enum validation
+         await product.save();
          console.log(`Product ${productId} updated by seller, set to pending review.`);
 
-        // Trigger Gemini review asynchronously
         reviewProductWithGemini(product).then(async reviewResult => {
              try {
                  const productToUpdate = await Product.findById(product._id);
@@ -2970,7 +2965,6 @@ exports.updateProduct = async (req, res, next) => {
      }
  };
 
-// --- Remove Product (Seller) ---
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     const sellerId = req.session.user._id;
@@ -2995,7 +2989,6 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-// --- Manage Orders (Seller) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const sellerId = req.session.user._id;
@@ -3012,15 +3005,18 @@ exports.getManageOrdersPage = async (req, res, next) => {
              });
         }
 
+        // Find orders containing ANY of the seller's products
         const orders = await Order.find({ 'products.productId': { $in: sellerProductIds } })
                                    .sort({ orderDate: -1 })
-                                   .populate('products.productId', 'name imageUrl _id price sellerId') // Ensure imageUrl is populated
+                                   .populate('products.productId', 'name imageUrl _id price sellerId')
                                    .populate('userId', 'name email')
                                    .lean();
 
         const now = Date.now();
         orders.forEach(order => {
+             // Mark if the order is relevant (already guaranteed by query, but good for clarity)
              order.isRelevantToSeller = true;
+             // Conditions for seller actions
              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending';
              order.canBeCancelledBySeller = order.status === 'Pending';
 
@@ -3029,11 +3025,13 @@ exports.getManageOrdersPage = async (req, res, next) => {
                                      !!order.orderOTPExpires &&
                                      new Date(order.orderOTPExpires).getTime() > now;
 
+            // Create summary, highlighting seller's items
             if (order.products && order.products.length > 0) {
                 order.itemsSummary = order.products.map(p => {
                     const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString();
                     const price = (p.priceAtOrder !== undefined && p.priceAtOrder !== null) ? p.priceAtOrder : (p.productId?.price ?? 0);
                     const productName = p.productId?.name || p.name || '[Product Name Missing]';
+                    // Highlight seller's item
                     return `${isSellerItem ? '<strong class="text-success">' : ''}${productName} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Your Item)</strong>' : ''}`;
                 }).join('<br>');
             } else {
@@ -3051,17 +3049,17 @@ exports.getManageOrdersPage = async (req, res, next) => {
     }
 };
 
-
-// --- Seller Order Actions ---
 exports.sendDirectDeliveryOtpBySeller = async (req, res, next) => {
     const { orderId } = req.params;
     const sellerId = req.session.user._id;
 
     try {
-        const order = await Order.findById(orderId);
+        // Basic check before calling the service function
+        const order = await Order.findById(orderId).select('status'); // Select minimal field
         if (!order) throw new Error("Order not found.");
         if (order.status !== 'Pending') throw new Error(`Cannot send OTP for order status ${order.status}.`);
 
+        // isOrderRelevantToSeller middleware already checked relevance
         const result = await generateAndSendDirectDeliveryOTPBySeller(orderId, sellerId);
         req.flash('success_msg', result.message + ' Ask customer for OTP.');
     } catch (error) {
@@ -3081,6 +3079,7 @@ exports.confirmDirectDeliveryBySeller = async (req, res, next) => {
     }
 
     try {
+         // isOrderRelevantToSeller middleware already checked relevance
          const { order } = await confirmDirectDeliveryBySeller(orderId, sellerId, otp.trim(), res);
         req.flash('success_msg', `Order ${orderId} confirmed delivered by you.`);
     } catch (error) {
@@ -3103,12 +3102,14 @@ exports.cancelOrderBySeller = async (req, res, next) => {
     const sessionDB = await mongoose.startSession();
     sessionDB.startTransaction();
     try {
+        // isOrderRelevantToSeller middleware ensures relevance
         const order = await Order.findById(orderId)
                                 .populate('products.productId', 'sellerId name _id')
-                                .populate('userId', 'email')
+                                // *** Populate user name for email ***
+                                .populate('userId', 'email name')
                                 .session(sessionDB);
 
-        if (!order) {
+        if (!order) { // Should not happen if middleware worked, but good check
             await sessionDB.abortTransaction(); sessionDB.endSession();
             req.flash('error_msg', 'Order not found.');
             return res.status(404).redirect('/seller/orders');
@@ -3120,18 +3121,9 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             return res.redirect('/seller/orders');
         }
 
-        const isRelevant = order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString());
-        if (!isRelevant) {
-             await sessionDB.abortTransaction(); sessionDB.endSession();
-             console.warn(`Seller ${sellerEmail} (${sellerId}) attempted cancellation for non-relevant order ${orderId}.`);
-             req.flash('error_msg', 'Permission Denied: Order does not contain your products.');
-             return res.status(403).redirect('/seller/orders');
-        }
-
-
         console.log(`Seller Cancel: Restoring stock for seller ${sellerId}'s items in order ${orderId}.`);
         const productStockRestorePromises = order.products
-            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString())
+            .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) // Filter only seller's items
             .map(item => {
                 const quantityToRestore = Number(item.quantity);
                  if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -3139,9 +3131,10 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                     return Promise.resolve();
                 }
                 console.log(`Seller Cancel: Restoring ${quantityToRestore} stock for P.ID ${item.productId._id}`);
+                 // Restore stock AND decrement order count for the specific product
                  return Product.updateOne(
                      { _id: item.productId._id },
-                     { $inc: { stock: quantityToRestore, orderCount: -1 } },
+                     { $inc: { stock: quantityToRestore, orderCount: -1 } }, // Also decrement orderCount
                      { session: sessionDB }
                  ).catch(err => {
                     console.error(`Seller Cancel: Failed stock/count restore P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`);
@@ -3151,8 +3144,10 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
         console.log(`Seller Cancel: Stock restoration attempts completed for seller ${sellerId} in order ${orderId}.`);
 
+        // Set order status to Cancelled - This applies to the whole order
         order.status = 'Cancelled';
         order.cancellationReason = `Cancelled by Seller: ${reason}`;
+        // Clear OTP fields (handled by pre-save hook as well)
         order.orderOTP = undefined;
         order.orderOTPExpires = undefined;
         order.cancellationAllowedUntil = undefined;
@@ -3161,12 +3156,28 @@ exports.cancelOrderBySeller = async (req, res, next) => {
 
         await sessionDB.commitTransaction();
 
+        // *** UPDATED: Send Cancellation Email to Customer using template ***
         try {
             const customerEmail = order.userEmail || order.userId?.email;
+            // *** Use populated name or fallback ***
+            const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Update on Your Order (${order._id})`;
-                const htmlCust = `<p>Unfortunately, your order (${order._id}) has been cancelled by the seller.</p><p><strong>Reason:</strong> ${reason}</p><p>Any payment made (if applicable) will be refunded according to policy.</p><p>We apologize for any inconvenience. Please contact support if you have questions.</p>`;
-                const textCust = `Your order ${order._id} was cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
+                const subjectCust = `Update on Your miniapp Order #${order._id}`;
+                const textCust = `Unfortunately, your order (${order._id}) has been cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
+                const htmlCust = generateEmailHtml({
+                    recipientName: customerName,
+                    subject: subjectCust,
+                    greeting: `Regarding Your Order #${order._id}`,
+                    bodyLines: [
+                        `We are writing to inform you that item(s) in your order (#${order._id}) had to be cancelled by the seller.`,
+                        `<strong>Reason:</strong> ${reason}`, // Use the seller's reason
+                        `If any payment was made for the cancelled items, a refund will be processed according to our policy.`,
+                        `We apologize for any inconvenience. Please contact support if you have questions.`
+                    ],
+                    buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
+                    buttonText: 'View My Orders',
+                    companyName: 'miniapp'
+                });
                 await sendEmail(customerEmail, subjectCust, textCust, htmlCust);
             } else {
                 console.warn(`Seller Cancel: Could not find customer email for order ${orderId} notification.`);
@@ -3174,17 +3185,22 @@ exports.cancelOrderBySeller = async (req, res, next) => {
         } catch (emailError) {
             console.error(`Seller Cancel: Failed sending cancellation email for order ${order._id}:`, emailError);
         }
+        // *** END UPDATE ***
 
         req.flash('success_msg', `Order ${orderId} cancelled successfully. Reason: ${reason}. Customer notified.`);
         res.redirect('/seller/orders');
 
     } catch (error) {
-        await sessionDB.abortTransaction();
+        if(sessionDB.inTransaction()) {
+            await sessionDB.abortTransaction();
+        }
         console.error(`Error cancelling order ${orderId} by seller ${sellerEmail} (${sellerId}):`, error);
         req.flash('error_msg', 'Failed to cancel order due to an internal error.');
         res.redirect('/seller/orders');
     } finally {
-        sessionDB.endSession();
+        if (sessionDB && sessionDB.endSession) {
+            sessionDB.endSession();
+        }
     }
 };
 
@@ -7386,6 +7402,116 @@ router.post('/orders/:orderId/cancel', isOrderRelevantToSeller, sellerController
 
 module.exports = router;
 
+
+services/emailTemplateService.js:
+const generateEmailHtml = (options) => {
+    const {
+      recipientName = 'Valued Customer',
+      subject = 'Notification',
+      greeting = `Hello ${recipientName},`,
+      bodyLines = [],
+      buttonUrl,
+      buttonText,
+      footerText = `© ${new Date().getFullYear()} miniapp. All rights reserved.`,
+      companyName = 'miniapp',
+      companyAddress = 'Your Company Address Here',
+    } = options;
+  
+    const styles = {
+      body: `margin: 0; padding: 0; -webkit-text-size-adjust: 100%; background-color: #f0f5fd;`,
+      wrapper: `width: 100%; table-layout: fixed; -webkit-text-size-adjust: 100%;`,
+      main: `background-color: #ffffff; margin: 0 auto; width: 100%; max-width: 600px; border-spacing: 0; font-family: Arial, sans-serif; color: #333333; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;`,
+      header: `background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: #ffffff; padding: 25px 20px; text-align: center; border-radius: 8px 8px 0 0; background-color: #007bff;`,
+      headerH1: `margin: 0; font-size: 24px; font-weight: bold;`,
+      content: `padding: 30px 25px; text-align: left; font-size: 16px; line-height: 1.6;`,
+      greeting: `font-size: 18px; font-weight: bold; margin-bottom: 15px;`,
+      paragraph: `margin: 0 0 15px 0;`,
+      buttonWrapper: `padding: 15px 0; text-align: center;`,
+      buttonLink: `background-color: #28a745; color: #ffffff; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; border: none; cursor: pointer; font-size: 16px;`,
+      footer: `background-color: #e9ecef; color: #6c757d; padding: 20px 25px; text-align: center; font-size: 12px; line-height: 1.4; border-radius: 0 0 8px 8px;`,
+      footerLink: `color: #007bff; text-decoration: none;`,
+      preheader: `display: none !important; visibility: hidden; mso-hide: all; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;`,
+    };
+  
+    const bodyHtml = bodyLines.map(line => `<p style="${styles.paragraph}">${String(line).replace(/</g, "<").replace(/>/g, ">")}</p>`)
+                             .map(line => line.replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>')
+                                               .replace(/<br>/g, '<br>')
+                                               .replace(/<h3 style="(.*?)">/g, '<h3 style="$1">').replace(/<\/h3>/g, '</h3>')
+                                               .replace(/<ul style="(.*?)">/g, '<ul style="$1">').replace(/<\/ul>/g, '</ul>')
+                                               .replace(/<li style="(.*?)">/g, '<li style="$1">').replace(/<\/li>/g, '</li>')
+                                               .replace(/<a href="(.*?)"(.*?)>/g, '<a href="$1"$2>').replace(/<\/a>/g, '</a>')
+                             )
+                             .join('');
+  
+    let buttonHtml = '';
+    if (buttonUrl && buttonText) {
+      const safeButtonUrl = buttonUrl.startsWith('http') ? buttonUrl : '#';
+      const safeButtonText = String(buttonText).replace(/</g, "<").replace(/>/g, ">");
+      buttonHtml = `
+        <table border="0" cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <td style="${styles.buttonWrapper}">
+              <a href="${safeButtonUrl}" target="_blank" style="${styles.buttonLink}">${safeButtonText}</a>
+            </td>
+          </tr>
+        </table>`;
+    }
+  
+    const html = `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>${String(subject).replace(/</g, "<")}</title>
+    <style type="text/css">
+      body { ${styles.body} }
+      .wrapper { ${styles.wrapper} }
+      .main { ${styles.main} }
+      @media screen and (max-width: 600px) {
+        .main { width: 95% !important; max-width: 95%; }
+        .content { padding: 20px 15px !important; }
+        .header h1 { font-size: 20px !important; }
+        .buttonLink { padding: 10px 20px !important; font-size: 15px !important; }
+      }
+    </style>
+  </head>
+  <body style="${styles.body}">
+    <span style="${styles.preheader}">${String(subject).replace(/</g, "<")} - ${bodyLines.length > 0 ? String(bodyLines[0]).substring(0, 50).replace(/<[^>]*>?/gm, '') + '...' : ''}</span>
+    <center class="wrapper" style="${styles.wrapper}">
+      <table class="main" width="100%" border="0" cellpadding="0" cellspacing="0" role="presentation" style="${styles.main}">
+        <tr>
+          <td class="header" style="${styles.header}">
+            <h1 style="${styles.headerH1}">${String(companyName).replace(/</g, "<")}</h1>
+          </td>
+        </tr>
+        <tr>
+          <td class="content" style="${styles.content}">
+            <p style="${styles.greeting}">${greeting}</p>
+            ${bodyHtml}
+            ${buttonHtml}
+            <p style="${styles.paragraph}">If you have any questions, feel free to contact our support team.</p>
+            <p style="${styles.paragraph}">Thanks,<br>The ${String(companyName).replace(/</g, "<")} Team</p>
+          </td>
+        </tr>
+        <tr>
+          <td class="footer" style="${styles.footer}">
+            <p style="margin:0 0 5px 0;">${String(footerText).replace(/</g, "<")}</p>
+             ${companyAddress ? `<p style="margin:0 0 5px 0;">${String(companyAddress).replace(/</g, "<")}</p>` : ''}
+          </td>
+        </tr>
+      </table>
+    </center>
+  </body>
+  </html>
+    `;
+  
+    return html;
+  };
+  
+  module.exports = { generateEmailHtml };
+
 services/otpService.js:
 // services/otpService.js
 const crypto = require('crypto');
@@ -8242,7 +8368,8 @@ views/auth/forgot-password.ejs:
     <form action="/auth/forgot-password" method="POST" class="auth-form">
         <div class="form-group">
             <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+            <%# Added Placeholder %>
+            <input type="email" id="email" name="email" placeholder="Enter your registered email" required>
         </div>
         <button type="submit" class="btn btn-primary">Send Reset OTP</button>
     </form>
@@ -8252,7 +8379,6 @@ views/auth/forgot-password.ejs:
 </div>
 
 <%- include('../partials/footer') %>
-
 
 views/auth/login.ejs:
 <%- include('../partials/header', { title: 'Login' }) %>
@@ -8359,10 +8485,48 @@ views/auth/reset-password.ejs :
                 </button>
             </div>
              <%# --- ADDED: Helper Text --- %>
-            <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g., !@#$).</small>
+            <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
         </div>
-         <%# --- END: Password Wrapper & Toggle Button --- %>
-         <%# --- ADDED: Confirm Password Wrapper & Toggle Button --- %>
+        
+        <div class="form-group">
+            <label for="confirmPassword">Confirm New Password:</label>
+             <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder --- %>
+                <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password" minlength="8" required>
+                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
+        </div>
+        <%# --- END: Confirm Password Wrapper & Toggle Button --- %>
+        <button type="submit" class="btn btn-primary">Reset Password</button>
+    </form>
+     <div class="auth-links">
+        <p><a href="/auth/login">Back to Login</a></p>
+    </div>
+</div>
+
+<%- include('../partials/footer') %><%- include('../partials/header', { title: 'Reset Password' }) %>
+
+<div class="auth-container">
+    <h1>Reset Password</h1>
+    <p>Enter your new password below.</p>
+
+    <form action="/auth/reset-password/<%= token %>" method="POST" class="auth-form">
+        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
+        <div class="form-group">
+            <label for="password">New Password:</label>
+             <div class="password-wrapper">
+                 <%# UPDATED: minlength="8", placeholder, title, added helper text --- %>
+                <input type="password" id="password" name="password" placeholder="Enter new password" minlength="8" required title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
+                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
+                    <i class="fas fa-eye-slash"></i>
+                </button>
+            </div>
+             <%# --- ADDED: Helper Text --- %>
+            <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
+        </div>
+        
         <div class="form-group">
             <label for="confirmPassword">Confirm New Password:</label>
              <div class="password-wrapper">
@@ -8413,31 +8577,6 @@ views/auth/verify-otp.ejs:
              <input type="hidden" name="email" value="<%= email %>">
              <button type="submit" class="btn btn-secondary btn-sm">Resend OTP</button>
          </form>
-    </div>
-</div>
-
-<%- include('../partials/footer') %>
-```
-
-**`views/auth/forgot-password.ejs` (Added Placeholder)**
-
-```ejs
-<%- include('../partials/header', { title: 'Forgot Password' }) %>
-
-<div class="auth-container">
-    <h1>Forgot Password</h1>
-    <p>Enter your email address below. If an account exists, we'll send an OTP to verify your request.</p>
-
-    <form action="/auth/forgot-password" method="POST" class="auth-form">
-        <div class="form-group">
-            <label for="email">Email:</label>
-            <%# Added Placeholder %>
-            <input type="email" id="email" name="email" placeholder="Enter your registered email" required>
-        </div>
-        <button type="submit" class="btn btn-primary">Send Reset OTP</button>
-    </form>
-    <div class="auth-links">
-        <p><a href="/auth/login">Back to Login</a></p>
     </div>
 </div>
 

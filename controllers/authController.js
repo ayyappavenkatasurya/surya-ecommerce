@@ -6,7 +6,8 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { generateOTP, setOTPExpiration } = require('../services/otpService');
 const { sendEmail } = require('../config/mailer');
-// *** Import categories and names ***
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
@@ -14,30 +15,26 @@ const { categoryNames } = require('../config/categories');
 const uppercaseRegex = /[A-Z]/;
 const lowercaseRegex = /[a-z]/;
 const numberRegex = /[0-9]/;
-// Define allowed special characters (escape regex special chars like - \ [ ] /)
 const specialCharRegex = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~`]/;
-const minPasswordLength = 8; // INCREASED MINIMUM LENGTH
+const minPasswordLength = 8;
 
-// Generic Password Format Error Message
 const passwordFormatErrorMsg = "password doesn't match requested format";
 
 
-// --- getLoginPage, getRegisterPage, getVerifyOtpPage, etc. ---
 exports.getLoginPage = (req, res) => {
     if (req.session.user) {
-         return res.redirect('/'); // Redirect if already logged in
+         return res.redirect('/');
     }
     res.render('auth/login', { title: 'Login' });
 };
 
 exports.getRegisterPage = (req, res) => {
     if (req.session.user) {
-        return res.redirect('/'); // Redirect if already logged in
+        return res.redirect('/');
    }
-   // Pass back potential form data from failed validation
     res.render('auth/register', {
         title: 'Register',
-        name: req.flash('form_name')[0] || '', // Get flashed data if exists
+        name: req.flash('form_name')[0] || '',
         email: req.flash('form_email')[0] || ''
     });
 };
@@ -48,7 +45,7 @@ exports.getVerifyOtpPage = (req, res) => {
         req.flash('error_msg', 'Email required for OTP verification.');
         return res.redirect('/auth/register');
     }
-     if (req.session.user) { // Redirect if already logged in
+     if (req.session.user) {
         return res.redirect('/');
    }
     res.render('auth/verify-otp', { title: 'Verify Email', email });
@@ -56,7 +53,7 @@ exports.getVerifyOtpPage = (req, res) => {
 
 exports.getForgotPasswordPage = (req, res) => {
      if (req.session.user) {
-         return res.redirect('/'); // Redirect if already logged in
+         return res.redirect('/');
     }
     res.render('auth/forgot-password', { title: 'Forgot Password' });
 };
@@ -82,7 +79,6 @@ exports.getResetPasswordPage = async (req, res, next) => {
     }
 };
 
-// --- UPDATED registerUser ---
 exports.registerUser = async (req, res, next) => {
      if (req.session.user) {
         return res.redirect('/');
@@ -94,8 +90,7 @@ exports.registerUser = async (req, res, next) => {
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
     if (email && !/^\S+@\S+\.\S+$/.test(email)) { errors.push('Please enter a valid email address.'); }
 
-    // --- MODIFIED Password Complexity Validation ---
-    let passwordComplexityFailed = false; // Flag to track if any complexity rule failed
+    let passwordComplexityFailed = false;
     if (password) {
         if (
             password.length < minPasswordLength ||
@@ -104,27 +99,23 @@ exports.registerUser = async (req, res, next) => {
             !numberRegex.test(password) ||
             !specialCharRegex.test(password)
         ) {
-            passwordComplexityFailed = true; // Set flag if any rule fails
+            passwordComplexityFailed = true;
         }
     } else {
-        // If password field itself is empty, it's caught by the initial check above
+        // Caught by initial check
     }
 
-    // Add the generic error message ONCE if any complexity rule failed
     if (passwordComplexityFailed) {
-        // Check if the generic message is already added to avoid duplicates
         if (!errors.includes(passwordFormatErrorMsg)) {
              errors.push(passwordFormatErrorMsg);
         }
     }
-    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
         req.flash('error_msg', errors.join(' '));
-        // Flash form data to repopulate
         req.flash('form_name', name);
         req.flash('form_email', email);
-        return res.redirect('/auth/register'); // Redirect back to GET route
+        return res.redirect('/auth/register');
     }
 
     try {
@@ -140,26 +131,38 @@ exports.registerUser = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
 
         if (user && !user.isVerified) {
-            // Update existing unverified user
             user.name = name;
-            if (password) { user.password = password; } // Hashing happens in pre-save
+            if (password) { user.password = password; }
             user.otp = otp;
             user.otpExpires = otpExpires;
             user.isVerified = false;
-            await user.save({ validateBeforeSave: true }); // Let Mongoose run its validators too
+            await user.save({ validateBeforeSave: true });
             console.log(`Updating existing unverified user: ${user.email}`);
         } else {
-            // Create new user
             user = new User({ name, email: lowerCaseEmail, password, otp, otpExpires, isVerified: false });
             await user.save();
             console.log(`New user created: ${user.email}`);
         }
 
-        // Send OTP Email (keep existing logic)
+        // *** UPDATED: Send OTP Email using template ***
         const subject = 'Verify Your Email Address';
-        const text = `Your verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
-        const html = `<p>Welcome to our store!</p><p>Your verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes. Welcome to miniapp!`; // Simple text version
+        const html = generateEmailHtml({
+            recipientName: user.name,
+            subject: subject,
+            greeting: `Welcome to miniapp, ${user.name}!`,
+            bodyLines: [
+                `Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:`,
+                // Use inline styles for better compatibility
+                `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                `This OTP will expire in 10 minutes.`,
+                `If you didn't request this, you can safely ignore this email.`
+            ],
+            companyName: 'miniapp' // Pass your app name
+            // No button needed for OTP verification usually
+        });
         const emailSent = await sendEmail(user.email, subject, text, html);
+        // *** END UPDATE ***
 
         if (emailSent) {
             req.flash('success_msg', `An OTP has been sent to ${user.email}. Please check your inbox and verify.`);
@@ -175,33 +178,28 @@ exports.registerUser = async (req, res, next) => {
             res.redirect('/auth/register');
         }
     } catch (error) {
-        if (error.code === 11000) { // Duplicate email
+        if (error.code === 11000) {
             req.flash('error_msg', 'Email already exists. Please login or use a different email.');
-             req.flash('form_name', name); // Flash values back
+             req.flash('form_name', name);
              req.flash('form_email', email);
             return res.redirect('/auth/register');
         }
         if (error.name === 'ValidationError') {
-           // Mongoose validation errors
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            // If Mongoose minlength error exists, ensure our generic format message is shown instead or alongside
             if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
                  if (!errors.includes(passwordFormatErrorMsg)) {
                     errors.push(passwordFormatErrorMsg);
                  }
-                 // Filter out the specific mongoose length error if we added the generic one
                  validationErrors = validationErrors.filter(msg => !msg.includes('Password must be at least'));
             }
-            // Combine remaining Mongoose errors with our custom ones
-            const finalErrors = [...new Set([...errors, ...validationErrors])]; // Use Set to avoid duplicates
+            const finalErrors = [...new Set([...errors, ...validationErrors])];
             req.flash('error_msg', finalErrors.join(' '));
             req.flash('form_name', name);
             req.flash('form_email', email);
             return res.redirect('/auth/register');
        }
-        // Catch other errors
         console.error("Registration Error:", error);
-        next(error); // Pass to global error handler
+        next(error);
     }
 };
 
@@ -239,12 +237,13 @@ exports.verifyOtp = async (req, res, next) => {
          user.otpExpires = undefined;
 
          if (isPasswordReset) {
-             await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for reset
+             // Don't clear reset token here, clear it in resetPassword controller
+             await user.save({ validateBeforeSave: false });
              req.flash('success_msg', 'OTP Verified. Please set your new password.');
              return res.redirect(`/auth/reset-password/${user.resetPasswordToken}`);
          }
          else {
-            await user.save({ validateBeforeSave: false }); // Skip validation on OTP verify for registration
+            await user.save({ validateBeforeSave: false });
              req.session.regenerate(err => {
                 if (err) {
                      console.error("Session regeneration error after OTP verify:", err);
@@ -298,18 +297,41 @@ exports.resendOtp = async (req, res, next) => {
         const otpExpires = setOTPExpiration(10);
         user.otp = otp;
         user.otpExpires = otpExpires;
-        await user.save({ validateBeforeSave: false }); // Skip validation for OTP resend
+        await user.save({ validateBeforeSave: false });
 
-        let subject, text, html;
+        // *** UPDATED: Send OTP Email using template ***
+        let subject, greeting, bodyLines;
+        const textOtpLine = `Your OTP is: ${otp}. It will expire in 10 minutes.`;
+
         if (isForReset) {
             subject = 'Your New Password Reset OTP';
-            text = `Your new password reset OTP is: ${otp}\nIt will expire in 10 minutes.\nIf you did not request this, please ignore this email.`;
-            html = `<p>Your new password reset OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
+            greeting = `Password Reset Request`;
+            bodyLines = [
+                `Here is your new One-Time Password (OTP) for your password reset request:`,
+                `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                `This OTP will expire in 10 minutes.`,
+                `If you didn't request a password reset, please ignore this email.`
+            ];
         } else {
              subject = 'Your New Verification OTP';
-             text = `Your new verification OTP is: ${otp}\nIt will expire in 10 minutes.`;
-            html = `<p>Your new verification OTP is: <strong>${otp}</strong></p><p>It will expire in 10 minutes.</p>`;
+             greeting = `Verify Your Email`;
+             bodyLines = [
+                 `Here is your new One-Time Password (OTP) to verify your email address:`,
+                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                 `This OTP will expire in 10 minutes.`,
+                 `If you didn't request this, please ignore this email.`
+             ];
         }
+
+        const text = `${subject}\n${textOtpLine}\nIf you didn't request this, please ignore this email.`;
+        const html = generateEmailHtml({
+             recipientName: user.name,
+             subject: subject,
+             greeting: greeting,
+             bodyLines: bodyLines,
+             companyName: 'miniapp'
+        });
+        // *** END UPDATE ***
 
         const emailSent = await sendEmail(user.email, subject, text, html);
         const redirectUrl = `/auth/verify-otp?email=${encodeURIComponent(user.email)}${isForReset ? '&reason=reset' : ''}`;
@@ -335,7 +357,6 @@ exports.loginUser = async (req, res, next) => {
     }
     try {
         const lowerCaseEmail = email.toLowerCase();
-        // Select password explicitly for comparison
         const user = await User.findOne({ email: lowerCaseEmail }).select('+password').populate('cart.productId', 'name price imageUrl');
 
         if (!user) {
@@ -346,28 +367,23 @@ exports.loginUser = async (req, res, next) => {
             req.flash('error_msg', 'Your email is not verified. Please check your inbox for the verification OTP or request a new one.');
             return res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          }
-        // Match password using the instance method
         const isMatch = await user.matchPassword(password);
         if (!isMatch) {
             req.flash('error_msg', 'Invalid credentials. Please check your email and password.');
             return res.render('auth/login', { title: 'Login', email: email });
         }
 
-         // Regenerate session upon successful login
          req.session.regenerate(err => {
             if (err) {
                  console.error("Session regeneration error during login:", err);
                  req.flash('error_msg', 'Login failed due to a session error. Please try again.');
                  return res.render('auth/login', { title: 'Login', email: email });
              }
-            // Set user data in the new session
             req.session.user = {
                 _id: user._id, name: user.name, email: user.email, role: user.role,
                 address: user.address ? user.address.toObject() : undefined,
-                // Ensure cart items are properly mapped for session storage
                 cart: user.cart ? user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
              };
-             // Save the session before redirecting
              req.session.save(err => {
                  if (err) {
                      console.error("Session save error after login:", err);
@@ -376,7 +392,7 @@ exports.loginUser = async (req, res, next) => {
                  }
                  req.flash('success_msg', 'You are now logged in successfully.');
                  const returnTo = req.session.returnTo || '/';
-                 delete req.session.returnTo; // Clear the returnTo path
+                 delete req.session.returnTo;
                  res.redirect(returnTo);
             });
         });
@@ -385,25 +401,19 @@ exports.loginUser = async (req, res, next) => {
     }
 };
 
-// --- REFINED logoutUser ---
 exports.logoutUser = (req, res, next) => {
-    const sessionUserEmail = req.session?.user?.email || 'User'; // Safely get email before potential destruction
+    const sessionUserEmail = req.session?.user?.email || 'User';
 
-    // 1. Set the flash message BEFORE destroying the session
     req.flash('success_msg', 'You have been logged out successfully.');
 
-    // 2. Clear the user data from the current session object
     if (req.session) {
         req.session.user = null;
     }
 
-    // 3. Clear the session cookie on the client side
     const cookieName = req.app.get('session cookie name') || 'connect.sid';
     res.clearCookie(cookieName);
     console.log(`${sessionUserEmail} - Cleared session cookie: ${cookieName}`);
 
-    // 4. Initiate the session destruction in the store (asynchronously)
-    // Log any errors but don't wait for it to complete before redirecting
     if (req.session) {
         req.session.destroy(err => {
             if (err) {
@@ -411,13 +421,10 @@ exports.logoutUser = (req, res, next) => {
             } else {
                 console.log(`${sessionUserEmail} - Session destroyed successfully in store.`);
             }
-            // **DO NOT redirect inside this callback**
         });
     } else {
         console.log(`${sessionUserEmail} - No active session found to destroy.`);
     }
-
-    // 5. Redirect the user immediately after clearing the cookie and initiating destruction
     return res.redirect('/auth/login');
 };
 
@@ -432,42 +439,50 @@ exports.forgotPassword = async (req, res, next) => {
         const lowerCaseEmail = email.toLowerCase();
         const user = await User.findOne({ email: lowerCaseEmail });
         const genericMessage = 'If an account with that email exists and is verified, a password reset OTP will be sent. Please check your inbox.';
-        req.flash('info_msg', genericMessage); // Use info_msg for neutral feedback
+        req.flash('info_msg', genericMessage);
 
-        // Send generic message even if user not found or not verified for security
         if (!user || !user.isVerified) {
             console.log(`Password reset request for ${lowerCaseEmail}: User ${!user ? 'not found' : 'found but not verified'}. Sending generic response.`);
             return res.redirect('/auth/forgot-password');
         }
 
-         // Generate OTP and Reset Token
          const otp = generateOTP();
          const resetToken = crypto.randomBytes(20).toString('hex');
-        const otpExpires = setOTPExpiration(10); // OTP expiry (short)
-        const resetExpires = setOTPExpiration(60); // Token expiry (longer)
+        const otpExpires = setOTPExpiration(10);
+        const resetExpires = setOTPExpiration(60);
 
-        // Update user document
         user.otp = otp;
         user.otpExpires = otpExpires;
         user.resetPasswordToken = resetToken;
         user.resetPasswordExpires = resetExpires;
-        await user.save({ validateBeforeSave: false }); // Skip validation for setting tokens/OTP
+        await user.save({ validateBeforeSave: false });
 
-        // Send Email
+        // *** UPDATED: Send Email using template ***
         const subject = 'Password Reset Request - Verify OTP';
-        const text = `You requested a password reset.\n\nPlease use the following OTP to verify your request: ${otp}\n\nThis OTP will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`;
-        const html = `<p>You requested a password reset.</p><p>Please use the following OTP to verify your request: <strong>${otp}</strong></p><p>This OTP will expire in 10 minutes.</p><p>If you did not request this, please ignore this email.</p>`;
-         const emailSent = await sendEmail(user.email, subject, text, html);
+        const text = `You requested a password reset. Your OTP is: ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`;
+        const html = generateEmailHtml({
+            recipientName: user.name,
+            subject: subject,
+            greeting: `Password Reset Request`,
+            bodyLines: [
+                 `We received a request to reset the password for your account associated with ${user.email}.`,
+                 `Please use the following One-Time Password (OTP) to verify your identity:`,
+                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
+                 `This OTP is valid for 10 minutes.`,
+                 `You will be prompted to enter this OTP on the verification page. After verification, you can set a new password.`,
+                 `If you did not request a password reset, please ignore this email. Your password will remain unchanged.`
+            ],
+            companyName: 'miniapp'
+            // No button needed here, user enters OTP on site
+        });
+        const emailSent = await sendEmail(user.email, subject, text, html);
+        // *** END UPDATE ***
 
-        // Redirect user to OTP verification page
         if (emailSent) {
              console.log(`Password reset OTP sent to verified user: ${user.email}`);
-             // Redirect to verify OTP page, indicating it's for reset
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}&reason=reset`);
         } else {
-            // Handle email failure (keep generic message flashed)
             console.error(`Failed to send password reset OTP email to ${user.email}`);
-            // Don't reveal email failure to user, redirect back
             res.redirect('/auth/forgot-password');
         }
     } catch (error) {
@@ -477,7 +492,6 @@ exports.forgotPassword = async (req, res, next) => {
     }
 };
 
-// --- UPDATED resetPassword ---
 exports.resetPassword = async (req, res, next) => {
     const { password, confirmPassword } = req.body;
     const token = req.params.token;
@@ -486,8 +500,7 @@ exports.resetPassword = async (req, res, next) => {
     if (!password || !confirmPassword) { errors.push('Please enter and confirm your new password.'); }
     if (password !== confirmPassword) { errors.push('Passwords do not match.'); }
 
-    // --- MODIFIED Password Complexity Validation ---
-    let passwordComplexityFailed = false; // Flag
+    let passwordComplexityFailed = false;
     if (password) {
         if (
             password.length < minPasswordLength ||
@@ -496,25 +509,22 @@ exports.resetPassword = async (req, res, next) => {
             !numberRegex.test(password) ||
             !specialCharRegex.test(password)
         ) {
-            passwordComplexityFailed = true; // Set flag
+            passwordComplexityFailed = true;
         }
     }
 
-    // Add the generic error message ONCE if needed
     if (passwordComplexityFailed) {
          if (!errors.includes(passwordFormatErrorMsg)) {
             errors.push(passwordFormatErrorMsg);
          }
     }
-    // --- END MODIFIED Password Complexity Validation ---
 
     if (errors.length > 0) {
          req.flash('error_msg', errors.join(' '));
-         return res.redirect(`/auth/reset-password/${token}`); // Redirect back to the form
+         return res.redirect(`/auth/reset-password/${token}`);
     }
 
     try {
-        // Find user by valid token and expiry, select password for pre-save hook
         const user = await User.findOne({
             resetPasswordToken: token,
             resetPasswordExpires: { $gt: Date.now() },
@@ -525,34 +535,51 @@ exports.resetPassword = async (req, res, next) => {
             return res.redirect('/auth/forgot-password');
         }
 
-        // Assign the new password (bcrypt hashing is handled by the pre-save hook in User model)
         user.password = password;
 
-        // Clear reset and OTP fields
         user.resetPasswordToken = undefined;
         user.resetPasswordExpires = undefined;
         user.otp = undefined;
         user.otpExpires = undefined;
-        user.isVerified = true; // Ensure user is marked as verified
+        user.isVerified = true;
 
-        // Save the user (will trigger pre-save hook for hashing)
         await user.save();
 
-        // Log the user in after successful password reset
+        // Optional: Send password change confirmation email
+        try {
+             const subject = 'Your Password Has Been Changed';
+             const text = `The password for your miniapp account associated with ${user.email} was successfully changed. If you did not make this change, please contact support immediately.`;
+             const html = generateEmailHtml({
+                 recipientName: user.name,
+                 subject: subject,
+                 greeting: 'Password Successfully Reset',
+                 bodyLines: [
+                     `This email confirms that the password for your miniapp account has been successfully changed.`,
+                     `If you made this change, no further action is required.`,
+                     `If you did not initiate this password reset, please contact our support team immediately.`
+                 ],
+                 companyName: 'miniapp',
+                 // Optional button to login
+                 buttonUrl: `${req.protocol}://${req.get('host')}/auth/login`,
+                 buttonText: 'Login to Your Account'
+             });
+             await sendEmail(user.email, subject, text, html);
+        } catch (emailError) {
+             console.error("Error sending password change confirmation email:", emailError);
+        }
+
+
         req.session.regenerate(err => {
              if (err) {
                 console.error("Session regeneration error after password reset:", err);
                 req.flash('success_msg', 'Password reset successful. Please log in with your new password.');
                 return res.redirect('/auth/login');
              }
-              // Populate session data
               req.session.user = {
                   _id: user._id, name: user.name, email: user.email, role: user.role,
                   address: user.address ? user.address.toObject() : undefined,
-                  // Initialize cart as empty after reset login.
                   cart: []
               };
-            // Save session before redirecting
             req.session.save(err => {
                 if(err) {
                     console.error("Session save error after password reset login:", err);
@@ -560,14 +587,12 @@ exports.resetPassword = async (req, res, next) => {
                     return res.redirect('/auth/login');
                  }
                  req.flash('success_msg', 'Password has been reset successfully. You are now logged in.');
-                res.redirect('/'); // Redirect to homepage
+                res.redirect('/');
              });
          });
     } catch (error) {
         if (error.name === 'ValidationError') {
-           // Handle Mongoose validation errors during save (e.g., if minlength check fails again)
            let validationErrors = Object.values(error.errors).map(el => el.message);
-            // Similar logic to handle Mongoose length error vs our generic one
              if (validationErrors.some(msg => msg.includes('Password must be at least'))) {
                  if (!errors.includes(passwordFormatErrorMsg)) {
                     errors.push(passwordFormatErrorMsg);
@@ -578,14 +603,12 @@ exports.resetPassword = async (req, res, next) => {
             req.flash('error_msg', finalErrors.join(' '));
             return res.redirect(`/auth/reset-password/${token}`);
        }
-        // Handle other errors
         console.error("Reset Password Error:", error);
-        next(error); // Pass to global error handler
+        next(error);
     }
 };
 
 
-// --- getHomePage ---
 exports.getHomePage = async (req, res, next) => {
   try {
     const searchTerm = req.query.search || '';
@@ -597,7 +620,6 @@ exports.getHomePage = async (req, res, next) => {
     };
 
     if (searchTerm) {
-         // Using MongoDB's text index for searching
          query.$text = { $search: searchTerm };
     }
     if (categoryFilter && categoryNames.includes(categoryFilter)) {
@@ -606,21 +628,17 @@ exports.getHomePage = async (req, res, next) => {
         console.warn(`Invalid category filter attempted: ${categoryFilter}`);
     }
 
-     // Define projection and sort based on whether a search term is present
      const projection = searchTerm ? { score: { $meta: "textScore" } } : {};
      const sort = searchTerm ? { score: { $meta: "textScore" } } : { createdAt: -1 };
 
-    // Fetch Products, Banners concurrently
     const [products, bannerConfig] = await Promise.all([
         Product.find(query, projection).sort(sort).lean(),
         BannerConfig.findOne({ configKey: 'mainBanners' }).lean()
     ]);
 
-    // Extract banner URLs
     const banners = bannerConfig?.banners || [];
     const validBanners = banners.filter(banner => banner.imageUrl);
 
-    // Determine page title based on filters
     let pageTitle = 'Home';
     if (searchTerm) {
         pageTitle = `Search Results for "${searchTerm}"`;

@@ -4,13 +4,14 @@ const Order = require('../models/Order');
 const User = require('../models/User');
 const BannerConfig = require('../models/BannerConfig');
 const { sendEmail } = require('../config/mailer');
+// *** IMPORT NEW SERVICE ***
+const { generateEmailHtml } = require('../services/emailTemplateService');
 const { reviewProductWithGemini } = require('../services/geminiService');
 const {
     generateAndSendDirectDeliveryOTPByAdmin,
     confirmDirectDeliveryByAdmin,
 } = require('./orderController');
 const mongoose = require('mongoose');
-// *** Import categories and names ***
 const categories = require('../config/categories');
 const { categoryNames } = require('../config/categories');
 
@@ -22,68 +23,54 @@ const cancellationReasons = [
     "❓ Other (Admin)",
 ];
 
-// --- Admin Dashboard ---
 exports.getAdminDashboard = (req, res) => {
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
 
-// --- Admin Product Upload Page ---
 exports.getUploadProductPage = (req, res) => {
-    // *** Pass categories to the view ***
     res.render('admin/upload-product', {
         title: 'Admin: Upload New Product',
         product: {},
-        categories: categories // Pass the full list
+        categories: categories
     });
 };
 
-// --- Admin Product Upload Action ---
 exports.uploadProduct = async (req, res, next) => {
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
-    // --- END UPDATED ---
     const adminUserId = req.session.user._id;
     const adminUserEmail = req.session.user.email;
 
-    // Basic Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields (Name, Category, Price, Stock, Primary Image URL).');
-        // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
     if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
-        // *** Pass categories back on error ***
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
-    // *** Add Category Validation ***
     if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
         return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
     }
-    // Optional: Add validation for imageUrl2 if needed (e.g., check URL format if provided)
 
     try {
         const newProduct = new Product({
             name: name.trim(),
-            category: category.trim(), // Category is now validated
+            category: category.trim(),
             shortDescription: shortDescription ? shortDescription.trim() : undefined,
             price: Number(price),
             stock: Number(stock),
             imageUrl: imageUrl.trim(),
-            // --- UPDATED: Assign imageUrl2 ---
             imageUrl2: imageUrl2 ? imageUrl2.trim() : undefined,
-            // --- END UPDATED ---
             specifications: specifications ? specifications.trim() : '',
             sellerId: adminUserId,
             sellerEmail: adminUserEmail,
             reviewStatus: 'pending'
         });
 
-        await newProduct.save(); // This will trigger enum validation
+        await newProduct.save();
         console.log(`Product ${newProduct._id} saved initially by ADMIN ${adminUserEmail}.`);
 
-        // Send for Gemini Review (Asynchronous - keep existing)
         reviewProductWithGemini(newProduct).then(async reviewResult => {
             try {
                 const productToUpdate = await Product.findById(newProduct._id);
@@ -108,7 +95,6 @@ exports.uploadProduct = async (req, res, next) => {
         if (error.name === 'ValidationError') {
            let errors = Object.values(error.errors).map(el => el.message);
            req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
-           // *** Pass categories back on error ***
            return res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: req.body, categories: categories });
        }
         console.error("Error uploading product by Admin:", error);
@@ -116,7 +102,6 @@ exports.uploadProduct = async (req, res, next) => {
     }
 };
 
-// --- Manage Products (Admin sees ALL) ---
 exports.getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({})
@@ -132,7 +117,6 @@ exports.getManageProductsPage = async (req, res, next) => {
     }
 };
 
-// --- Edit Product (Admin edits ANY) ---
 exports.getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id)
@@ -142,12 +126,11 @@ exports.getEditProductPage = async (req, res, next) => {
             req.flash('error_msg', 'Product not found.');
             return res.redirect('/admin/manage-products');
         }
-        // *** Pass categories to the view ***
         res.render('admin/edit-product', {
             title: `Admin Edit: ${product.name}`,
             product: product,
             isAdminView: true,
-            categories: categories // Pass the full list
+            categories: categories
         });
     } catch (error) {
         if (error.name === 'CastError') {
@@ -158,15 +141,11 @@ exports.getEditProductPage = async (req, res, next) => {
     }
 };
 
-// --- Update Product (Admin updates ANY) ---
 exports.updateProduct = async (req, res, next) => {
     const productId = req.params.id;
-    // --- UPDATED: Destructure imageUrl2 ---
     const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
-    // --- END UPDATED ---
-    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories }; // For re-rendering on error
+    const renderOptions = { title: `Admin Edit Error`, product: { _id: productId, ...req.body }, isAdminView: true, categories: categories };
 
-    // Validation
     if (!name || !category || price === undefined || stock === undefined || !imageUrl) {
         req.flash('error_msg', 'Please fill in all required fields.');
         return res.render('admin/edit-product', renderOptions);
@@ -175,7 +154,6 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Price and Stock must be valid non-negative numbers.');
          return res.render('admin/edit-product', renderOptions);
     }
-    // *** Add Category Validation ***
     if (!categoryNames.includes(category)) {
         req.flash('error_msg', 'Invalid category selected.');
          return res.render('admin/edit-product', renderOptions);
@@ -189,24 +167,21 @@ exports.updateProduct = async (req, res, next) => {
         req.flash('error_msg', 'Rejection reason is required when setting status to Rejected.');
         return res.render('admin/edit-product', renderOptions);
     }
-    // Optional: Validate imageUrl2 format if present
 
     try {
-        const product = await Product.findById(productId); // Fetch non-lean for saving
+        const product = await Product.findById(productId);
         if (!product) {
             req.flash('error_msg', 'Product not found.');
             return res.status(404).redirect('/admin/manage-products');
         }
 
         product.name = name.trim();
-        product.category = category.trim(); // Category validated
+        product.category = category.trim();
         product.shortDescription = shortDescription ? shortDescription.trim() : undefined;
         product.price = Number(price);
         product.stock = Number(stock);
         product.imageUrl = imageUrl.trim();
-        // --- UPDATED: Update imageUrl2 ---
         product.imageUrl2 = imageUrl2 ? imageUrl2.trim() : undefined;
-        // --- END UPDATED ---
         product.specifications = specifications ? specifications.trim() : '';
 
         if (reviewStatus && allowedStatus.includes(reviewStatus)) {
@@ -214,7 +189,7 @@ exports.updateProduct = async (req, res, next) => {
             product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined;
         }
 
-        await product.save(); // Will trigger enum validation
+        await product.save();
         req.flash('success_msg', `Product "${product.name}" updated successfully by admin.`);
         res.redirect('/admin/manage-products');
 
@@ -224,10 +199,9 @@ exports.updateProduct = async (req, res, next) => {
             req.flash('error_msg', `Validation Error: ${errors.join(' ')}`);
              try {
                  const originalProduct = await Product.findById(productId).lean();
-                 renderOptions.product = { ...originalProduct, ...req.body }; // Merge original with invalid data
+                 renderOptions.product = { ...originalProduct, ...req.body };
              } catch (fetchErr) {
                  console.error("Error refetching product on update validation fail:", fetchErr);
-                 // Use req.body as fallback
              }
              return res.render('admin/edit-product', renderOptions);
         }
@@ -240,8 +214,6 @@ exports.updateProduct = async (req, res, next) => {
     }
 };
 
-
-// --- Remove Product (Admin removes ANY - keep existing) ---
 exports.removeProduct = async (req, res, next) => {
     const productId = req.params.id;
     try {
@@ -262,8 +234,6 @@ exports.removeProduct = async (req, res, next) => {
     }
 };
 
-
-// --- Manage Orders (Admin sees ALL - keep existing) ---
 exports.getManageOrdersPage = async (req, res, next) => {
     try {
         const orders = await Order.find({})
@@ -301,8 +271,6 @@ exports.getManageOrdersPage = async (req, res, next) => {
     }
 };
 
-
-// --- Admin Order Actions (keep existing) ---
 exports.sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
     const { orderId } = req.params;
     try {
@@ -348,7 +316,8 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
     try {
         const order = await Order.findById(orderId)
                                 .populate('products.productId', 'name _id')
-                                .populate('userId', 'email')
+                                // *** Populate user name for email ***
+                                .populate('userId', 'email name')
                                 .session(sessionDB);
 
         if (!order) {
@@ -362,7 +331,6 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             return res.redirect('/admin/manage-orders');
         }
 
-        // Restore Stock
         const productStockRestorePromises = order.products.map(item => {
             const quantityToRestore = Number(item.quantity);
             if (!item.productId?._id || isNaN(quantityToRestore) || quantityToRestore <= 0) {
@@ -380,22 +348,39 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         await Promise.allSettled(productStockRestorePromises);
 
         order.status = 'Cancelled';
-        order.cancellationReason = reason;
+        order.cancellationReason = reason; // Admin reason selected from dropdown
         await order.save({ session: sessionDB });
 
         await sessionDB.commitTransaction();
 
-        // Send Email Notification
+        // *** UPDATED: Send Email Notification using template ***
         try {
             const customerEmail = order.userEmail || order.userId?.email;
+            // *** Use populated name or fallback ***
+            const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Your Order (${order._id}) Has Been Cancelled`;
-                const htmlCust = `<p>Your order (${order._id}) has been cancelled by administration.</p><p><strong>Reason:</strong> ${order.cancellationReason}</p><p>Contact support for questions.</p>`;
-                await sendEmail(customerEmail, subjectCust, `Order ${order._id} cancelled. Reason: ${order.cancellationReason}`, htmlCust);
+                const subjectCust = `Update on Your miniapp Order #${order._id}`;
+                const textCust = `Your order (${order._id}) has been cancelled by administration. Reason: ${order.cancellationReason}. Contact support for questions.`;
+                const htmlCust = generateEmailHtml({
+                    recipientName: customerName,
+                    subject: subjectCust,
+                    greeting: `Regarding Your Order #${order._id}`,
+                    bodyLines: [
+                        `We are writing to inform you that your order (#${order._id}) has been cancelled by our administration team.`,
+                        `<strong>Reason for Cancellation:</strong> ${order.cancellationReason}`, // Use the admin reason
+                        `If any payment was made, a refund will be processed shortly according to our policy.`,
+                        `We apologize for any inconvenience this may cause. Please contact our support team if you have any questions.`
+                    ],
+                     buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
+                     buttonText: 'View My Orders',
+                     companyName: 'miniapp'
+                });
+                await sendEmail(customerEmail, subjectCust, textCust, htmlCust);
             }
         } catch (emailError) {
             console.error(`Failed sending cancellation email for order ${order._id}:`, emailError);
         }
+        // *** END UPDATE ***
 
         req.flash('success_msg', `Order ${orderId} cancelled by admin. Reason: ${reason}.`);
         res.redirect('/admin/manage-orders');
@@ -406,12 +391,12 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
         req.flash('error_msg', 'Failed to cancel order due to an internal error.');
         res.redirect('/admin/manage-orders');
     } finally {
-        sessionDB.endSession();
+        if (sessionDB && sessionDB.endSession) {
+             sessionDB.endSession();
+        }
     }
 };
 
-
-// --- Manage Users (Admin - keep existing) ---
 exports.getManageUsersPage = async (req, res, next) => {
     try {
         const users = await User.find({ _id: { $ne: req.session.user._id } })
@@ -486,6 +471,8 @@ exports.removeUser = async (req, res, next) => {
             }
         }
 
+        // Consider implications: Should deleting a user cascade to products/orders?
+        // For now, just delete the user document.
         await User.deleteOne({ _id: userId });
         req.flash('success_msg', `User ${user.email} removed successfully.`);
         res.redirect('/admin/manage-users');
@@ -501,8 +488,6 @@ exports.removeUser = async (req, res, next) => {
     }
 };
 
-
-// --- Banner Management Controllers ---
 exports.getManageBannersPage = async (req, res, next) => {
     try {
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean();
@@ -558,6 +543,10 @@ exports.updateBanners = async (req, res, next) => {
                      title: trimmedTitle || undefined
                  });
              }
+        } else if (trimmedLinkUrl || trimmedTitle) {
+             // Ensure if Link or Title is provided, Image URL is also required
+             req.flash('error_msg', `Banner ${i + 1}: Image URL is required if Link URL or Title is provided.`);
+             validationError = true;
         }
     }
 
