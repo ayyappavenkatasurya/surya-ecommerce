@@ -460,17 +460,17 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             // *** Use populated name or fallback ***
             const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Update on Your miniapp Order #${order._id}`;
+                const subjectCust = `Order Cancelled - miniapp`;
                 const textCust = `Your order (${order._id}) has been cancelled by administration. Reason: ${order.cancellationReason}. Contact support for questions.`;
                 const htmlCust = generateEmailHtml({
                     recipientName: customerName,
                     subject: subjectCust,
                     greeting: `Regarding Your Order #${order._id}`,
                     bodyLines: [
-                        `We are writing to inform you that your order (#${order._id}) has been cancelled by our administration team.`,
+                        `We are inform you that your order (#${order._id}) has been cancelled by our administration team.`,
                         `<strong>Reason for Cancellation:</strong> ${order.cancellationReason}`, // Use the admin reason
                         `If any payment was made, a refund will be processed shortly according to our policy.`,
-                        `We apologize for any inconvenience this may cause. Please contact our support team if you have any questions.`
+                        `We apologize for any inconvenience. Please contact our support team if you have any questions.`
                     ],
                      buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                      buttonText: 'View My Orders',
@@ -831,8 +831,8 @@ exports.registerUser = async (req, res, next) => {
         }
 
         // *** UPDATED: Send OTP Email using template ***
-        const subject = 'Verify Your Email Address';
-        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes. Welcome to miniapp!`; // Simple text version
+        const subject = 'Email Verify - miniapp';
+        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes.`; // Simple text version
         const html = generateEmailHtml({
             recipientName: user.name,
             subject: subject,
@@ -841,8 +841,7 @@ exports.registerUser = async (req, res, next) => {
                 `Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:`,
                 // Use inline styles for better compatibility
                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
-                `This OTP will expire in 10 minutes.`,
-                `If you didn't request this, you can safely ignore this email.`
+                `This OTP will expire in 10 minutes.`
             ],
             companyName: 'miniapp' // Pass your app name
             // No button needed for OTP verification usually
@@ -1144,18 +1143,17 @@ exports.forgotPassword = async (req, res, next) => {
         await user.save({ validateBeforeSave: false });
 
         // *** UPDATED: Send Email using template ***
-        const subject = 'Password Reset Request - Verify OTP';
+        const subject = 'Password Reset - miniapp';
         const text = `You requested a password reset. Your OTP is: ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`;
         const html = generateEmailHtml({
             recipientName: user.name,
             subject: subject,
             greeting: `Password Reset Request`,
             bodyLines: [
-                 `We received a request to reset the password for your account associated with ${user.email}.`,
+                 `We received a request to reset the password for your account ${user.email}.`,
                  `Please use the following One-Time Password (OTP) to verify your identity:`,
                  `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
                  `This OTP is valid for 10 minutes.`,
-                 `You will be prompted to enter this OTP on the verification page. After verification, you can set a new password.`,
                  `If you did not request a password reset, please ignore this email. Your password will remain unchanged.`
             ],
             companyName: 'miniapp'
@@ -1233,15 +1231,14 @@ exports.resetPassword = async (req, res, next) => {
 
         // Optional: Send password change confirmation email
         try {
-             const subject = 'Your Password Has Been Changed';
-             const text = `The password for your miniapp account associated with ${user.email} was successfully changed. If you did not make this change, please contact support immediately.`;
+             const subject = 'Password Reset Success - miniapp';
+             const text = `Your account associated with ${user.email}  password was successfully changed. If you did not make this change, please contact support immediately.`;
              const html = generateEmailHtml({
                  recipientName: user.name,
                  subject: subject,
                  greeting: 'Password Successfully Reset',
                  bodyLines: [
                      `This email confirms that the password for your miniapp account has been successfully changed.`,
-                     `If you made this change, no further action is required.`,
                      `If you did not initiate this password reset, please contact our support team immediately.`
                  ],
                  companyName: 'miniapp',
@@ -1483,10 +1480,8 @@ exports.placeOrder = async (req, res, next) => {
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = `Your miniapp Order #${order._id} Has Been Placed!`;
-            // Create a more detailed text fallback
-            const productListText = order.products.map(p => `- ${p.name} (Qty: ${p.quantity}) @ ₹${p.priceAtOrder.toFixed(2)}`).join('\n');
-            const text = `Thank you for your order!\nOrder ID: ${order._id}\nTotal: ₹${order.totalAmount.toFixed(2)}\n\nItems:\n${productListText}\n\nShipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.pincode}\n\nWe'll notify you when it ships. You can view status here: ${req.protocol}://${req.get('host')}/orders/my-orders`;
+            const subject = `Order Placed - miniapp`;
+            const text = `Thank you for your order!`;
 
             // Generate HTML using the template
             const productListHTML = order.products.map(p => `<li style="margin-bottom: 5px; padding-left: 0;">${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
@@ -1498,10 +1493,9 @@ exports.placeOrder = async (req, res, next) => {
                     `Thank you for your purchase! Your order has been successfully placed and is being processed.`,
                     `<strong>Order ID:</strong> ${order._id}`,
                     `<strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}`,
-                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, // Added locality
+                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`,
                     `<h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Order Summary:</h3>
-                     <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">${productListHTML}</ul>`, // Added bottom margin to ul
-                    `We'll send you another email once your order has shipped.`
+                     <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">${productListHTML}</ul>`
                 ],
                 buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                 buttonText: 'View Order Status',
@@ -1590,15 +1584,15 @@ exports.cancelOrder = async (req, res, next) => {
 
         // *** UPDATED: Send email confirmation using template ***
          try{
-             const subject = `Your miniapp Order #${order._id} Has Been Cancelled`;
-             const text = `Your order (${order._id}) has been successfully cancelled as requested. Any applicable refund will be processed shortly.`;
+             const subject = `Order Cancelled - miniapp`;
+             const text = `Any applicable refund will be processed shortly.`;
              const html = generateEmailHtml({
                   recipientName: order.userId?.name || req.session.user.name, // Use populated name or session name
                   subject: subject,
                   greeting: `Order Cancellation Confirmation`,
                   bodyLines: [
                       `Your order (#${order._id}) has been successfully cancelled as per your request.`,
-                      `If any payment was made, a refund will be processed according to our policy. Please allow a few business days for it to reflect in your account.`,
+                      `If any payment was made, a refund will be processed according to our policy.`,
                       `We're sorry to see this order go. We hope to serve you again soon!`
                   ],
                   buttonUrl: `${req.protocol}://${req.get('host')}/`,
@@ -1740,7 +1734,7 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
+            const subject = `Order Delivered - miniapp!`;
             const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Admin. Thank you for shopping!`;
             const html = generateEmailHtml({
@@ -1804,9 +1798,9 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-           const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
+           const subject = `Order Delivered - miniapp`;
            const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-           const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Seller. Thank you for shopping!`;
+           const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}.\n`;
            const html = generateEmailHtml({
                recipientName: order.shippingAddress.name,
                subject: subject,
@@ -3162,8 +3156,8 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             // *** Use populated name or fallback ***
             const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Update on Your miniapp Order #${order._id}`;
-                const textCust = `Unfortunately, your order (${order._id}) has been cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
+                const subjectCust = `Order Cancelled - miniapp`;
+                const textCust = `Unfortunately, your order (${order._id}) has been cancelled by the seller.\n Reason: ${reason}. Contact support for questions.`;
                 const htmlCust = generateEmailHtml({
                     recipientName: customerName,
                     subject: subjectCust,
@@ -3172,7 +3166,6 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                         `We are writing to inform you that item(s) in your order (#${order._id}) had to be cancelled by the seller.`,
                         `<strong>Reason:</strong> ${reason}`, // Use the seller's reason
                         `If any payment was made for the cancelled items, a refund will be processed according to our policy.`,
-                        `We apologize for any inconvenience. Please contact support if you have questions.`
                     ],
                     buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                     buttonText: 'View My Orders',
@@ -10312,7 +10305,6 @@ app.use('/', mainRouter);
 // --- Error Handling ---
 app.use(notFound);
 app.use(errorHandler);
-
 
 // --- Server Start ---
 const PORT = process.env.PORT || 3000;

@@ -134,10 +134,8 @@ exports.placeOrder = async (req, res, next) => {
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = `Your miniapp Order #${order._id} Has Been Placed!`;
-            // Create a more detailed text fallback
-            const productListText = order.products.map(p => `- ${p.name} (Qty: ${p.quantity}) @ ₹${p.priceAtOrder.toFixed(2)}`).join('\n');
-            const text = `Thank you for your order!\nOrder ID: ${order._id}\nTotal: ₹${order.totalAmount.toFixed(2)}\n\nItems:\n${productListText}\n\nShipping To: ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.pincode}\n\nWe'll notify you when it ships. You can view status here: ${req.protocol}://${req.get('host')}/orders/my-orders`;
+            const subject = `Order Placed - miniapp`;
+            const text = `Thank you for your order!`;
 
             // Generate HTML using the template
             const productListHTML = order.products.map(p => `<li style="margin-bottom: 5px; padding-left: 0;">${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
@@ -149,10 +147,9 @@ exports.placeOrder = async (req, res, next) => {
                     `Thank you for your purchase! Your order has been successfully placed and is being processed.`,
                     `<strong>Order ID:</strong> ${order._id}`,
                     `<strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)}`,
-                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, // Added locality
+                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.cityVillage}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`,
                     `<h3 style="margin-top: 20px; margin-bottom: 10px; font-size: 16px; border-bottom: 1px solid #eee; padding-bottom: 5px;">Order Summary:</h3>
-                     <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">${productListHTML}</ul>`, // Added bottom margin to ul
-                    `We'll send you another email once your order has shipped.`
+                     <ul style="list-style: none; padding: 0; margin: 0 0 15px 0;">${productListHTML}</ul>`
                 ],
                 buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                 buttonText: 'View Order Status',
@@ -241,15 +238,15 @@ exports.cancelOrder = async (req, res, next) => {
 
         // *** UPDATED: Send email confirmation using template ***
          try{
-             const subject = `Your miniapp Order #${order._id} Has Been Cancelled`;
-             const text = `Your order (${order._id}) has been successfully cancelled as requested. Any applicable refund will be processed shortly.`;
+             const subject = `Order Cancelled - miniapp`;
+             const text = `Any applicable refund will be processed shortly.`;
              const html = generateEmailHtml({
                   recipientName: order.userId?.name || req.session.user.name, // Use populated name or session name
                   subject: subject,
                   greeting: `Order Cancellation Confirmation`,
                   bodyLines: [
                       `Your order (#${order._id}) has been successfully cancelled as per your request.`,
-                      `If any payment was made, a refund will be processed according to our policy. Please allow a few business days for it to reflect in your account.`,
+                      `If any payment was made, a refund will be processed according to our policy.`,
                       `We're sorry to see this order go. We hope to serve you again soon!`
                   ],
                   buttonUrl: `${req.protocol}://${req.get('host')}/`,
@@ -391,7 +388,7 @@ exports.confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp,
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-            const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
+            const subject = `Order Delivered - miniapp!`;
             const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Admin. Thank you for shopping!`;
             const html = generateEmailHtml({
@@ -455,9 +452,9 @@ exports.confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, r
 
         // *** UPDATED: Send Confirmation Email using template ***
         try {
-           const subject = `Your miniapp Order #${order._id} Has Been Delivered!`;
+           const subject = `Order Delivered - miniapp`;
            const formattedDeliveryDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-           const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}. Confirmed by Seller. Thank you for shopping!`;
+           const text = `Great news! Your order (${order._id}) has been delivered on ${formattedDeliveryDate}.\n`;
            const html = generateEmailHtml({
                recipientName: order.shippingAddress.name,
                subject: subject,

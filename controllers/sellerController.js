@@ -413,8 +413,8 @@ exports.cancelOrderBySeller = async (req, res, next) => {
             // *** Use populated name or fallback ***
             const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Update on Your miniapp Order #${order._id}`;
-                const textCust = `Unfortunately, your order (${order._id}) has been cancelled by the seller. Reason: ${reason}. Contact support for questions.`;
+                const subjectCust = `Order Cancelled - miniapp`;
+                const textCust = `Unfortunately, your order (${order._id}) has been cancelled by the seller.\n Reason: ${reason}. Contact support for questions.`;
                 const htmlCust = generateEmailHtml({
                     recipientName: customerName,
                     subject: subjectCust,
@@ -423,7 +423,6 @@ exports.cancelOrderBySeller = async (req, res, next) => {
                         `We are writing to inform you that item(s) in your order (#${order._id}) had to be cancelled by the seller.`,
                         `<strong>Reason:</strong> ${reason}`, // Use the seller's reason
                         `If any payment was made for the cancelled items, a refund will be processed according to our policy.`,
-                        `We apologize for any inconvenience. Please contact support if you have questions.`
                     ],
                     buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                     buttonText: 'View My Orders',

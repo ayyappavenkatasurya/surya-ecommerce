@@ -359,17 +359,17 @@ exports.cancelOrderByAdmin = async (req, res, next) => {
             // *** Use populated name or fallback ***
             const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
             if(customerEmail) {
-                const subjectCust = `Update on Your miniapp Order #${order._id}`;
+                const subjectCust = `Order Cancelled - miniapp`;
                 const textCust = `Your order (${order._id}) has been cancelled by administration. Reason: ${order.cancellationReason}. Contact support for questions.`;
                 const htmlCust = generateEmailHtml({
                     recipientName: customerName,
                     subject: subjectCust,
                     greeting: `Regarding Your Order #${order._id}`,
                     bodyLines: [
-                        `We are writing to inform you that your order (#${order._id}) has been cancelled by our administration team.`,
+                        `We are inform you that your order (#${order._id}) has been cancelled by our administration team.`,
                         `<strong>Reason for Cancellation:</strong> ${order.cancellationReason}`, // Use the admin reason
                         `If any payment was made, a refund will be processed shortly according to our policy.`,
-                        `We apologize for any inconvenience this may cause. Please contact our support team if you have any questions.`
+                        `We apologize for any inconvenience. Please contact our support team if you have any questions.`
                     ],
                      buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`,
                      buttonText: 'View My Orders',

@@ -145,8 +145,8 @@ exports.registerUser = async (req, res, next) => {
         }
 
         // *** UPDATED: Send OTP Email using template ***
-        const subject = 'Verify Your Email Address';
-        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes. Welcome to miniapp!`; // Simple text version
+        const subject = 'Email Verify - miniapp';
+        const text = `Your verification OTP is: ${otp}. It will expire in 10 minutes.`; // Simple text version
         const html = generateEmailHtml({
             recipientName: user.name,
             subject: subject,
@@ -155,8 +155,7 @@ exports.registerUser = async (req, res, next) => {
                 `Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:`,
                 // Use inline styles for better compatibility
                 `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
-                `This OTP will expire in 10 minutes.`,
-                `If you didn't request this, you can safely ignore this email.`
+                `This OTP will expire in 10 minutes.`
             ],
             companyName: 'miniapp' // Pass your app name
             // No button needed for OTP verification usually
@@ -458,18 +457,17 @@ exports.forgotPassword = async (req, res, next) => {
         await user.save({ validateBeforeSave: false });
 
         // *** UPDATED: Send Email using template ***
-        const subject = 'Password Reset Request - Verify OTP';
+        const subject = 'Password Reset - miniapp';
         const text = `You requested a password reset. Your OTP is: ${otp}. It expires in 10 minutes. If you did not request this, ignore this email.`;
         const html = generateEmailHtml({
             recipientName: user.name,
             subject: subject,
             greeting: `Password Reset Request`,
             bodyLines: [
-                 `We received a request to reset the password for your account associated with ${user.email}.`,
+                 `We received a request to reset the password for your account ${user.email}.`,
                  `Please use the following One-Time Password (OTP) to verify your identity:`,
                  `<strong style="font-size: 20px; display: block; text-align: center; margin: 15px 0; letter-spacing: 2px; background-color: #f0f0f0; padding: 5px 10px; border-radius: 4px;">${otp}</strong>`,
                  `This OTP is valid for 10 minutes.`,
-                 `You will be prompted to enter this OTP on the verification page. After verification, you can set a new password.`,
                  `If you did not request a password reset, please ignore this email. Your password will remain unchanged.`
             ],
             companyName: 'miniapp'
@@ -547,15 +545,14 @@ exports.resetPassword = async (req, res, next) => {
 
         // Optional: Send password change confirmation email
         try {
-             const subject = 'Your Password Has Been Changed';
-             const text = `The password for your miniapp account associated with ${user.email} was successfully changed. If you did not make this change, please contact support immediately.`;
+             const subject = 'Password Reset Success - miniapp';
+             const text = `Your account associated with ${user.email}  password was successfully changed. If you did not make this change, please contact support immediately.`;
              const html = generateEmailHtml({
                  recipientName: user.name,
                  subject: subject,
                  greeting: 'Password Successfully Reset',
                  bodyLines: [
                      `This email confirms that the password for your miniapp account has been successfully changed.`,
-                     `If you made this change, no further action is required.`,
                      `If you did not initiate this password reset, please contact our support team immediately.`
                  ],
                  companyName: 'miniapp',
