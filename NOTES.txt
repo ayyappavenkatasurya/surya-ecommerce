@@ -103,7 +103,6 @@ module.exports = {
 };
 
 controllers.js:
-
 // controllers.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -941,23 +940,114 @@ exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
  };
 
 exports.user_updateCartQuantity = async (req, res, next) => {
-          const { productId, quantity } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
-          if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) return res.status(400).json({ success: false, message: 'Invalid product/qty.' });
-         try {
-             const [user, product] = await Promise.all([ User.findById(userId), Product.findById(productId).select('stock price reviewStatus name') ]);
-             if (!user || !product) return res.status(404).json({ success: false, message: 'User/Product not found.' });
-             if (product.reviewStatus !== 'approved') { const index = user.cart.findIndex(i => i.productId.toString() === productId); if (index > -1) { user.cart.splice(index, 1); await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity })); await req.session.save(); } return res.status(400).json({ success: false, message: `Product "${product.name}" unavailable, removed.`, removal: true }); }
-             const index = user.cart.findIndex(i => i.productId.toString() === productId);
-             if (numQuantity === 0) { if (index > -1) user.cart.splice(index, 1); }
-             else { if (product.stock < numQuantity) return res.status(400).json({ success: false, message: `Stock low: ${product.name} (${product.stock} avail).` }); if (index > -1) user.cart[index].quantity = numQuantity; else user.cart.push({ productId, quantity: numQuantity }); }
-             await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-             let cartTotal = 0; let itemSubtotal = 0;
-             const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
-             updatedUser.cart.forEach(i => { if (i.productId?.price) { const currentSub = i.productId.price * i.quantity; cartTotal += currentSub; if (i.productId._id.toString() === productId) itemSubtotal = currentSub; } });
-             await req.session.save();
-             res.json({ success: true, message: 'Cart updated.', newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0, itemSubtotal, cartTotal, itemId: productId });
-         } catch (error) { console.error("Cart Update Error:", error); res.status(500).json({ success: false, message: 'Error updating quantity.' }); }
- };
+    const { productId, quantity } = req.body;
+    const userId = req.session.user._id;
+    const numQuantity = parseInt(quantity, 10);
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) {
+        return res.status(400).json({ success: false, message: 'Invalid product/quantity.' });
+    }
+
+    try {
+        const [user, product] = await Promise.all([
+            User.findById(userId),
+            Product.findById(productId).select('stock price reviewStatus name')
+        ]);
+
+        if (!user || !product) {
+            return res.status(404).json({ success: false, message: 'User/Product not found.' });
+        }
+
+        if (product.reviewStatus !== 'approved') {
+            const index = user.cart.findIndex(i => i.productId.toString() === productId);
+            if (index > -1) {
+                user.cart.splice(index, 1);
+                await user.save();
+                req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
+                await req.session.save(); // Save session after cart update
+            }
+            // After removal, calculate the new cart item count for the response
+            const updatedCartItemCountAfterRemoval = user.cart.reduce((sum, item) => sum + item.quantity, 0);
+            return res.status(400).json({
+                success: false,
+                message: `Product "${product.name}" unavailable, removed.`,
+                removal: true,
+                cartItemCount: updatedCartItemCountAfterRemoval // Send updated count
+            });
+        }
+
+        const index = user.cart.findIndex(i => i.productId.toString() === productId);
+
+        if (numQuantity === 0) {
+            if (index > -1) {
+                user.cart.splice(index, 1);
+            }
+        } else {
+            if (product.stock < numQuantity) {
+                // If stock is low, do not change the cart. Respond with current cart count.
+                const currentCartItemCount = user.cart.reduce((sum, item) => sum + item.quantity, 0);
+                return res.status(400).json({
+                    success: false,
+                    message: `Stock low: ${product.name} (${product.stock} avail).`,
+                    cartItemCount: currentCartItemCount // Send current count
+                });
+            }
+            if (index > -1) {
+                user.cart[index].quantity = numQuantity;
+            } else {
+                user.cart.push({ productId, quantity: numQuantity });
+            }
+        }
+
+        await user.save();
+        req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
+
+        let cartTotal = 0;
+        let itemSubtotal = 0;
+
+        // Re-fetch user to get populated cart for accurate totals based on current prices
+        // This also ensures we have the most up-to-date cart state for item count.
+        const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
+
+        updatedUser.cart.forEach(i => {
+            if (i.productId?.price) {
+                const currentSub = i.productId.price * i.quantity;
+                cartTotal += currentSub;
+                if (i.productId._id.toString() === productId) {
+                    itemSubtotal = currentSub;
+                }
+            }
+        });
+
+        // Calculate the final cart item count
+        const updatedCartItemCount = updatedUser.cart.reduce((sum, item) => sum + item.quantity, 0);
+
+        await req.session.save(); // Save session after all updates
+
+        res.json({
+            success: true,
+            message: 'Cart updated.',
+            newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0,
+            itemSubtotal,
+            cartTotal,
+            cartItemCount: updatedCartItemCount, // Send updated count
+            itemId: productId
+        });
+    } catch (error) {
+        console.error("Cart Update Error:", error);
+        // Try to get current cart count even on error for client UI consistency
+        let currentCartItemCountOnError = 0;
+        if (req.session.user?.cart) {
+            currentCartItemCountOnError = req.session.user.cart.reduce((sum, item) => sum + item.quantity, 0);
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Error updating quantity.',
+            cartItemCount: currentCartItemCountOnError // Send best-effort count
+        });
+    }
+};
+
 
 exports.user_removeFromCart = async (req, res, next) => {
      const { productId } = req.params; const userId = req.session.user._id;
@@ -3588,20 +3678,16 @@ document.addEventListener('DOMContentLoaded', () => {
         form.addEventListener('submit', (event) => {
             const submitButton = form.querySelector('button[type="submit"]');
             if (submitButton && !submitButton.disabled) {
-                // Basic HTML5 validation check
                 if (typeof form.checkValidity === 'function' && !form.checkValidity()) {
-                    // If form is invalid, don't disable button or show spinner
                     return;
                 }
                 const originalText = submitButton.innerHTML;
-                submitButton.dataset.originalText = originalText; // Store original HTML
+                submitButton.dataset.originalText = originalText;
                 submitButton.disabled = true;
                 submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Working...';
 
-                // Reset button if user navigates back without form submitting (browser specific)
-                window.addEventListener('pageshow', function(pageEvent) { // Renamed event variable
+                window.addEventListener('pageshow', function(pageEvent) {
                     if (pageEvent.persisted && submitButton.disabled) {
-                        // Restore button only if it still has the loading state
                         if (submitButton.dataset.originalText) {
                             submitButton.innerHTML = submitButton.dataset.originalText;
                         }
@@ -3624,7 +3710,6 @@ document.addEventListener('DOMContentLoaded', () => {
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 cells.forEach((cell, index) => {
-                    // Add data-label only if it doesn't exist and header exists
                     if (!cell.hasAttribute('data-label') && headers[index] !== undefined && headers[index] !== '') {
                          cell.setAttribute('data-label', headers[index]);
                     }
@@ -3641,18 +3726,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const fallbackLinks = document.getElementById('fallback-share-links');
     if (shareButton && fallbackLinks) {
         shareButton.addEventListener('click', async () => {
-            const title = shareButton.dataset.title || document.title; // Fallback to page title
-            const text = shareButton.dataset.text || `Check out ${title}`; // Fallback text
-            const url = shareButton.dataset.url || window.location.href; // Fallback url
+            const title = shareButton.dataset.title || document.title;
+            const text = shareButton.dataset.text || `Check out ${title}`;
+            const url = shareButton.dataset.url || window.location.href;
 
             if (navigator.share) {
                 try {
                     await navigator.share({ title, text, url });
                     console.log('Product shared successfully!');
-                    showToast('Link shared!', 'success'); // Optional feedback
+                    showToast('Link shared!', 'success');
                 } catch (error) {
                     console.error('Error sharing:', error);
-                    // Don't show fallback if user explicitly cancelled (AbortError)
                     if (error.name !== 'AbortError') {
                          fallbackLinks.classList.remove('hidden');
                          showToast('Sharing failed, use fallback links.', 'warning');
@@ -3667,11 +3751,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Profile Page Specific Logic ---
-    const profilePage = document.querySelector('.profile-container'); // Check if we are on profile page
+    const profilePage = document.querySelector('.profile-container');
     if (profilePage) {
-        // --- Address Edit/Add Logic ---
         const editAddressBtn = document.getElementById('edit-address-btn');
-        const addAddressBtn = document.getElementById('add-address-btn'); // Get the Add button
+        const addAddressBtn = document.getElementById('add-address-btn');
         const cancelAddressBtn = document.getElementById('cancel-edit-btn');
         const addressForm = document.getElementById('address-form');
         const savedAddressDiv = document.getElementById('saved-address-display');
@@ -3682,19 +3765,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const isEditing = savedAddressDiv.querySelector('strong') !== null;
             addressForm.querySelector('h3').textContent = isEditing ? 'Edit Address' : 'Add Address';
             savedAddressDiv.classList.add('hidden');
-            if (addAddressBtn) addAddressBtn.classList.add('hidden'); // Hide Add button when form is visible
-            if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden'); // Always show Cancel when form is open
+            if (addAddressBtn) addAddressBtn.classList.add('hidden');
+            if (cancelAddressBtn) cancelAddressBtn.classList.remove('hidden');
 
-            // Trigger pincode check for edit
             const pincodeInput = addressForm.querySelector('#profile-pincode');
             const localitySelect = addressForm.querySelector('#profile-locality');
-            // Get the potentially pre-filled value from the EJS render
             const savedLocality = localitySelect ? localitySelect.dataset.savedValue : null;
 
             if (pincodeInput && pincodeInput.value.length === 6 && /^\d{6}$/.test(pincodeInput.value)) {
-                fetchPincodeData(pincodeInput.value, 'profile', savedLocality); // Pass saved locality
+                fetchPincodeData(pincodeInput.value, 'profile', savedLocality);
             } else if (localitySelect) {
-                // Ensure locality is reset if pincode isn't valid when opening form
                 localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
                 localitySelect.disabled = true;
             }
@@ -3703,17 +3783,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const hideAddressForm = () => {
             if (!addressForm || !savedAddressDiv) return;
             addressForm.classList.add('hidden');
-            savedAddressDiv.classList.remove('hidden'); // Show the container (has address or "No address" text)
+            savedAddressDiv.classList.remove('hidden');
             if (cancelAddressBtn) cancelAddressBtn.classList.add('hidden');
-            // Show Add button only if there's no saved address content
             if (!savedAddressDiv.querySelector('strong') && addAddressBtn) {
                  addAddressBtn.classList.remove('hidden');
             }
-            // Clear status messages when hiding
             const statusElement = addressForm.querySelector('.pincode-status');
             if (statusElement) statusElement.textContent = '';
-             // Also clear locality dropdown and other derived fields
-            clearAutoFilledFields('profile'); // This will reset locality too
+            clearAutoFilledFields('profile');
         };
 
         if (editAddressBtn) {
@@ -3721,8 +3798,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (addAddressBtn) {
              addAddressBtn.addEventListener('click', () => {
-                 if(addressForm) addressForm.reset(); // Clear form fields when adding new
-                 clearAutoFilledFields('profile'); // Clear auto-filled fields too
+                 if(addressForm) addressForm.reset();
+                 clearAutoFilledFields('profile');
                  showAddressForm();
              });
         }
@@ -3730,7 +3807,6 @@ document.addEventListener('DOMContentLoaded', () => {
             cancelAddressBtn.addEventListener('click', hideAddressForm);
         }
 
-        // Initial state check: Show Add button only if no address exists and form is hidden
         if (savedAddressDiv && addressForm && addAddressBtn) {
             if (!savedAddressDiv.querySelector('strong') && addressForm.classList.contains('hidden')) {
                 addAddressBtn.classList.remove('hidden');
@@ -3739,8 +3815,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-
-        // --- Name Edit Logic ---
         const editNameBtn = document.getElementById('edit-name-btn');
         const cancelNameBtn = document.getElementById('cancel-edit-name-btn');
         const nameForm = document.getElementById('name-form');
@@ -3753,12 +3827,12 @@ document.addEventListener('DOMContentLoaded', () => {
             nameForm.classList.remove('hidden');
             savedNameDisplaySpan.classList.add('hidden');
             editNameBtn.classList.add('hidden');
-            if(displayUserNameStrong) nameInput.value = displayUserNameStrong.textContent;
-            nameInput.focus();
+            if(displayUserNameStrong && nameInput) nameInput.value = displayUserNameStrong.textContent;
+            if(nameInput) nameInput.focus();
         };
 
         const hideNameForm = () => {
-            if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong) return;
+            if (!nameForm || !savedNameDisplaySpan || !editNameBtn || !displayUserNameStrong || !nameInput) return;
             nameForm.classList.add('hidden');
             savedNameDisplaySpan.classList.remove('hidden');
             editNameBtn.classList.remove('hidden');
@@ -3768,14 +3842,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editNameBtn) {
             editNameBtn.addEventListener('click', showNameForm);
         }
-
         if (cancelNameBtn) {
             cancelNameBtn.addEventListener('click', hideNameForm);
         }
-    } // End if (profilePage)
+    }
 
     // --- Checkout Address Toggle Logic ---
-    const checkoutPage = document.querySelector('.checkout-container'); // Check if on checkout page
+    const checkoutPage = document.querySelector('.checkout-container');
     if (checkoutPage) {
         const checkoutEditBtn = checkoutPage.querySelector('.checkout-address #edit-address-btn');
         const checkoutCancelBtn = checkoutPage.querySelector('.checkout-address #cancel-edit-btn');
@@ -3790,16 +3863,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 checkoutAddressForm.classList.remove('hidden');
                 checkoutSavedAddressDiv.classList.add('hidden');
                 if(placeOrderBtn) placeOrderBtn.disabled = true;
-                checkoutAddressForm.querySelector('h3').textContent = 'Edit Address';
+                if(checkoutAddressForm.querySelector('h3')) checkoutAddressForm.querySelector('h3').textContent = 'Edit Address';
                 if (checkoutCancelBtn) checkoutCancelBtn.classList.remove('hidden');
 
-                // Trigger pincode check for edit
                 const pincodeInput = checkoutAddressForm.querySelector('#checkout-pincode');
                 const localitySelect = checkoutAddressForm.querySelector('#checkout-locality');
                 const savedLocality = localitySelect ? localitySelect.dataset.savedValue : null;
 
                 if (pincodeInput && pincodeInput.value.length === 6 && /^\d{6}$/.test(pincodeInput.value)) {
-                    fetchPincodeData(pincodeInput.value, 'checkout', savedLocality); // Pass saved locality
+                    fetchPincodeData(pincodeInput.value, 'checkout', savedLocality);
                 } else if (localitySelect){
                     localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
                     localitySelect.disabled = true;
@@ -3818,55 +3890,59 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(placeOrderBtn) placeOrderBtn.disabled = true;
                 }
                 checkoutCancelBtn.classList.add('hidden');
-                // Clear status messages when hiding
                 const statusElement = checkoutAddressForm.querySelector('.pincode-status');
                 if (statusElement) statusElement.textContent = '';
-                clearAutoFilledFields('checkout'); // Reset locality too
+                clearAutoFilledFields('checkout');
             });
         }
 
-        // Initialize form state on page load
         if (!hasInitialAddress && checkoutAddressForm) {
             checkoutAddressForm.classList.remove('hidden');
             if (placeOrderBtn) placeOrderBtn.disabled = true;
-            checkoutAddressForm.querySelector('h3').textContent = 'Add Shipping Address';
+            if(checkoutAddressForm.querySelector('h3')) checkoutAddressForm.querySelector('h3').textContent = 'Add Shipping Address';
             if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         } else if (hasInitialAddress && checkoutAddressForm) {
             checkoutAddressForm.classList.add('hidden');
             if (placeOrderBtn) placeOrderBtn.disabled = false;
             if (checkoutCancelBtn) checkoutCancelBtn.classList.add('hidden');
         }
-    } // End if(checkoutPage)
+    }
 
 
-    // --- Cart Update AJAX Logic ---
-    const updateQtyButtons = document.querySelectorAll('.btn-update-qty');
-    updateQtyButtons.forEach(button => {
-        button.addEventListener('click', (e) => {
-            e.preventDefault();
-            const productId = button.dataset.productId;
-            const quantityInput = document.getElementById(`quantity-${productId}`);
-            if (!quantityInput) return;
-            const newQuantity = parseInt(quantityInput.value, 10);
+    // --- Cart Update AJAX Logic (Using Event Delegation) ---
+    const cartItemsContainer = document.querySelector('.cart-items');
+    if (cartItemsContainer) {
+        cartItemsContainer.addEventListener('click', (e) => {
+            const button = e.target.closest('.btn-update-qty');
+            if (button) {
+                e.preventDefault();
+                const productId = button.dataset.productId;
+                const quantityInput = document.getElementById(`quantity-${productId}`);
+                if (!quantityInput) return;
+                
+                const newQuantity = parseInt(quantityInput.value, 10);
 
-            if (!quantityInput.dataset.originalValue) {
-                quantityInput.dataset.originalValue = quantityInput.value;
+                if (!quantityInput.dataset.originalValue) {
+                    quantityInput.dataset.originalValue = quantityInput.value;
+                }
+
+                if (isNaN(newQuantity) || newQuantity < 0) {
+                    showToast('Invalid quantity entered.', 'danger');
+                    quantityInput.value = quantityInput.dataset.originalValue;
+                    return;
+                }
+                const maxStock = parseInt(quantityInput.max, 10);
+                if (!isNaN(maxStock) && newQuantity > maxStock) {
+                    showToast(`Only ${maxStock} items available in stock.`, 'warning');
+                    quantityInput.value = maxStock;
+                    return;
+                }
+                // Pass the button and quantityInput for UI updates within the AJAX function
+                updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
             }
-
-            if (isNaN(newQuantity) || newQuantity < 0) {
-                 showToast('Invalid quantity entered.', 'danger');
-                 quantityInput.value = quantityInput.dataset.originalValue;
-                return;
-             }
-            const maxStock = parseInt(quantityInput.max, 10);
-            if (!isNaN(maxStock) && newQuantity > maxStock) {
-                showToast(`Only ${maxStock} items available in stock.`, 'warning');
-                quantityInput.value = maxStock;
-                 return;
-             }
-            updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
         });
-    });
+    }
+    // --- End Cart Update AJAX Logic ---
 
 
     // ========================================
@@ -3874,7 +3950,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     const searchContainer = document.getElementById('dynamic-search-container');
     const searchToggleBtn = document.getElementById('search-toggle-btn');
-    const searchForm = document.getElementById('dynamic-search-form');
     const searchInput = document.getElementById('search-input-dynamic');
     const suggestionsDropdown = document.getElementById('suggestions-dropdown');
     let suggestionFetchTimeout;
@@ -3943,7 +4018,6 @@ document.addEventListener('DOMContentLoaded', () => {
                  const item = document.createElement('a');
                  item.classList.add('suggestion-item');
                  item.href = `/products/${product._id}`;
-                 // Basic sanitization for display
                  const safeName = product.name ? product.name.replace(/</g, "<").replace(/>/g, ">") : '[No Name]';
                  const safeImageUrl = product.imageUrl ? product.imageUrl.replace(/</g, "<").replace(/>/g, ">") : '/images/placeholder.png';
                  item.innerHTML = `
@@ -3959,7 +4033,6 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      }
 
-     // Global click listener to close search/suggestions
      document.addEventListener('click', (e) => {
          if (searchContainer && suggestionsDropdown && searchToggleBtn && !searchContainer.contains(e.target) && !searchToggleBtn.contains(e.target)) {
              searchContainer.classList.remove('active');
@@ -3967,17 +4040,14 @@ document.addEventListener('DOMContentLoaded', () => {
          }
      });
 
-     // Handle clicks within the suggestions dropdown
      if(suggestionsDropdown) {
          suggestionsDropdown.addEventListener('click', (e) => {
              const link = e.target.closest('a.suggestion-item');
              if (!link) {
-                 // Prevent closing if clicking inside the dropdown but not on a link
                  e.stopPropagation();
              } else {
-                 // Allow link navigation and close dropdown/search
                  suggestionsDropdown.classList.remove('active');
-                 if (searchContainer && window.innerWidth < 768) { // Only hide container on mobile
+                 if (searchContainer && window.innerWidth < 768) {
                     searchContainer.classList.remove('active');
                  }
              }
@@ -3991,10 +4061,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     // Toast Notification Logic
     // ========================================
-    const toastContainer = document.querySelector('.toast-container');
-    if (toastContainer) {
-        const toastElements = toastContainer.querySelectorAll('.toast');
-
+    const toastContainerGlobal = document.querySelector('.toast-container'); // Renamed to avoid conflict
+    if (toastContainerGlobal) {
+        const toastElements = toastContainerGlobal.querySelectorAll('.toast');
         toastElements.forEach((toastElement) => {
             const closeButton = toastElement.querySelector('.toast-close-btn');
             const autoHideDelay = 5000;
@@ -4012,25 +4081,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, { once: true });
             };
 
-            // Show toast initially
-            setTimeout(() => {
-                if (toastElement.parentNode) {
-                   toastElement.classList.add('show');
-                }
-            }, 10);
-
-             // Auto hide
-             hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
-
-            // Manual close
-            if (closeButton) {
-                closeButton.addEventListener('click', dismissToast);
-            }
-
-             // Pause on hover
-             toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
-             toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
-
+            setTimeout(() => { if (toastElement.parentNode) toastElement.classList.add('show'); }, 10);
+            hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
+            if (closeButton) closeButton.addEventListener('click', dismissToast);
+            toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
+            toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
         });
     }
     // ========================================
@@ -4041,33 +4096,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.rating-bar-fill').forEach(function(el) {
         var width = el.getAttribute('data-width');
         if (width) {
-            requestAnimationFrame(() => {
-                 if(el.parentNode) {
-                    el.style.width = width + '%';
-                 }
-            });
+            requestAnimationFrame(() => { if(el.parentNode) el.style.width = width + '%'; });
         }
     });
 
     // ========================================
-    // Loading State for Non-Form Actions (e.g., Proceed to Checkout)
+    // Loading State for Non-Form Actions
     // ========================================
     const proceedCheckoutBtn = document.getElementById('btn-proceed-checkout');
     if (proceedCheckoutBtn) {
         const originalCheckoutText = proceedCheckoutBtn.innerHTML;
         const loadingCheckoutText = proceedCheckoutBtn.dataset.loadingText || '<i class="fas fa-spinner fa-spin"></i> Loading...';
-
         proceedCheckoutBtn.addEventListener('click', function(event) {
             if (proceedCheckoutBtn.classList.contains('loading')) {
-                event.preventDefault();
-                return;
+                event.preventDefault(); return;
             }
             proceedCheckoutBtn.classList.add('loading');
             proceedCheckoutBtn.innerHTML = loadingCheckoutText;
             proceedCheckoutBtn.style.pointerEvents = 'none';
             proceedCheckoutBtn.setAttribute('aria-disabled', 'true');
         });
-
         window.addEventListener('pageshow', function(pageEvent) {
             if (pageEvent.persisted && proceedCheckoutBtn.classList.contains('loading')) {
                 proceedCheckoutBtn.classList.remove('loading');
@@ -4082,7 +4130,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
 
     // ========================================
-    // Homepage Banner Slider Logic (with Touch Events)
+    // Homepage Banner Slider Logic
     // ========================================
     const sliderContainer = document.querySelector('[data-slider-container]');
     if (sliderContainer) {
@@ -4091,15 +4139,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const nextBtn = sliderContainer.querySelector('[data-slider-next]');
         const dotsContainer = sliderContainer.querySelector('[data-slider-dots]');
         const dots = dotsContainer ? dotsContainer.querySelectorAll('[data-slide-to]') : [];
-
         let currentSlideIndex = 0;
         let autoSlideInterval = null;
         const slideIntervalTime = 5000;
-
-        let isDragging = false;
-        let startX = 0;
-        let currentX = 0;
-        let diffX = 0;
+        let isDragging = false, startX = 0, currentX = 0, diffX = 0;
         const swipeThreshold = 50;
 
         function showSlide(index) {
@@ -4109,46 +4152,28 @@ document.addEventListener('DOMContentLoaded', () => {
             dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
             currentSlideIndex = newIndex;
         }
-
         function nextSlide() { showSlide(currentSlideIndex + 1); }
         function prevSlide() { showSlide(currentSlideIndex - 1); }
-
         function startAutoSlide() {
             clearInterval(autoSlideInterval);
-            if (slides.length > 1) {
-                autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
-            }
+            if (slides.length > 1) autoSlideInterval = setInterval(nextSlide, slideIntervalTime);
         }
-
         function handleTouchStart(event) {
-            if (slides.length <= 1) return;
-            isDragging = true;
-            startX = event.touches[0].pageX;
-            currentX = startX;
-            diffX = 0;
-            clearInterval(autoSlideInterval);
+            if (slides.length <= 1) return; isDragging = true; startX = event.touches[0].pageX;
+            currentX = startX; diffX = 0; clearInterval(autoSlideInterval);
         }
-
         function handleTouchMove(event) {
-            if (!isDragging || slides.length <= 1) return;
-            currentX = event.touches[0].pageX;
-            diffX = startX - currentX;
-            if (Math.abs(diffX) > 10) { event.preventDefault(); }
+            if (!isDragging || slides.length <= 1) return; currentX = event.touches[0].pageX;
+            diffX = startX - currentX; if (Math.abs(diffX) > 10) event.preventDefault();
         }
-
         function handleTouchEnd() {
-            if (!isDragging || slides.length <= 1) return;
-            isDragging = false;
-            if (Math.abs(diffX) > swipeThreshold) {
-                if (diffX > 0) { nextSlide(); } else { prevSlide(); }
-            }
-            startX = 0; currentX = 0; diffX = 0;
-            startAutoSlide();
+            if (!isDragging || slides.length <= 1) return; isDragging = false;
+            if (Math.abs(diffX) > swipeThreshold) { if (diffX > 0) nextSlide(); else prevSlide(); }
+            startX = 0; currentX = 0; diffX = 0; startAutoSlide();
         }
-
         if (slides.length > 0) { showSlide(0); startAutoSlide(); }
-        if (nextBtn) { nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); }); }
-        if (prevBtn) { prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); }); }
+        if (nextBtn) nextBtn.addEventListener('click', () => { nextSlide(); startAutoSlide(); });
+        if (prevBtn) prevBtn.addEventListener('click', () => { prevSlide(); startAutoSlide(); });
         if (dotsContainer) {
             dotsContainer.addEventListener('click', (e) => {
                 const targetDot = e.target.closest('[data-slide-to]');
@@ -4158,261 +4183,144 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-
         sliderContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
         sliderContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
         sliderContainer.addEventListener('touchend', handleTouchEnd);
         sliderContainer.addEventListener('touchcancel', handleTouchEnd);
-        sliderContainer.addEventListener('mouseenter', () => { clearInterval(autoSlideInterval); });
-        sliderContainer.addEventListener('mouseleave', () => { startAutoSlide(); });
+        sliderContainer.addEventListener('mouseenter', () => clearInterval(autoSlideInterval));
+        sliderContainer.addEventListener('mouseleave', () => startAutoSlide());
     }
     // ========================================
     // End Homepage Banner Slider Logic
     // ========================================
 
-
     // ========================================
-    // Pincode Lookup Logic (UPDATED for Locality)
+    // Pincode Lookup Logic
     // ========================================
     const pincodeInputs = document.querySelectorAll('.pincode-input');
     let pincodeTimeout;
-
     pincodeInputs.forEach(input => {
         const targetPrefix = input.dataset.targetPrefix;
-        if (!targetPrefix) {
-            console.warn("Pincode input missing data-target-prefix:", input);
-            return;
-        }
-
-        // Get Locality Select Element
+        if (!targetPrefix) { console.warn("Pincode input missing data-target-prefix:", input); return; }
         const localitySelect = document.getElementById(`${targetPrefix}-locality`);
-        if (!localitySelect) {
-            console.warn(`Locality select not found for prefix ${targetPrefix}`);
-            return;
-        }
+        if (!localitySelect) { console.warn(`Locality select not found for prefix ${targetPrefix}`); return; }
 
         input.addEventListener('input', () => {
-            clearTimeout(pincodeTimeout);
-            const pincode = input.value.trim();
+            clearTimeout(pincodeTimeout); const pincode = input.value.trim();
             const statusElement = input.nextElementSibling;
-
-            // Basic validation and clearing
             if (pincode.length < 6) {
-                clearAutoFilledFields(targetPrefix); // Clears locality too
-                if (statusElement) {
-                    statusElement.textContent = '';
-                    statusElement.className = 'pincode-status text-muted'; // Reset class
-                }
+                clearAutoFilledFields(targetPrefix);
+                if (statusElement) { statusElement.textContent = ''; statusElement.className = 'pincode-status text-muted'; }
                 if (pincode.length > 0 && !/^\d*$/.test(pincode)) {
-                    if (statusElement) {
-                        statusElement.textContent = 'Digits only';
-                        statusElement.className = 'pincode-status text-danger';
-                    }
-                }
-                return;
+                    if (statusElement) { statusElement.textContent = 'Digits only'; statusElement.className = 'pincode-status text-danger';}
+                } return;
             }
-
             if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
-                if (statusElement) {
-                    statusElement.textContent = 'Looking up...';
-                    statusElement.className = 'pincode-status text-muted';
-                }
-                localitySelect.disabled = true;
-                localitySelect.innerHTML = '<option value="" selected disabled>Looking up Pincode...</option>';
-
-                pincodeTimeout = setTimeout(() => {
-                    // Pass null for savedLocalityValue when triggered by input event
-                    fetchPincodeData(pincode, targetPrefix, null);
-                }, 500);
+                if (statusElement) { statusElement.textContent = 'Looking up...'; statusElement.className = 'pincode-status text-muted'; }
+                localitySelect.disabled = true; localitySelect.innerHTML = '<option value="" selected disabled>Looking up Pincode...</option>';
+                pincodeTimeout = setTimeout(() => fetchPincodeData(pincode, targetPrefix, null), 500);
             } else if (pincode.length === 6) {
                 clearAutoFilledFields(targetPrefix);
-                if (statusElement) {
-                    statusElement.textContent = 'Invalid Pincode (digits only)';
-                    statusElement.className = 'pincode-status text-danger';
-                }
+                if (statusElement) { statusElement.textContent = 'Invalid Pincode (digits only)'; statusElement.className = 'pincode-status text-danger';}
             }
         });
-
         input.addEventListener('blur', () => {
-            clearTimeout(pincodeTimeout);
-            const pincode = input.value.trim();
-            const targetPrefix = input.dataset.targetPrefix;
+            clearTimeout(pincodeTimeout); const pincode = input.value.trim();
             const statusElement = input.nextElementSibling;
-            const localitySelect = document.getElementById(`${targetPrefix}-locality`);
-
             if (pincode.length === 6 && /^\d{6}$/.test(pincode)) {
                 if (statusElement && !statusElement.classList.contains('text-success') && statusElement.textContent !== 'Fetching...') {
-                     statusElement.textContent = 'Looking up...';
-                     statusElement.className = 'pincode-status text-muted';
-                     // Pass null for savedLocalityValue on blur fetch
+                     statusElement.textContent = 'Looking up...'; statusElement.className = 'pincode-status text-muted';
                      fetchPincodeData(pincode, targetPrefix, null);
                 }
             } else if (pincode.length > 0) {
                  clearAutoFilledFields(targetPrefix);
-                 if (statusElement) {
-                    statusElement.textContent = 'Invalid Pincode';
-                    statusElement.className = 'pincode-status text-danger';
-                 }
-            } else {
-                  clearAutoFilledFields(targetPrefix);
-                  if (statusElement) statusElement.textContent = '';
-            }
+                 if (statusElement) { statusElement.textContent = 'Invalid Pincode'; statusElement.className = 'pincode-status text-danger';}
+            } else { clearAutoFilledFields(targetPrefix); if (statusElement) statusElement.textContent = '';}
         });
-
-        // Initial check on page load for pre-filled pincodes
         const initialPincode = input.value.trim();
-        // Get saved locality value from data attribute set in EJS
         const savedLocality = localitySelect.dataset.savedValue || null;
-
         if (initialPincode.length === 6 && /^\d{6}$/.test(initialPincode)) {
             const initialStatusElement = input.nextElementSibling;
-            if (initialStatusElement) {
-                initialStatusElement.textContent = 'Verifying...';
-                 initialStatusElement.className = 'pincode-status text-muted';
-            }
-            localitySelect.disabled = true;
-            localitySelect.innerHTML = '<option value="" selected disabled>Verifying Pincode...</option>';
-            fetchPincodeData(initialPincode, targetPrefix, savedLocality); // Pass saved locality
+            if (initialStatusElement) { initialStatusElement.textContent = 'Verifying...'; initialStatusElement.className = 'pincode-status text-muted';}
+            localitySelect.disabled = true; localitySelect.innerHTML = '<option value="" selected disabled>Verifying Pincode...</option>';
+            fetchPincodeData(initialPincode, targetPrefix, savedLocality);
         } else {
-             localitySelect.disabled = true;
-             localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
+             localitySelect.disabled = true; localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
         }
-
-    }); // end pincodeInputs.forEach
+    });
 
     async function fetchPincodeData(pincode, prefix, savedLocalityValue = null) {
-        const stateInput = document.getElementById(`${prefix}-state`);
-        const districtInput = document.getElementById(`${prefix}-district`);
-        const mandalInput = document.getElementById(`${prefix}-mandal`);
-        const stateHiddenInput = document.getElementById(`${prefix}-state-hidden`);
-        const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
-        const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
-        const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-        const pincodeInput = document.getElementById(`${prefix}-pincode`);
-        const pincodeStatusElement = pincodeInput?.nextElementSibling;
-        const localitySelect = document.getElementById(`${prefix}-locality`);
+        const stateInput = document.getElementById(`${prefix}-state`), districtInput = document.getElementById(`${prefix}-district`),
+              mandalInput = document.getElementById(`${prefix}-mandal`), stateHiddenInput = document.getElementById(`${prefix}-state-hidden`),
+              districtHiddenInput = document.getElementById(`${prefix}-district-hidden`), mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`),
+              containerDiv = document.getElementById(`${prefix}-auto-filled-fields`), pincodeInputEl = document.getElementById(`${prefix}-pincode`), // Renamed to avoid conflict
+              pincodeStatusElement = pincodeInputEl?.nextElementSibling, localitySelect = document.getElementById(`${prefix}-locality`);
 
         if (!stateInput || !districtInput || !mandalInput || !containerDiv || !pincodeStatusElement || !localitySelect || !stateHiddenInput || !districtHiddenInput || !mandalHiddenInput) {
             console.error("Pincode related elements not found for prefix:", prefix);
             if (pincodeStatusElement) { pincodeStatusElement.textContent = 'Setup Error'; pincodeStatusElement.className = 'pincode-status text-danger'; }
-            if (localitySelect) { localitySelect.innerHTML = '<option value="" selected disabled>Setup Error</option>'; localitySelect.disabled = true; }
-            return;
+            if (localitySelect) { localitySelect.innerHTML = '<option value="" selected disabled>Setup Error</option>'; localitySelect.disabled = true; } return;
         }
-
-        if (!pincodeStatusElement.classList.contains('text-success')) {
-            pincodeStatusElement.textContent = 'Fetching...';
-            pincodeStatusElement.className = 'pincode-status text-muted';
-        }
-
+        if (!pincodeStatusElement.classList.contains('text-success')) { pincodeStatusElement.textContent = 'Fetching...'; pincodeStatusElement.className = 'pincode-status text-muted';}
         try {
-            const response = await fetch(`/user/pincode-lookup/${pincode}`);
-            const data = await response.json();
-
-            if (!response.ok || !data.success) {
-                 throw new Error(data.message || `Pincode ${response.statusText}`);
-             }
-
+            const response = await fetch(`/user/pincode-lookup/${pincode}`); const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.message || `Pincode ${response.statusText}`);
             const location = data.location;
-            stateInput.value = location.stateName || '';
-            districtInput.value = location.districtName || '';
-            mandalInput.value = location.mandalName || '';
-            stateHiddenInput.value = location.stateName || '';
-            districtHiddenInput.value = location.districtName || '';
-            mandalHiddenInput.value = location.mandalName || '';
-
-            // Populate Locality Dropdown
+            stateInput.value = location.stateName || ''; districtInput.value = location.districtName || '';
+            mandalInput.value = location.mandalName || ''; stateHiddenInput.value = location.stateName || '';
+            districtHiddenInput.value = location.districtName || ''; mandalHiddenInput.value = location.mandalName || '';
             populateLocalityDropdown(localitySelect, location.localities, savedLocalityValue);
-
             containerDiv.style.display = 'block';
-            const firstLocality = location.localities && location.localities.length > 0 ? location.localities[0] : 'Area';
-            pincodeStatusElement.textContent = `✓ Location found `;
-            pincodeStatusElement.className = 'pincode-status text-success';
-
+            pincodeStatusElement.textContent = `✓ Location found `; pincodeStatusElement.className = 'pincode-status text-success';
         } catch (error) {
-             console.error('Pincode lookup error:', error);
-             clearAutoFilledFields(prefix);
-             pincodeStatusElement.textContent = `Error: ${error.message}`;
-             pincodeStatusElement.className = 'pincode-status text-danger';
-             localitySelect.innerHTML = '<option value="" selected disabled>Pincode Error</option>';
-             localitySelect.disabled = true;
+             console.error('Pincode lookup error:', error); clearAutoFilledFields(prefix);
+             pincodeStatusElement.textContent = `Error: ${error.message}`; pincodeStatusElement.className = 'pincode-status text-danger';
+             localitySelect.innerHTML = '<option value="" selected disabled>Pincode Error</option>'; localitySelect.disabled = true;
         }
     }
-
     function populateLocalityDropdown(selectElement, localities, valueToSelect = null) {
-        if (!selectElement) return;
-        selectElement.innerHTML = ''; // Clear existing
-
+        if (!selectElement) return; selectElement.innerHTML = '';
         if (localities && localities.length > 0) {
-            const defaultOption = document.createElement('option');
-            defaultOption.value = "";
-            defaultOption.textContent = "Select Locality / Post Office...";
-            defaultOption.disabled = true;
-            defaultOption.selected = !valueToSelect; // Select if no value needs pre-selection
-            selectElement.appendChild(defaultOption);
-
+            const defaultOption = document.createElement('option'); defaultOption.value = "";
+            defaultOption.textContent = "Select Locality / Post Office..."; defaultOption.disabled = true;
+            defaultOption.selected = !valueToSelect; selectElement.appendChild(defaultOption);
             let valueMatched = false;
             localities.forEach(locality => {
-                const option = document.createElement('option');
-                option.value = locality;
-                option.textContent = locality;
-                if (valueToSelect && locality === valueToSelect) {
-                    option.selected = true;
-                    valueMatched = true;
-                }
+                const option = document.createElement('option'); option.value = locality; option.textContent = locality;
+                if (valueToSelect && locality === valueToSelect) { option.selected = true; valueMatched = true;}
                 selectElement.appendChild(option);
             });
-             if (valueMatched) {
-                 defaultOption.selected = false;
-             }
-
+             if (valueMatched) defaultOption.selected = false;
             selectElement.disabled = false;
         } else {
             selectElement.innerHTML = '<option value="" selected disabled>No Localities Found</option>';
             selectElement.disabled = true;
         }
     }
-
     function clearAutoFilledFields(prefix) {
-        const stateInput = document.getElementById(`${prefix}-state`);
-        const districtInput = document.getElementById(`${prefix}-district`);
-        const mandalInput = document.getElementById(`${prefix}-mandal`);
-        const stateHiddenInput = document.getElementById(`${prefix}-state-hidden`);
-        const districtHiddenInput = document.getElementById(`${prefix}-district-hidden`);
-        const mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`);
-        const containerDiv = document.getElementById(`${prefix}-auto-filled-fields`);
-        const localitySelect = document.getElementById(`${prefix}-locality`);
-
-        if (stateInput) stateInput.value = '';
-        if (districtInput) districtInput.value = '';
-        if (mandalInput) mandalInput.value = '';
-        if (stateHiddenInput) stateHiddenInput.value = '';
-        if (districtHiddenInput) districtHiddenInput.value = '';
-        if (mandalHiddenInput) mandalHiddenInput.value = '';
-        if (containerDiv) containerDiv.style.display = 'none';
-
+        const stateInput = document.getElementById(`${prefix}-state`), districtInput = document.getElementById(`${prefix}-district`),
+              mandalInput = document.getElementById(`${prefix}-mandal`), stateHiddenInput = document.getElementById(`${prefix}-state-hidden`),
+              districtHiddenInput = document.getElementById(`${prefix}-district-hidden`), mandalHiddenInput = document.getElementById(`${prefix}-mandal-hidden`),
+              containerDiv = document.getElementById(`${prefix}-auto-filled-fields`), localitySelect = document.getElementById(`${prefix}-locality`);
+        if (stateInput) stateInput.value = ''; if (districtInput) districtInput.value = ''; if (mandalInput) mandalInput.value = '';
+        if (stateHiddenInput) stateHiddenInput.value = ''; if (districtHiddenInput) districtHiddenInput.value = '';
+        if (mandalHiddenInput) mandalHiddenInput.value = ''; if (containerDiv) containerDiv.style.display = 'none';
         if (localitySelect) {
             localitySelect.innerHTML = '<option value="" selected disabled>Enter Pincode First</option>';
-            localitySelect.disabled = true;
-            localitySelect.value = '';
-            localitySelect.dataset.savedValue = ''; // Clear saved value tracker
+            localitySelect.disabled = true; localitySelect.value = ''; localitySelect.dataset.savedValue = '';
         }
-         // Pincode status cleared by input event handler
     }
     // ========================================
     // End Pincode Lookup Logic
     // ========================================
 
-
     // ========================================
-    // Live Order Filtering Logic
+    // Live Order/Product/User Filtering Logic
     // ========================================
     const orderFilterInput = document.getElementById('order-filter-input');
     const adminOrderTable = document.getElementById('admin-order-table');
     const sellerOrderTable = document.getElementById('seller-order-table');
-
-    let targetOrderTableBody = null;
-    let noOrderResultsRow = null;
-
+    let targetOrderTableBody = null, noOrderResultsRow = null;
     if (adminOrderTable) {
         targetOrderTableBody = adminOrderTable.querySelector('tbody');
         noOrderResultsRow = document.getElementById('no-admin-orders-found');
@@ -4420,76 +4328,45 @@ document.addEventListener('DOMContentLoaded', () => {
         targetOrderTableBody = sellerOrderTable.querySelector('tbody');
         noOrderResultsRow = document.getElementById('no-seller-orders-found');
     }
-
     if (orderFilterInput && targetOrderTableBody && noOrderResultsRow) {
         orderFilterInput.addEventListener('input', () => {
             const filterValue = orderFilterInput.value.trim().toLowerCase();
-            const rows = targetOrderTableBody.querySelectorAll('tr.order-row');
-            let matchFound = false;
-
+            const rows = targetOrderTableBody.querySelectorAll('tr.order-row'); let matchFound = false;
             rows.forEach(row => {
                 const rowText = row.textContent.toLowerCase();
                 if (filterValue === '' || rowText.includes(filterValue)) {
-                    row.style.display = '';
-                    matchFound = true;
-                } else {
-                    row.style.display = 'none';
-                }
+                    row.style.display = ''; matchFound = true;
+                } else row.style.display = 'none';
             });
-
             if (!matchFound && rows.length > 0) {
-                noOrderResultsRow.classList.remove('hidden');
-                noOrderResultsRow.style.display = '';
+                noOrderResultsRow.classList.remove('hidden'); noOrderResultsRow.style.display = '';
             } else {
-                noOrderResultsRow.classList.add('hidden');
-                noOrderResultsRow.style.display = 'none';
+                noOrderResultsRow.classList.add('hidden'); noOrderResultsRow.style.display = 'none';
             }
         });
     }
-    // ========================================
-    // End Live Order Filtering Logic
-    // ========================================
-
-
-    // ========================================
-    // Live Product/User Filtering Logic (Refactored)
-    // ========================================
     function setupLiveFilter(inputId, tableId, noResultsId, rowSelector) {
-        const filterInput = document.getElementById(inputId);
-        const table = document.getElementById(tableId);
-        const noResultsRow = document.getElementById(noResultsId);
-
+        const filterInput = document.getElementById(inputId), table = document.getElementById(tableId),
+              noResultsRow = document.getElementById(noResultsId);
         if (filterInput && table && noResultsRow) {
-            const tableBody = table.querySelector('tbody');
-            if (!tableBody) return;
-
+            const tableBody = table.querySelector('tbody'); if (!tableBody) return;
             filterInput.addEventListener('input', () => {
                 const filterValue = filterInput.value.trim().toLowerCase();
-                const rows = tableBody.querySelectorAll(rowSelector); // Use the specific row selector
-                let matchFound = false;
-
+                const rows = tableBody.querySelectorAll(rowSelector); let matchFound = false;
                 rows.forEach(row => {
                     const rowText = row.textContent.toLowerCase();
                     if (filterValue === '' || rowText.includes(filterValue)) {
-                        row.style.display = ''; // Use default display (usually 'table-row')
-                        matchFound = true;
-                    } else {
-                        row.style.display = 'none';
-                    }
+                        row.style.display = ''; matchFound = true;
+                    } else row.style.display = 'none';
                 });
-
-                // Toggle visibility of the "no results" row
                 if (!matchFound && rows.length > 0) {
-                    noResultsRow.classList.remove('hidden');
-                    noResultsRow.style.display = ''; // Use default display
+                    noResultsRow.classList.remove('hidden'); noResultsRow.style.display = '';
                 } else {
-                    noResultsRow.classList.add('hidden');
-                    noResultsRow.style.display = 'none';
+                    noResultsRow.classList.add('hidden'); noResultsRow.style.display = 'none';
                 }
             });
         }
     }
-    // Apply the filter to different tables
     setupLiveFilter('admin-product-filter-input', 'admin-product-table', 'no-admin-products-found', 'tr.product-row');
     setupLiveFilter('seller-product-filter-input', 'seller-product-table', 'no-seller-products-found', 'tr.product-row');
     setupLiveFilter('user-filter-input', 'admin-user-table', 'no-admin-users-found', 'tr.user-row');
@@ -4497,9 +4374,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // End Live Filtering Logic
     // ========================================
 
-
     // ========================================
-    // Product Image Slider Logic (with Touch)
+    // Product Image Slider Logic
     // ========================================
     const imageSlider = document.querySelector('[data-product-image-slider]');
     if (imageSlider) {
@@ -4508,11 +4384,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const nextBtn = imageSlider.querySelector('[data-product-image-nav="next"]');
         const dots = imageSlider.querySelectorAll('[data-product-image-dot]');
         let currentImageIndex = 0;
-
-        let isProductDragging = false;
-        let productStartX = 0;
-        let productCurrentX = 0;
-        let productDiffX = 0;
+        let isProductDragging = false, productStartX = 0, productCurrentX = 0, productDiffX = 0;
         const productSwipeThreshold = 50;
 
         function showProductImage(index) {
@@ -4522,39 +4394,29 @@ document.addEventListener('DOMContentLoaded', () => {
             dots.forEach((dot, i) => { dot.classList.toggle('active', i === newIndex); });
             currentImageIndex = newIndex;
         }
-
         function handleProductTouchStart(event) {
-            if (slides.length <= 1) return;
-            isProductDragging = true;
-            productStartX = event.touches[0].pageX;
-            productCurrentX = productStartX;
-            productDiffX = 0;
+            if (slides.length <= 1) return; isProductDragging = true; productStartX = event.touches[0].pageX;
+            productCurrentX = productStartX; productDiffX = 0;
         }
-
         function handleProductTouchMove(event) {
-            if (!isProductDragging || slides.length <= 1) return;
-            productCurrentX = event.touches[0].pageX;
-            productDiffX = productStartX - productCurrentX;
-            if (Math.abs(productDiffX) > 10) { event.preventDefault(); }
+            if (!isProductDragging || slides.length <= 1) return; productCurrentX = event.touches[0].pageX;
+            productDiffX = productStartX - productCurrentX; if (Math.abs(productDiffX) > 10) event.preventDefault();
         }
-
         function handleProductTouchEnd() {
-            if (!isProductDragging || slides.length <= 1) return;
-            isProductDragging = false;
+            if (!isProductDragging || slides.length <= 1) return; isProductDragging = false;
             if (Math.abs(productDiffX) > productSwipeThreshold) {
-                if (productDiffX > 0) { showProductImage(currentImageIndex + 1); }
-                else { showProductImage(currentImageIndex - 1); }
+                if (productDiffX > 0) showProductImage(currentImageIndex + 1);
+                else showProductImage(currentImageIndex - 1);
             }
             productStartX = 0; productCurrentX = 0; productDiffX = 0;
         }
-
         if (slides.length > 1) {
-            if (nextBtn) { nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1)); }
-            if (prevBtn) { prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1)); }
+            if (nextBtn) nextBtn.addEventListener('click', () => showProductImage(currentImageIndex + 1));
+            if (prevBtn) prevBtn.addEventListener('click', () => showProductImage(currentImageIndex - 1));
             dots.forEach(dot => {
                 dot.addEventListener('click', () => {
                     const index = parseInt(dot.dataset.productImageDot, 10);
-                    if (!isNaN(index)) { showProductImage(index); }
+                    if (!isNaN(index)) showProductImage(index);
                 });
             });
             imageSlider.addEventListener('touchstart', handleProductTouchStart, { passive: true });
@@ -4562,13 +4424,11 @@ document.addEventListener('DOMContentLoaded', () => {
             imageSlider.addEventListener('touchend', handleProductTouchEnd);
             imageSlider.addEventListener('touchcancel', handleProductTouchEnd);
         } else {
-            if (nextBtn) nextBtn.style.display = 'none';
-            if (prevBtn) prevBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none'; if (prevBtn) prevBtn.style.display = 'none';
             const dotsContainer = imageSlider.querySelector('.product-image-dots');
             if (dotsContainer) dotsContainer.style.display = 'none';
         }
-
-        if (slides.length > 0) { showProductImage(0); }
+        if (slides.length > 0) showProductImage(0);
     }
     // ========================================
     // End Product Image Slider Logic
@@ -4579,13 +4439,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // ========================================
     document.querySelectorAll('.password-toggle-btn').forEach(button => {
         button.addEventListener('click', () => {
-            const passwordInput = button.previousElementSibling; // Assumes input is directly before button
+            const passwordInput = button.previousElementSibling;
             if (passwordInput && (passwordInput.type === 'password' || passwordInput.type === 'text')) {
-                // Toggle input type
                 const isPassword = passwordInput.type === 'password';
                 passwordInput.type = isPassword ? 'text' : 'password';
-
-                // Toggle icon
                 const icon = button.querySelector('i');
                 if (icon) {
                     icon.classList.toggle('fa-eye', !isPassword);
@@ -4598,91 +4455,59 @@ document.addEventListener('DOMContentLoaded', () => {
     // End: Password Visibility Toggle
     // ========================================
 
-
     // ========================================
-    // AJAX Add to Cart (Index Page) - MODIFIED
+    // AJAX Add to Cart (Index Page - Event Delegation)
     // ========================================
-    document.querySelectorAll('.btn-ajax-add-to-cart').forEach(button => {
-        const originalHtml = button.innerHTML; // Store original button content
-        const loadingHtml = '<i class="fas fa-spinner fa-spin"></i>';
-        const successHtml = '<i class="fas fa-check"></i> Added';
+    const productIndexContainer = document.querySelector('.product-index-container'); // Or a more specific parent like .product-grid
+    if (productIndexContainer) {
+        productIndexContainer.addEventListener('click', async (e) => {
+            const button = e.target.closest('.btn-ajax-add-to-cart');
+            if (button) {
+                if (!button.dataset.originalHtmlContent) {
+                    button.dataset.originalHtmlContent = button.innerHTML;
+                }
+                const originalHtml = button.dataset.originalHtmlContent;
+                const loadingHtml = '<i class="fas fa-spinner fa-spin"></i>';
+                const successHtml = '<i class="fas fa-check"></i> Added';
 
-        button.addEventListener('click', async () => {
-            // *** NEW: Check authentication status ***
-            const isAuthenticated = document.body.dataset.isAuthenticated === 'true';
-
-            if (!isAuthenticated) {
-                // Store a flag in sessionStorage to indicate the reason for redirection
-                sessionStorage.setItem('showLoginRedirectToast', 'true');
-                // Redirect to login page, preserving the current path as returnTo
-                window.location.href = `/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-                return; // Stop further execution
-            }
-            // *** END: Check authentication status ***
-
-            // --- Existing Logic (Runs only if authenticated) ---
-            const productId = button.dataset.productId;
-            if (!productId) {
-                console.error('Product ID not found on button');
-                showToast('Could not add item (missing ID).', 'danger');
-                return;
-            }
-            const quantity = 1; // Always add 1 from index page
-
-            // Set loading state
-            button.disabled = true;
-            button.classList.add('loading');
-            button.innerHTML = loadingHtml;
-
-            try {
-                const response = await fetch('/user/cart/add-ajax', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Add CSRF token header if needed
-                    },
-                    body: JSON.stringify({ productId, quantity })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok || !data.success) {
-                    throw new Error(data.message || `Failed to add item (${response.status})`);
+                const isAuthenticated = document.body.dataset.isAuthenticated === 'true';
+                if (!isAuthenticated) {
+                    sessionStorage.setItem('showLoginRedirectToast', 'true');
+                    window.location.href = `/auth/login?returnTo=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+                    return;
                 }
 
-                // Success State
-                showToast(data.message || 'Item added to cart!', 'success');
-                updateCartBadge(data.cartItemCount);
+                const productId = button.dataset.productId;
+                if (!productId) { console.error('Product ID not found on button'); showToast('Could not add item (missing ID).', 'danger'); return; }
+                const quantity = 1;
 
-                // Temporary success indication on button
-                button.classList.remove('loading');
-                button.classList.add('success');
-                button.innerHTML = successHtml;
-
-                // Revert button after a delay
-                setTimeout(() => {
-                    // Check if the button still exists before trying to modify it
+                button.disabled = true; button.classList.add('loading'); button.innerHTML = loadingHtml;
+                try {
+                    const response = await fetch('/user/cart/add-ajax', {
+                        method: 'POST', headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ productId, quantity })
+                    });
+                    const data = await response.json();
+                    if (!response.ok || !data.success) throw new Error(data.message || `Failed to add item (${response.status})`);
+                    
+                    showToast(data.message || 'Item added to cart!', 'success');
+                    updateCartBadge(data.cartItemCount); // Server provides the new count
+                    button.classList.remove('loading'); button.classList.add('success'); button.innerHTML = successHtml;
+                    setTimeout(() => {
+                        if (document.body.contains(button)) {
+                            button.disabled = false; button.classList.remove('success'); button.innerHTML = originalHtml;
+                        }
+                    }, 1500);
+                } catch (error) {
+                    console.error("AJAX Add to Cart error:", error);
+                    showToast(error.message || 'Could not add item to cart.', 'danger');
                     if (document.body.contains(button)) {
-                        button.disabled = false;
-                        button.classList.remove('success');
-                        button.innerHTML = originalHtml;
+                        button.disabled = false; button.classList.remove('loading'); button.innerHTML = originalHtml;
                     }
-                }, 1500); // Revert after 1.5 seconds
-
-            } catch (error) {
-                console.error("AJAX Add to Cart error:", error);
-                showToast(error.message || 'Could not add item to cart.', 'danger');
-                // Revert button immediately on error
-                 // Check if the button still exists before trying to modify it
-                 if (document.body.contains(button)) {
-                    button.disabled = false;
-                    button.classList.remove('loading');
-                    button.innerHTML = originalHtml;
-                 }
+                }
             }
-            // --- End Existing Logic ---
         });
-    });
+    }
     // ========================================
     // End: AJAX Add to Cart (Index Page)
     // ========================================
@@ -4694,7 +4519,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const showToastFlag = sessionStorage.getItem('showLoginRedirectToast');
         if (showToastFlag === 'true') {
             showToast('Please log in to add items to your cart.', 'info');
-            // Remove the flag so it doesn't show again on refresh
             sessionStorage.removeItem('showLoginRedirectToast');
         }
     }
@@ -4709,13 +4533,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-     const originalButtonText = 'Add'; // Consider changing this if needed
-     const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
-     const cartItemDiv = buttonElement.closest('.cart-item');
+    // Note: originalButtonText should be 'Add' or similar from the cart page,
+    // it might be different from the index page's 'Add to Cart'.
+    // This function is specific to cart page updates.
+    const originalButtonText = 'Add'; // Default for the cart page update button
+    const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
+    const cartItemDiv = buttonElement.closest('.cart-item');
 
-     buttonElement.disabled = true;
-     buttonElement.innerHTML = loadingButtonText;
-     if(quantityInputElement) quantityInputElement.readOnly = true;
+    buttonElement.disabled = true;
+    buttonElement.innerHTML = loadingButtonText;
+    if(quantityInputElement) quantityInputElement.readOnly = true;
 
     try {
         const response = await fetch('/user/cart/update', {
@@ -4723,7 +4550,6 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
             headers: { 'Content-Type': 'application/json', },
             body: JSON.stringify({ productId, quantity })
          });
-
         const data = await response.json();
 
         if (!response.ok) {
@@ -4731,20 +4557,16 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                  showToast(data.message || 'Item unavailable and removed.', 'warning');
                  if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
-                    cartItemDiv.style.opacity = '0';
-                    cartItemDiv.style.height = '0';
-                    cartItemDiv.style.paddingTop = '0';
-                    cartItemDiv.style.paddingBottom = '0';
-                    cartItemDiv.style.marginBottom = '0';
-                    cartItemDiv.style.borderWidth = '0';
+                    cartItemDiv.style.opacity = '0'; cartItemDiv.style.height = '0';
+                    cartItemDiv.style.paddingTop = '0'; cartItemDiv.style.paddingBottom = '0';
+                    cartItemDiv.style.marginBottom = '0'; cartItemDiv.style.borderWidth = '0';
                      setTimeout(() => {
                          if (cartItemDiv.parentNode) cartItemDiv.remove();
-                         // --- UPDATED: Call updateCartBadge only ---
-                         updateCartBadgeOnly();
-                         // --- END UPDATE ---
+                         // Use server-provided count if available, otherwise, client calculation is fallback
+                         updateCartTotalAndBadge(data.cartTotal, data.cartItemCount);
                          handleEmptyCartDisplay();
                      }, 300);
-                     return; // Exit after starting removal animation
+                     return; 
                  }
              } else {
                  throw new Error(data.message || `Update failed (Status: ${response.status})`);
@@ -4753,32 +4575,25 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
 
          if (data.success) {
              if(quantityInputElement) quantityInputElement.dataset.originalValue = data.newQuantity;
-
              if (quantity === 0) {
                 if (cartItemDiv) {
                     cartItemDiv.style.transition = 'opacity 0.3s ease, height 0.3s ease, margin 0.3s ease, padding 0.3s ease, border 0.3s ease';
-                    cartItemDiv.style.opacity = '0';
-                    cartItemDiv.style.height = '0';
-                    cartItemDiv.style.paddingTop = '0';
-                    cartItemDiv.style.paddingBottom = '0';
-                    cartItemDiv.style.marginBottom = '0';
-                    cartItemDiv.style.borderWidth = '0';
+                    cartItemDiv.style.opacity = '0'; cartItemDiv.style.height = '0';
+                    cartItemDiv.style.paddingTop = '0'; cartItemDiv.style.paddingBottom = '0';
+                    cartItemDiv.style.marginBottom = '0'; cartItemDiv.style.borderWidth = '0';
                     setTimeout(() => {
-                        if (cartItemDiv.parentNode) {
-                           cartItemDiv.remove();
-                        }
-                        updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
+                        if (cartItemDiv.parentNode) cartItemDiv.remove();
+                        updateCartTotalAndBadge(data.cartTotal, data.cartItemCount);
                         handleEmptyCartDisplay();
                         showToast('Item removed from cart.', 'success');
                     }, 300);
-                     return; // Exit after starting removal animation
+                    return; 
                 }
              } else {
-                 // Update UI for non-zero quantity
                  const subtotalSpan = cartItemDiv?.querySelector('.item-subtotal-value');
                  if (subtotalSpan) subtotalSpan.textContent = (data.itemSubtotal !== undefined ? data.itemSubtotal : 0).toFixed(2);
                  if(quantityInputElement) quantityInputElement.value = data.newQuantity;
-                 updateCartTotalAndBadge(data.cartTotal); // Update total AND badge here
+                 updateCartTotalAndBadge(data.cartTotal, data.cartItemCount);
              }
          } else {
               showToast(`Update failed: ${data.message || 'Unknown error'}`, 'danger');
@@ -4786,14 +4601,12 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                   quantityInputElement.value = quantityInputElement.dataset.originalValue;
               }
          }
-
     } catch (error) {
          console.error('Error updating cart quantity:', error);
           showToast(`Error: ${error.message}`, 'danger');
           if(quantityInputElement && quantityInputElement.dataset.originalValue) {
             quantityInputElement.value = quantityInputElement.dataset.originalValue;
           }
-
     } finally {
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
@@ -4806,78 +4619,53 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
 // --- Helper Function to Show Toasts Dynamically ---
 function showToast(message, type = 'info') {
     const toastContainer = document.querySelector('.toast-container');
-    if (!toastContainer) {
-        console.error("Toast container not found! Falling back to alert.");
-        alert(message);
-        return;
-    }
-
+    if (!toastContainer) { console.error("Toast container not found! Falling back to alert."); alert(message); return; }
     const toastElement = document.createElement('div');
     toastElement.className = `toast toast-${type}`;
-    toastElement.setAttribute('role', 'alert');
-    toastElement.setAttribute('aria-live', 'assertive');
+    toastElement.setAttribute('role', 'alert'); toastElement.setAttribute('aria-live', 'assertive');
     toastElement.setAttribute('aria-atomic', 'true');
-
-    const sanitizedMessage = typeof message === 'string'
-        ? message.replace(/</g, "<").replace(/>/g, ">")
-        : 'An unexpected error occurred.';
-
-    toastElement.innerHTML = `
-        <div class="toast-body">
-            ${sanitizedMessage}
-            <button type="button" class="toast-close-btn" aria-label="Close">×</button>
-        </div>
-    `;
-
+    const sanitizedMessage = typeof message === 'string' ? message.replace(/</g, "<").replace(/>/g, ">") : 'An unexpected error occurred.';
+    toastElement.innerHTML = `<div class="toast-body">${sanitizedMessage}<button type="button" class="toast-close-btn" aria-label="Close">×</button></div>`;
     const closeButton = toastElement.querySelector('.toast-close-btn');
     toastContainer.appendChild(toastElement);
-
-    const autoHideDelay = 5000;
-    let hideTimeoutId;
-
+    const autoHideDelay = 5000; let hideTimeoutId;
     const dismissToast = () => {
         clearTimeout(hideTimeoutId);
         if (toastElement.classList.contains('hide') || !toastElement.parentNode) return;
-        toastElement.classList.remove('show');
-        toastElement.classList.add('hide');
+        toastElement.classList.remove('show'); toastElement.classList.add('hide');
         toastElement.addEventListener('transitionend', (event) => {
             if ((event.propertyName === 'opacity' || event.propertyName === 'transform') && toastElement.classList.contains('hide') && toastElement.parentNode) {
                 try { toastElement.remove(); } catch(e) { console.warn("Error removing toast:", e); }
             }
         }, { once: true });
     };
-
-    setTimeout(() => {
-        if (toastElement.parentNode) {
-           toastElement.classList.add('show');
-        }
-    }, 10);
-
+    setTimeout(() => { if (toastElement.parentNode) toastElement.classList.add('show'); }, 10);
     hideTimeoutId = setTimeout(dismissToast, autoHideDelay);
-    if (closeButton) { closeButton.addEventListener('click', dismissToast); }
+    if (closeButton) closeButton.addEventListener('click', dismissToast);
     toastElement.addEventListener('mouseenter', () => clearTimeout(hideTimeoutId));
     toastElement.addEventListener('mouseleave', () => hideTimeoutId = setTimeout(dismissToast, autoHideDelay / 2));
 }
 
-
 // --- Helper Functions for Cart Badge and Empty Display ---
-
 // Updates BOTH cart total display (on cart page) and header badge
-function updateCartTotalAndBadge(newCartTotal) {
+function updateCartTotalAndBadge(newCartTotal, newCartItemCount) { // Accepts newCartItemCount
      const cartTotalSpan = document.getElementById('cart-total-value');
      if (cartTotalSpan) cartTotalSpan.textContent = (newCartTotal !== undefined ? newCartTotal : 0).toFixed(2);
 
-     // --- UPDATED: Call the badge-specific update function ---
-     updateCartBadgeOnly();
+     if (newCartItemCount !== undefined) { // Prioritize server-sent count
+         updateCartBadge(newCartItemCount);
+     } else { // Fallback if server doesn't send it (should be avoided)
+         updateCartBadgeOnly();
+     }
 }
 
-// --- ADDED: Function to ONLY update the header cart badge ---
-// (Used by AJAX add-to-cart and can be called directly if needed)
+// Function to ONLY update the header cart badge
 function updateCartBadge(newCount) {
     const cartBadge = document.querySelector('.cart-badge');
     if (cartBadge) {
-        if (newCount > 0) {
-            cartBadge.textContent = newCount;
+        const count = Number(newCount); // Ensure it's a number
+        if (count > 0) {
+            cartBadge.textContent = count;
             cartBadge.classList.remove('hide');
         } else {
             cartBadge.textContent = '0';
@@ -4886,29 +4674,20 @@ function updateCartBadge(newCount) {
     }
 }
 
-// --- ADDED: Helper to update badge by recalculating from cart page elements ---
-// (Used by updateCartItemQuantityAJAX after removing item)
+// Helper to update badge by recalculating from cart page elements (FALLBACK ONLY)
 function updateCartBadgeOnly() {
      const newCartItemCount = calculateNewCartCount();
      updateCartBadge(newCartItemCount);
 }
 
-
-function calculateNewCartCount() {
-    // This calculation might be slightly off if called during the removal animation.
-    // A more robust way is to get the count from the server response (as done in addToCartAjax).
-    const cartItems = document.querySelectorAll('.cart-item');
-    let count = 0;
+function calculateNewCartCount() { // This is a fallback and might be less accurate during animations
+    const cartItems = document.querySelectorAll('.cart-item'); let count = 0;
     cartItems.forEach(item => {
         const style = window.getComputedStyle(item);
-        // Check if item is visually present (not display:none and not faded out)
         if (style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0)) {
              const qtyInput = item.querySelector('.quantity-input');
-             if (qtyInput) {
-                 count += parseInt(qtyInput.value, 10) || 0; // Sum quantities
-             } else {
-                 count++; // Fallback if quantity input isn't found (less accurate)
-             }
+             if (qtyInput) count += parseInt(qtyInput.value, 10) || 0;
+             else count++;
         }
     });
     return count;
@@ -4918,35 +4697,25 @@ function handleEmptyCartDisplay() {
     const cartItemsContainer = document.querySelector('.cart-items');
      const cartContainer = document.querySelector('.cart-container');
      const cartSummary = document.querySelector('.cart-summary');
-
      if (cartItemsContainer && cartContainer) {
-         // Check based on actual elements remaining, not just the count from calculation
          const visibleItems = Array.from(cartItemsContainer.querySelectorAll('.cart-item')).filter(item => {
              const style = window.getComputedStyle(item);
              return style.display !== 'none' && (!item.style.opacity || parseFloat(item.style.opacity) > 0);
          });
-
          if (visibleItems.length === 0) {
              if (!cartContainer.querySelector('.alert-info')) {
-                 cartItemsContainer.innerHTML = ''; // Clear the container definitively
+                 cartItemsContainer.innerHTML = '';
                  if(cartSummary) cartSummary.remove();
-                 const emptyCartHTML = `
-                    <h1>Your Shopping Cart</h1>
-                    <p class="alert alert-info mt-3">
-                        Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a>
-                    </p>`;
-                  const h1 = cartContainer.querySelector('h1');
-                  if (h1) {
-                      h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
-                  } else {
-                      // If h1 somehow got removed, replace container content
-                      cartContainer.innerHTML = emptyCartHTML;
-                  }
+                 const emptyCartHTML = `<h1>Your Shopping Cart</h1><p class="alert alert-info mt-3">Your cart is empty. <a href="/" class="alert-link">Continue Shopping</a></p>`;
+                 const h1 = cartContainer.querySelector('h1');
+                 if (h1) h1.insertAdjacentHTML('afterend', emptyCartHTML.substring(emptyCartHTML.indexOf('<p')));
+                 else cartContainer.innerHTML = emptyCartHTML;
              }
          }
      }
 }
 
+routes.js:
 // routes.js
 const express = require('express');
 const controllers = require('./controllers'); // Correct import
@@ -5086,7 +4855,6 @@ sellerRouter.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, seller_s
 sellerRouter.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, seller_confirmDirectDeliveryBySeller); // Calls controller func, requires relevance
 sellerRouter.post('/orders/:orderId/cancel', isOrderRelevantToSeller, seller_cancelOrderBySeller); // Calls controller func, requires relevance
 router.use('/seller', sellerRouter);
-
 
 module.exports = router; // Export the single consolidated router
 

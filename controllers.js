@@ -835,23 +835,114 @@ exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
  };
 
 exports.user_updateCartQuantity = async (req, res, next) => {
-          const { productId, quantity } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
-          if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) return res.status(400).json({ success: false, message: 'Invalid product/qty.' });
-         try {
-             const [user, product] = await Promise.all([ User.findById(userId), Product.findById(productId).select('stock price reviewStatus name') ]);
-             if (!user || !product) return res.status(404).json({ success: false, message: 'User/Product not found.' });
-             if (product.reviewStatus !== 'approved') { const index = user.cart.findIndex(i => i.productId.toString() === productId); if (index > -1) { user.cart.splice(index, 1); await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity })); await req.session.save(); } return res.status(400).json({ success: false, message: `Product "${product.name}" unavailable, removed.`, removal: true }); }
-             const index = user.cart.findIndex(i => i.productId.toString() === productId);
-             if (numQuantity === 0) { if (index > -1) user.cart.splice(index, 1); }
-             else { if (product.stock < numQuantity) return res.status(400).json({ success: false, message: `Stock low: ${product.name} (${product.stock} avail).` }); if (index > -1) user.cart[index].quantity = numQuantity; else user.cart.push({ productId, quantity: numQuantity }); }
-             await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-             let cartTotal = 0; let itemSubtotal = 0;
-             const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
-             updatedUser.cart.forEach(i => { if (i.productId?.price) { const currentSub = i.productId.price * i.quantity; cartTotal += currentSub; if (i.productId._id.toString() === productId) itemSubtotal = currentSub; } });
-             await req.session.save();
-             res.json({ success: true, message: 'Cart updated.', newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0, itemSubtotal, cartTotal, itemId: productId });
-         } catch (error) { console.error("Cart Update Error:", error); res.status(500).json({ success: false, message: 'Error updating quantity.' }); }
- };
+    const { productId, quantity } = req.body;
+    const userId = req.session.user._id;
+    const numQuantity = parseInt(quantity, 10);
+
+    if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) {
+        return res.status(400).json({ success: false, message: 'Invalid product/quantity.' });
+    }
+
+    try {
+        const [user, product] = await Promise.all([
+            User.findById(userId),
+            Product.findById(productId).select('stock price reviewStatus name')
+        ]);
+
+        if (!user || !product) {
+            return res.status(404).json({ success: false, message: 'User/Product not found.' });
+        }
+
+        if (product.reviewStatus !== 'approved') {
+            const index = user.cart.findIndex(i => i.productId.toString() === productId);
+            if (index > -1) {
+                user.cart.splice(index, 1);
+                await user.save();
+                req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
+                await req.session.save(); // Save session after cart update
+            }
+            // After removal, calculate the new cart item count for the response
+            const updatedCartItemCountAfterRemoval = user.cart.reduce((sum, item) => sum + item.quantity, 0);
+            return res.status(400).json({
+                success: false,
+                message: `Product "${product.name}" unavailable, removed.`,
+                removal: true,
+                cartItemCount: updatedCartItemCountAfterRemoval // Send updated count
+            });
+        }
+
+        const index = user.cart.findIndex(i => i.productId.toString() === productId);
+
+        if (numQuantity === 0) {
+            if (index > -1) {
+                user.cart.splice(index, 1);
+            }
+        } else {
+            if (product.stock < numQuantity) {
+                // If stock is low, do not change the cart. Respond with current cart count.
+                const currentCartItemCount = user.cart.reduce((sum, item) => sum + item.quantity, 0);
+                return res.status(400).json({
+                    success: false,
+                    message: `Stock low: ${product.name} (${product.stock} avail).`,
+                    cartItemCount: currentCartItemCount // Send current count
+                });
+            }
+            if (index > -1) {
+                user.cart[index].quantity = numQuantity;
+            } else {
+                user.cart.push({ productId, quantity: numQuantity });
+            }
+        }
+
+        await user.save();
+        req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
+
+        let cartTotal = 0;
+        let itemSubtotal = 0;
+
+        // Re-fetch user to get populated cart for accurate totals based on current prices
+        // This also ensures we have the most up-to-date cart state for item count.
+        const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
+
+        updatedUser.cart.forEach(i => {
+            if (i.productId?.price) {
+                const currentSub = i.productId.price * i.quantity;
+                cartTotal += currentSub;
+                if (i.productId._id.toString() === productId) {
+                    itemSubtotal = currentSub;
+                }
+            }
+        });
+
+        // Calculate the final cart item count
+        const updatedCartItemCount = updatedUser.cart.reduce((sum, item) => sum + item.quantity, 0);
+
+        await req.session.save(); // Save session after all updates
+
+        res.json({
+            success: true,
+            message: 'Cart updated.',
+            newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0,
+            itemSubtotal,
+            cartTotal,
+            cartItemCount: updatedCartItemCount, // Send updated count
+            itemId: productId
+        });
+    } catch (error) {
+        console.error("Cart Update Error:", error);
+        // Try to get current cart count even on error for client UI consistency
+        let currentCartItemCountOnError = 0;
+        if (req.session.user?.cart) {
+            currentCartItemCountOnError = req.session.user.cart.reduce((sum, item) => sum + item.quantity, 0);
+        }
+        res.status(500).json({
+            success: false,
+            message: 'Error updating quantity.',
+            cartItemCount: currentCartItemCountOnError // Send best-effort count
+        });
+    }
+};
+
 
 exports.user_removeFromCart = async (req, res, next) => {
      const { productId } = req.params; const userId = req.session.user._id;
