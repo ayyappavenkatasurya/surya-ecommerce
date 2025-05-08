@@ -2,6 +2,50 @@
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
+const NodeCache = require('node-cache');
+
+// --- Cache Setup ---
+const CACHE_TTL_SECONDS = {
+    DEFAULT: 60,                // 1 minute default
+    PRODUCTS_LIST: 300,         // 5 minutes for general product lists
+    PRODUCT_DETAIL: 600,        // 10 minutes for specific product details
+    BANNERS: 1800,              // 30 minutes for banners
+    SUGGESTIONS: 120,           // 2 minutes for search suggestions
+    PINCODE: 86400,             // 1 day for pincode lookups
+    CATEGORIES_DATA: 3600,      // 1 hour for categories data (if fetched, currently static)
+};
+
+const appCache = new NodeCache({
+    stdTTL: CACHE_TTL_SECONDS.DEFAULT,
+    checkperiod: CACHE_TTL_SECONDS.DEFAULT * 0.2, // How often to check for expired keys
+    useClones: false // Improves performance; be careful not to mutate cached objects directly if they are needed elsewhere unmodified
+});
+console.log("In-memory cache initialized.");
+
+// Helper function to clear product list caches (can be more granular later)
+const clearProductListCaches = () => {
+    const keysToClear = [];
+    appCache.keys().forEach(key => {
+        if (key.startsWith('products_list_') || key.startsWith('suggestions_') || key === 'products_home') {
+            keysToClear.push(key);
+        }
+    });
+    if (keysToClear.length > 0) {
+        const clearedCount = appCache.del(keysToClear);
+        console.log(`Cleared ${clearedCount} product/suggestion list caches.`);
+    }
+};
+
+const clearProductDetailCache = (productId) => {
+    if (productId) {
+        const cacheKey = `product_detail_${productId}`;
+        if (appCache.has(cacheKey)) {
+            appCache.del(cacheKey);
+            console.log(`Cleared cache for product detail: ${productId}`);
+        }
+    }
+};
+
 
 // --- From config/categories.js ---
 const categoriesData = [
@@ -94,9 +138,14 @@ module.exports = {
     // From database.js
     connectDB,
     // From gemini.js
-    textModel, // Exporting text model in case it's used, primarily visionModel is used in services
-    visionModel, // Exporting the vision model directly for geminiService
-    geminiSafetySettings, // Exporting safety settings
+    textModel, 
+    visionModel, 
+    geminiSafetySettings, 
     // From mailer.js
-    sendEmail
+    sendEmail,
+    // Cache
+    appCache,
+    CACHE_TTL_SECONDS,
+    clearProductListCaches,
+    clearProductDetailCache
 };
