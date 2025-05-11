@@ -15,11 +15,16 @@ MAIL_FROM='"miniapp" <ayyappanallamothu4@gmail.com>' # Ensure format is correct
 # --- NEW: Add your Gemini API Key ---
 GEMINI_API_KEY=AIzaSyCX31vkQ9Qf7t-ytSeDZUGR8hK4XZUHQT0
 
+# --- NEW: Razorpay API Keys ---
+RAZORPAY_KEY_ID=rzp_test_pqiinPMS00E9lu # Replace with your actual Key ID
+RAZORPAY_KEY_SECRET=x7MZpBzxmuyH0opjy4RGg5r5 # Replace with your actual Key Secret
+
 config.js :
 // config.js
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
+const Razorpay = require('razorpay'); // <<< ADDED
 
 // --- From config/categories.js ---
 const categoriesData = [
@@ -50,9 +55,7 @@ if (!process.env.GEMINI_API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-// Text-only model (if still needed elsewhere)
-const textModel = genAI ? genAI.getGenerativeModel({ model: "gemini-pro"}) : null; // Use appropriate model
-// Vision model (used in geminiService)
+const textModel = genAI ? genAI.getGenerativeModel({ model: "gemini-pro"}) : null;
 const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
 const geminiSafetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -61,7 +64,7 @@ const geminiSafetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-if (genAI && visionModel) { // Primarily check the vision model used in services
+if (genAI && visionModel) {
     console.log("Gemini AI SDK Initialized successfully (Vision capable).");
 } else {
      console.log("Gemini AI SDK could not be initialized (API Key missing or Vision model error?).");
@@ -104,6 +107,19 @@ const sendEmail = async (to, subject, text, html) => {
   }
 };
 
+// --- Razorpay Configuration --- // <<< ADDED
+let razorpayInstance = null;
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpayInstance = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("Razorpay SDK Initialized successfully.");
+} else {
+    console.warn("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set in .env file. Razorpay features will be disabled.");
+}
+
+
 // --- Consolidated Exports ---
 module.exports = {
     // From categories.js
@@ -112,11 +128,14 @@ module.exports = {
     // From database.js
     connectDB,
     // From gemini.js
-    textModel, // Exporting text model in case it's used, primarily visionModel is used in services
-    visionModel, // Exporting the vision model directly for geminiService
-    geminiSafetySettings, // Exporting safety settings
+    textModel,
+    visionModel,
+    geminiSafetySettings,
     // From mailer.js
-    sendEmail
+    sendEmail,
+    // Razorpay
+    razorpayInstance, // <<< ADDED
+    RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID // <<< ADDED (to pass to frontend)
 };
 
 controllers.js :
@@ -128,12 +147,12 @@ const axios = require('axios');
 
 // Import consolidated modules
 const Models = require('./models');
-const Config = require('./config');
+const Config = require('./config'); // Existing config require
 const Services = require('./services');
 
 const { User, Product, Order, BannerConfig } = Models;
-const { sendEmail, categories, categoryNames } = Config;
-const { generateOTP, setOTPExpiration, reviewProductWithGemini, generateEmailHtml } = Services;
+const { sendEmail, categories, categoryNames, RAZORPAY_KEY_ID } = Config; // Added RAZORPAY_KEY_ID
+const { generateOTP, setOTPExpiration, reviewProductWithGemini, generateEmailHtml, createRazorpayOrder, verifyRazorpayPayment } = Services; // Added Razorpay services
 
 // Shared Constants (moved here from individual controllers for consolidation)
 const passwordFormatErrorMsg = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
@@ -155,6 +174,7 @@ const sellerCancellationReasons = [
 // ============================
 // Auth Controller Functions
 // ============================
+// ... (auth_getLoginPage, auth_getRegisterPage, etc. - NO CHANGES to these) ...
 exports.auth_getLoginPage = (req, res) => {
     if (req.session.user) { return res.redirect('/'); }
     res.render('auth/login', { title: 'Login' });
@@ -188,7 +208,7 @@ exports.auth_getResetPasswordPage = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.auth_getHomePage = async (req, res, next) => { // Keep name generic for potential reuse
+exports.auth_getHomePage = async (req, res, next) => { 
   try {
     const searchTerm = req.query.search || '';
     const categoryFilter = req.query.category || '';
@@ -251,7 +271,7 @@ exports.auth_registerUser = async (req, res, next) => {
              req.flash('success_msg', `OTP sent to ${user.email}. Please verify.`);
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          } else {
-             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { // Cleanup recent failures
+             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { 
                 try { await User.deleteOne({ _id: user._id, isVerified: false }); console.log(`Cleaned up ${user.email} due to failed email.`); }
                 catch (deleteError) { console.error(`Error cleaning up unverified user ${user.email}:`, deleteError); }
              }
@@ -396,7 +416,7 @@ exports.auth_resetPassword = async (req, res, next) => {
          if (!user) { req.flash('error_msg', 'Token invalid/expired. Request new link.'); return res.redirect('/auth/forgot-password'); }
          user.password = password; user.resetPasswordToken = undefined; user.resetPasswordExpires = undefined; user.otp = undefined; user.otpExpires = undefined; user.isVerified = true;
          await user.save();
-         try { // Send confirmation email (optional)
+         try { 
               const subject = 'Password Reset Success - miniapp'; const text = `Your account password for ${user.email} changed. Contact support if not you.`;
               const html = generateEmailHtml({ recipientName: user.name, subject: subject, greeting: 'Password Reset Successful', bodyLines: [`Password changed for miniapp account.`, `Contact support if not you.`], companyName: 'miniapp', buttonUrl: `${req.protocol}://${req.get('host')}/auth/login`, buttonText: 'Login' });
               await sendEmail(user.email, subject, text, html);
@@ -421,15 +441,13 @@ exports.auth_resetPassword = async (req, res, next) => {
 // ============================
 // Admin Controller Functions
 // ============================
-
+// ... (Existing Admin controllers - NO CHANGES to these specific functions) ...
 exports.admin_getDashboard = (req, res) => {
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
-
 exports.admin_getUploadProductPage = (req, res) => {
     res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {}, categories: categories });
 };
-
 exports.admin_uploadProduct = async (req, res, next) => {
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
      const adminUserId = req.session.user._id, adminUserEmail = req.session.user.email;
@@ -456,14 +474,12 @@ exports.admin_uploadProduct = async (req, res, next) => {
         console.error("Error uploading product by Admin:", error); next(error);
      }
  };
-
 exports.admin_getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({}).populate('sellerId', 'name email').sort({ createdAt: -1 }).lean();
         res.render('admin/manage-products', { title: 'Manage All Products', products: products });
     } catch (error) { next(error); }
 };
-
 exports.admin_getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id).populate('sellerId', 'name email').lean();
@@ -474,11 +490,10 @@ exports.admin_getEditProductPage = async (req, res, next) => {
         next(error);
     }
 };
-
 exports.admin_updateProduct = async (req, res, next) => {
      const productId = req.params.id;
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
-     let productDataForRender = { _id: productId, ...req.body }; // Default if product fetch fails
+     let productDataForRender = { _id: productId, ...req.body };
      const renderOptions = { title: 'Admin Edit Error', product: productDataForRender, isAdminView: true, categories: categories };
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) { req.flash('error_msg', 'Required: Name, Cat, Price, Stock, Image1.'); return res.render('admin/edit-product', renderOptions); }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) { req.flash('error_msg', 'Price/Stock must be >= 0.'); return res.render('admin/edit-product', renderOptions); }
@@ -493,14 +508,13 @@ exports.admin_updateProduct = async (req, res, next) => {
          if (reviewStatus) { product.reviewStatus = reviewStatus; product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined; }
          await product.save(); req.flash('success_msg', `Product "${product.name}" updated by admin.`); res.redirect('/admin/manage-products');
      } catch (error) {
-          productDataForRender = await Product.findById(productId).lean() || productDataForRender; // Try refetching on error
-          renderOptions.product = { ...productDataForRender, ...req.body }; // Merge old + new attempts
+          productDataForRender = await Product.findById(productId).lean() || productDataForRender;
+          renderOptions.product = { ...productDataForRender, ...req.body }; 
           if (error.name === 'ValidationError') { req.flash('error_msg', `Validation Error: ${Object.values(error.errors).map(el => el.message).join(' ')}`); return res.render('admin/edit-product', renderOptions); }
           if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.status(400).redirect('/admin/manage-products'); }
           console.error("Error updating product by Admin:", error); next(error);
      }
  };
-
 exports.admin_removeProduct = async (req, res, next) => {
      const productId = req.params.id;
      try {
@@ -512,13 +526,13 @@ exports.admin_removeProduct = async (req, res, next) => {
          console.error("Error removing product by Admin:", error); next(error);
      }
  };
-
 exports.admin_getManageOrdersPage = async (req, res, next) => {
      try {
          const orders = await Order.find({}) .sort({ orderDate: -1 }).select('-__v -products.__v -shippingAddress._id').populate('products.productId', 'name imageUrl _id price sellerId').populate('userId', 'name email').lean();
          const now = Date.now();
          orders.forEach(order => {
-             order.canBeCancelledByAdmin = order.status === 'Pending'; order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
+             order.canBeCancelledByAdmin = order.status === 'Pending' || order.status === 'PaymentPending' || order.status === 'PaymentFailed'; // UPDATED
+             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
              order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
              if (order.products?.length > 0) {
                  order.itemsSummary = order.products.map(p => `${p.productId?.name || p.name || '[?Name?]'} (Qty: ${p.quantity}) @ ₹${p.priceAtOrder?.toFixed(2) || '?.??'}`).join('<br>');
@@ -527,7 +541,6 @@ exports.admin_getManageOrdersPage = async (req, res, next) => {
          res.render('admin/manage-orders', { title: 'Manage All Orders', orders: orders, cancellationReasons: adminCancellationReasons });
      } catch (error) { next(error); }
  };
-
 exports.admin_sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
      try {
          const result = await this.order_generateAndSendDirectDeliveryOTPByAdmin(req.params.orderId);
@@ -535,7 +548,6 @@ exports.admin_sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `Admin OTP Send Failed: ${error.message}`); }
      res.redirect('/admin/manage-orders');
  };
-
 exports.admin_confirmDirectDeliveryByAdmin = async (req, res, next) => {
      const { otp } = req.body;
      if (!otp || !/^\d{6}$/.test(otp.trim())) { req.flash('error_msg', 'Enter 6-digit OTP.'); return res.redirect('/admin/manage-orders'); }
@@ -545,7 +557,6 @@ exports.admin_confirmDirectDeliveryByAdmin = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `Admin Delivery Confirm Failed: ${error.message}`); }
      res.redirect('/admin/manage-orders');
  };
-
 exports.admin_cancelOrderByAdmin = async (req, res, next) => {
      const { orderId } = req.params; const { reason } = req.body; const adminUserId = req.session.user._id;
      if (!reason || !adminCancellationReasons.includes(reason)) { req.flash('error_msg', 'Select valid admin reason.'); return res.redirect('/admin/manage-orders'); }
@@ -553,19 +564,37 @@ exports.admin_cancelOrderByAdmin = async (req, res, next) => {
      try {
          const order = await Order.findById(orderId).populate('products.productId', 'name _id').populate('userId', 'email name').session(sessionDB);
          if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found.'); return res.status(404).redirect('/admin/manage-orders'); }
-         if (order.status !== 'Pending') { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/admin/manage-orders'); }
-         const restorePromises = order.products.map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Admin Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Admin Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-         });
-         await Promise.allSettled(restorePromises);
-         order.status = 'Cancelled'; order.cancellationReason = reason; await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send email
+         
+         if (!['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status)) { 
+            await sessionDB.abortTransaction(); sessionDB.endSession(); 
+            req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/admin/manage-orders'); 
+         }
+
+         if (order.status === 'Pending') { 
+            const restorePromises = order.products.map(item => {
+                const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Admin Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
+                return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Admin Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
+            });
+            await Promise.allSettled(restorePromises);
+         } 
+         
+         order.status = 'Cancelled'; order.cancellationReason = reason; 
+         order.cancellationAllowedUntil = undefined; // Clear this if cancelling
+         await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
+         
+         try { 
               const customerEmail = order.userEmail || order.userId?.email; const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
               if(customerEmail) {
                   const subject = `Order Cancelled - miniapp`; const text = `Your order (${order._id}) cancelled by admin. Reason: ${reason}.`;
+                  let bodyLines = [`Order (#${order._id}) cancelled by admin.`, `<strong>Reason:</strong> ${reason}`, `Contact support if needed.`];
+                  if (order.paymentMethod === 'Razorpay' && order.paymentVerified) {
+                     bodyLines.push(`For this pre-paid order, a refund will be processed to your original payment method shortly.`);
+                     console.warn(`ADMIN NOTE: Order ${orderId} was Razorpay-paid. Manual refund needed from Razorpay dashboard. Amount: ${order.totalAmount}`);
+                  } else if (order.paymentMethod === 'Razorpay' && !order.paymentVerified) {
+                     bodyLines.push('No payment was processed for this online order attempt.');
+                  }
                   const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Regarding Order #${order._id}`,
-                      bodyLines: [`Order (#${order._id}) cancelled by admin.`, `<strong>Reason:</strong> ${reason}`, `Refund processed if applicable.`, `Contact support if needed.`],
+                      bodyLines: bodyLines,
                       buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
                   await sendEmail(customerEmail, subject, text, html);
               }
@@ -575,14 +604,12 @@ exports.admin_cancelOrderByAdmin = async (req, res, next) => {
          await sessionDB.abortTransaction(); console.error(`Error admin cancelling O.ID ${orderId}:`, error); req.flash('error_msg', 'Internal cancel error.'); res.redirect('/admin/manage-orders');
      } finally { if (sessionDB) sessionDB.endSession(); }
  };
-
 exports.admin_getManageUsersPage = async (req, res, next) => {
      try {
          const users = await User.find({ _id: { $ne: req.session.user._id } }).select('name email role createdAt isVerified address.phone').sort({ createdAt: -1 }).lean();
          res.render('admin/manage-users', { title: 'Manage Registered Users', users: users });
      } catch (error) { next(error); }
  };
-
 exports.admin_updateUserRole = async (req, res, next) => {
       const userId = req.params.id; const { role } = req.body; const allowedRoles = ['user', 'admin', 'seller'];
       if (!role || !allowedRoles.includes(role)) { req.flash('error_msg', 'Invalid role.'); return res.status(400).redirect('/admin/manage-users'); }
@@ -595,7 +622,6 @@ exports.admin_updateUserRole = async (req, res, next) => {
           console.error(`Error updating role user ${userId}:`, error); req.flash('error_msg', 'Error updating role.'); res.redirect('/admin/manage-users');
       }
   };
-
 exports.admin_removeUser = async (req, res, next) => {
       const userId = req.params.id;
       if (userId === req.session.user._id.toString()) { req.flash('error_msg', 'Cannot remove self.'); return res.redirect('/admin/manage-users'); }
@@ -608,7 +634,6 @@ exports.admin_removeUser = async (req, res, next) => {
           console.error(`Error removing user ${userId}:`, error); req.flash('error_msg', 'Error removing user.'); res.redirect('/admin/manage-users');
       }
   };
-
 exports.admin_getManageBannersPage = async (req, res, next) => {
     try {
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean() || { configKey: 'mainBanners', banners: [] };
@@ -616,7 +641,6 @@ exports.admin_getManageBannersPage = async (req, res, next) => {
         res.render('admin/manage-banners', { title: 'Manage Homepage Banners', bannerConfig: { ...bannerConfig, banners: displayBanners } });
     } catch (error) { console.error("Error fetching banner config:", error); next(error); }
 };
-
 exports.admin_updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const bannerInputs = [ { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 }, { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 }, { imageUrl: imageUrl3, linkUrl: linkUrl3, title: title3 }, { imageUrl: imageUrl4, linkUrl: linkUrl4, title: title4 } ];
@@ -642,11 +666,16 @@ exports.admin_updateBanners = async (req, res, next) => {
     }
 };
 
+
 // ============================
 // Order Controller Functions (called internally or by other controllers)
 // ============================
-exports.order_placeOrder = async (req, res, next) => {
-     const userId = req.session.user._id; const sessionDB = await mongoose.startSession(); sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+
+// Place COD Order
+exports.order_placeCODOrder = async (req, res, next) => {
+     const userId = req.session.user._id;
+     const sessionDB = await mongoose.startSession();
+     sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
      try {
          const user = await User.findById(userId).populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId').session(sessionDB);
          if (!user) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'User session lost. Login.'); return res.redirect('/auth/login'); }
@@ -675,37 +704,316 @@ exports.order_placeOrder = async (req, res, next) => {
          }
          const order = new Order({ userId: userId, userEmail: user.email, products: orderProducts, totalAmount: totalAmount, shippingAddress: user.address, paymentMethod: 'COD', status: 'Pending' });
          await order.save({ session: sessionDB }); user.cart = []; await user.save({ session: sessionDB }); await sessionDB.commitTransaction(); req.session.user.cart = []; await req.session.save();
-         try { // Send confirmation email
-              const subject = `Order Placed - miniapp`; const text = `Thank you for your order!`;
+         try {
+              const subject = `Order Placed (COD) - miniapp`; const text = `Thank you for your order!`;
               const prodListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
               const html = generateEmailHtml({ recipientName: user.name, subject: subject, greeting: `Order Confirmation #${order._id}`,
-                   bodyLines: [`Order placed successfully.`, `<strong>ID:</strong> ${order._id}`, `<strong>Total:</strong> ₹${order.totalAmount.toFixed(2)}`, `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, `<h3 style="margin-top:15px;">Summary:</h3><ul>${prodListHTML}</ul>` ],
+                   bodyLines: [`COD Order placed successfully.`, `<strong>ID:</strong> ${order._id}`, `<strong>Total:</strong> ₹${order.totalAmount.toFixed(2)}`, `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, `<h3 style="margin-top:15px;">Summary:</h3><ul>${prodListHTML}</ul>`, `You will be contacted for delivery confirmation.`],
                    buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'View Order Status', companyName: 'miniapp' });
               await sendEmail(user.email, subject, text, html);
-         } catch (emailError) { console.error(`Failed sending order confirm email O.ID ${order._id}:`, emailError); }
-         req.flash('success_msg', 'Order placed successfully!'); res.redirect('/orders/my-orders');
+         } catch (emailError) { console.error(`Failed sending COD order confirm email O.ID ${order._id}:`, emailError); }
+         req.flash('success_msg', 'COD Order placed successfully!'); res.redirect('/orders/my-orders');
      } catch (error) {
-         if (sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error("Order Placement Error:", error);
-         let userErrorMessage = 'Order failed: server error. Try again.'; if (error.message?.includes('Stock changed')) userErrorMessage = error.message;
+         if (sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error("COD Order Placement Error:", error);
+         let userErrorMessage = 'COD Order failed: server error. Try again.'; if (error.message?.includes('Stock changed')) userErrorMessage = error.message;
          req.flash('error_msg', userErrorMessage); res.redirect('/user/cart');
      } finally { if (sessionDB) await sessionDB.endSession(); }
- };
+};
 
-exports.order_cancelOrder = async (req, res, next) => { // User cancellation
+// Create Razorpay Order Intent
+exports.order_createRazorpayOrderIntent = async (req, res, next) => {
+    const userId = req.session.user._id;
+    try {
+        const user = await User.findById(userId).populate('cart.productId', 'name price imageUrl stock reviewStatus');
+        if (!user) return res.status(401).json({ success: false, message: 'User session lost. Please login.' });
+        if (!user.cart || user.cart.length === 0) return res.status(400).json({ success: false, message: 'Your cart is empty.' });
+        if (!user.address?.name || !user.address.phone || !user.address.pincode) return res.status(400).json({ success: false, message: 'Shipping address is incomplete.' });
+
+        let orderProducts = []; let totalAmount = 0;
+        for (const item of user.cart) {
+            const product = item.productId;
+            if (!product || product.reviewStatus !== 'approved' || product.stock < item.quantity) {
+                return res.status(400).json({ success: false, message: `Problem with item "${product?.name || 'Unknown'}": It might be out of stock or unavailable. Please review your cart.` });
+            }
+            orderProducts.push({ productId: product._id, name: product.name, priceAtOrder: product.price, quantity: item.quantity, imageUrl: product.imageUrl, sellerId: product.sellerId });
+            totalAmount += product.price * item.quantity;
+        }
+
+        if (totalAmount <= 0) return res.status(400).json({ success: false, message: 'Total amount must be greater than zero.' });
+
+        const internalOrder = new Order({
+            userId: userId,
+            userEmail: user.email,
+            products: orderProducts,
+            totalAmount: totalAmount,
+            shippingAddress: user.address,
+            paymentMethod: 'Razorpay',
+            status: 'PaymentPending',
+        });
+        await internalOrder.save();
+
+        const razorpayAmount = Math.round(totalAmount * 100);
+        const razorpayOrderOptions = {
+            amount: razorpayAmount,
+            currency: 'INR',
+            receipt: internalOrder._id.toString(),
+            notes: {
+                internal_order_id: internalOrder._id.toString(),
+                customer_email: user.email
+            }
+        };
+        const rzpOrder = await createRazorpayOrder(razorpayAmount, internalOrder._id.toString(), razorpayOrderOptions.notes);
+
+        internalOrder.razorpayOrderId = rzpOrder.id;
+        await internalOrder.save();
+        
+        res.status(200).json({
+            success: true,
+            message: 'Razorpay order created',
+            orderId: internalOrder._id, 
+            razorpayOrderId: rzpOrder.id,
+            amount: rzpOrder.amount, 
+            currency: rzpOrder.currency,
+            keyId: RAZORPAY_KEY_ID,
+            userName: user.name,
+            userEmail: user.email,
+            userPhone: user.address.phone
+        });
+
+    } catch (error) {
+        console.error("Create Razorpay Order Intent Error:", error);
+        if (error.message && error.message.includes("Razorpay not initialized")) {
+             return res.status(503).json({ success: false, message: 'Payment service unavailable. Please try again later or select COD.' });
+        }
+        let userMessage = 'Could not initiate payment. Please try again.';
+        if (error.statusCode && error.error && error.error.description) { 
+            userMessage = `Payment Gateway Error: ${error.error.description}`;
+            console.error("Razorpay API Error details:", error.error);
+        } else if (error.response && error.response.data && error.response.data.message) { 
+             userMessage = error.response.data.message;
+        } else if (error.message) {
+             userMessage = error.message;
+        }
+        return res.status(500).json({ success: false, message: userMessage });
+    }
+};
+
+// Verify Razorpay Payment
+exports.order_verifyRazorpayPayment = async (req, res, next) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, internal_order_id } = req.body;
+    const userId = req.session.user._id;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !internal_order_id) {
+        return res.status(400).json({ success: false, message: "Missing payment verification details." });
+    }
+
+    const sessionDB = await mongoose.startSession();
+    sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+
+    try {
+        const isSignatureValid = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+
+        if (!isSignatureValid) {
+            await Order.findByIdAndUpdate(internal_order_id, 
+                { 
+                    status: 'PaymentFailed', 
+                    paymentVerified: false, 
+                    razorpayPaymentId: razorpay_payment_id, 
+                    razorpayOrderId: razorpay_order_id, // Store Razorpay Order ID on failure too
+                    razorpaySignature: "VERIFICATION_FAILED",
+                    cancellationReason: "Payment signature verification failed."
+                }, 
+                { session: sessionDB }
+            );
+            await sessionDB.commitTransaction(); 
+            return res.status(400).json({ success: false, message: "Payment verification failed. Invalid signature." });
+        }
+
+        const order = await Order.findOne({ _id: internal_order_id, razorpayOrderId: razorpay_order_id, userId: userId }).session(sessionDB);
+        if (!order) {
+            await sessionDB.abortTransaction();
+            console.error(`Order not found for internal_order_id: ${internal_order_id} and rzp_order_id: ${razorpay_order_id}`);
+            // Attempt to update the failed payment even if the order with user ID match fails
+            await Order.findByIdAndUpdate(internal_order_id, { status: 'PaymentFailed', cancellationReason: 'Order mismatch during verification.'});
+            return res.status(404).json({ success: false, message: "Order not found for verification." });
+        }
+        if (order.status === 'Pending' && order.paymentVerified) {
+             await sessionDB.commitTransaction();
+             console.log(`Razorpay payment for order ${order._id} already verified.`);
+             return res.status(200).json({ success: true, message: "Payment already verified.", orderId: order._id });
+        }
+        if (order.status !== 'PaymentPending') {
+            await sessionDB.abortTransaction();
+            return res.status(400).json({ success: false, message: `Order status is ${order.status}, cannot verify payment.` });
+        }
+        
+        order.status = 'Pending'; 
+        order.razorpayPaymentId = razorpay_payment_id;
+        order.razorpaySignature = razorpay_signature;
+        order.paymentVerified = true;
+        order.cancellationReason = undefined; // Clear any previous failure reasons
+
+        const stockUpdates = order.products.map(item => ({ productId: item.productId, qtyDecr: item.quantity }));
+        for (const update of stockUpdates) {
+            const productResult = await Product.updateOne(
+                { _id: update.productId, stock: { $gte: update.qtyDecr } },
+                { $inc: { stock: -update.qtyDecr, orderCount: 1 } },
+                { session: sessionDB }
+            );
+            if (productResult.modifiedCount === 0) {
+                order.status = 'PaymentFailed'; // Set to PaymentFailed
+                order.cancellationReason = `Stock unavailable for P.ID ${update.productId} after successful payment. REFUND REQUIRED.`;
+                order.paymentVerified = true; // Payment was successful with Razorpay, but order failed due to stock.
+                await order.save({ session: sessionDB });
+                await sessionDB.commitTransaction(); // COMMIT transaction to save PaymentFailed status
+                console.error(`CRITICAL: Stock unavailable for ${update.productId} after successful Razorpay payment for order ${order._id}. Order marked PaymentFailed. Manual refund needed.`);
+                // This is critical and needs admin attention for refund
+                // TODO: Send admin notification
+                return res.status(500).json({ success: false, message: "Order processing failed due to stock issue post-payment. Please contact support immediately for refund."});
+            }
+        }
+        await order.save({ session: sessionDB }); // This sets the cancellationAllowedUntil via pre-save hook
+        
+        const user = await User.findById(userId).session(sessionDB);
+        if (user) {
+            user.cart = [];
+            await user.save({ session: sessionDB });
+            req.session.user.cart = [];
+            await req.session.save();
+        }
+        
+        await sessionDB.commitTransaction();
+
+        try {
+            const subject = `Payment Successful - Order Placed - miniapp`;
+            const prodListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
+            const html = generateEmailHtml({
+                recipientName: order.shippingAddress.name, subject: subject,
+                greeting: `Order Confirmed #${order._id}`,
+                bodyLines: [
+                    `Your payment for order #${order._id} was successful.`,
+                    `<strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)} (Paid via Razorpay)`,
+                    `<strong>Razorpay Payment ID:</strong> ${razorpay_payment_id}`,
+                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`,
+                    `<h3 style="margin-top:15px;">Order Summary:</h3><ul>${prodListHTML}</ul>`,
+                    `Your order is now being processed.`
+                ],
+                buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'View Your Orders',
+                companyName: 'miniapp'
+            });
+            await sendEmail(order.userEmail, subject, `Payment for order ${order._id} successful. Total: Rs.${order.totalAmount.toFixed(2)}`, html);
+        } catch (emailError) {
+            console.error(`Failed sending Razorpay order confirm email O.ID ${order._id}:`, emailError);
+        }
+        res.status(200).json({ success: true, message: "Payment verified successfully. Order placed!", orderId: order._id });
+    } catch (error) {
+        if (sessionDB.inTransaction()) await sessionDB.abortTransaction();
+        console.error("Verify Razorpay Payment Error:", error);
+        try {
+           await Order.findByIdAndUpdate(internal_order_id, { 
+               status: 'PaymentFailed', 
+               paymentVerified: false,
+               cancellationReason: "Payment verification system error." 
+            });
+        } catch (updateError) {
+           console.error("Failed to mark order as PaymentFailed during Razorpay verification error:", updateError);
+        }
+        res.status(500).json({ success: false, message: "Error verifying payment. " + (error.message || "Internal Server Error") });
+    } finally {
+        if(sessionDB) await sessionDB.endSession();
+    }
+};
+
+// --- NEW: Mark Payment as Failed (called by frontend on Razorpay payment.failed event) ---
+exports.order_markPaymentFailed = async (req, res, next) => {
+    const { internal_order_id } = req.params; // ID from route parameter
+    const { razorpay_payment_id, razorpay_order_id, reason = "Payment failed on Razorpay client-side." } = req.body;
+    const userId = req.session.user._id;
+
+    if (!internal_order_id) {
+        return res.status(400).json({ success: false, message: "Internal order ID is required." });
+    }
+
+    try {
+        const order = await Order.findOne({ _id: internal_order_id, userId: userId });
+
+        if (!order) {
+            console.warn(`Payment Failed Hook: Order ${internal_order_id} not found for user ${userId}.`);
+            return res.status(404).json({ success: false, message: "Order not found." });
+        }
+
+        // Only update if it's in PaymentPending, to avoid overwriting other states like already 'Cancelled'
+        if (order.status === 'PaymentPending') {
+            order.status = 'PaymentFailed';
+            order.razorpayPaymentId = razorpay_payment_id || order.razorpayPaymentId; // Keep existing if new not provided
+            order.razorpayOrderId = razorpay_order_id || order.razorpayOrderId;     // Keep existing if new not provided
+            order.paymentVerified = false;
+            order.cancellationReason = reason;
+            await order.save();
+            console.log(`Order ${internal_order_id} marked as PaymentFailed by user ${userId}. Razorpay Order ID: ${order.razorpayOrderId}`);
+            return res.status(200).json({ success: true, message: "Order status updated to PaymentFailed." });
+        } else {
+            console.log(`Payment Failed Hook: Order ${internal_order_id} status is already '${order.status}'. Not updating.`);
+            return res.status(200).json({ success: false, message: `Order is already in '${order.status}' state.` });
+        }
+    } catch (error) {
+        console.error(`Error in order_markPaymentFailed for order ${internal_order_id}:`, error);
+        return res.status(500).json({ success: false, message: "Server error while updating order status." });
+    }
+};
+
+exports.order_cancelOrder = async (req, res, next) => {
      const orderId = req.params.id; const userId = req.session.user._id; const sessionDB = await mongoose.startSession(); sessionDB.startTransaction({ writeConcern: { w: 'majority' }});
      try {
-         const order = await Order.findOne({ _id: orderId, userId: userId, status: 'Pending', cancellationAllowedUntil: { $gt: Date.now() } }).populate('products.productId', '_id name').populate('userId', 'name').session(sessionDB);
-         if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found, processed, or cancel period expired.'); return res.redirect('/orders/my-orders'); }
-         console.log(`User Cancel: Restore stock O.ID ${orderId}.`);
-         const restorePromises = order.products.map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`User Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`User Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-         });
-         await Promise.allSettled(restorePromises); console.log(`User Cancel: Stock restore complete O.ID ${orderId}.`);
-         order.status = 'Cancelled'; order.cancellationReason = "Cancelled by customer"; await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send cancellation email
-              const subject = `Order Cancelled - miniapp`; const text = `Refund processed if applicable.`;
-              const html = generateEmailHtml({ recipientName: order.userId?.name || req.session.user.name, subject: subject, greeting: 'Order Cancellation Confirmation', bodyLines: [`Order (#${order._id}) cancelled per request.`, `Refund processed if applicable.`, `Hope to serve you soon!` ], buttonUrl: `${req.protocol}://${req.get('host')}/`, buttonText: 'Continue Shopping', companyName: 'miniapp' });
+        const order = await Order.findOne({
+             _id: orderId,
+             userId: userId,
+             status: { $in: ['Pending', 'PaymentPending', 'PaymentFailed'] }, // User can cancel PaymentFailed too
+             $or: [ 
+                 { cancellationAllowedUntil: { $exists: false } }, 
+                 { cancellationAllowedUntil: { $gt: Date.now() } }
+             ]
+         }).populate('products.productId', '_id name').populate('userId', 'name').session(sessionDB);
+
+         if (!order) {
+            await sessionDB.abortTransaction(); sessionDB.endSession();
+            const checkOrder = await Order.findById(orderId).select('status cancellationAllowedUntil').lean();
+            let reasonMsg = 'Order not found or cannot be cancelled at this stage.';
+            if (checkOrder && checkOrder.status === 'Pending' && checkOrder.cancellationAllowedUntil && new Date(checkOrder.cancellationAllowedUntil).getTime() <= Date.now()) {
+                reasonMsg = 'Cancellation window has expired for this order.';
+            }
+            req.flash('error_msg', reasonMsg); return res.redirect('/orders/my-orders');
+         }
+
+        if (order.status === 'Pending') { // Only for 'Pending' as stock was debited.
+            console.log(`User Cancel (Order ID ${orderId}): Restoring stock for order in 'Pending' status.`);
+            const restorePromises = order.products.map(item => {
+                const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`User Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
+                return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`User Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
+            });
+            await Promise.allSettled(restorePromises); console.log(`User Cancel: Stock restore complete O.ID ${orderId}.`);
+        } else { // For PaymentPending or PaymentFailed, stock wasn't debited or was already handled if previously failed.
+            console.log(`User Cancel (Order ID ${orderId}): Order was in ${order.status}, no stock restoration needed.`);
+        }
+
+        order.status = 'Cancelled';
+        order.cancellationReason = "Cancelled by customer";
+        order.cancellationAllowedUntil = undefined;
+        await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
+
+         try {
+              const subject = `Order Cancelled - miniapp`; let text = `Your order (#${order._id}) has been cancelled.`;
+              let emailBodyLines = [
+                  `Your order (#${order._id}) has been cancelled as per your request.`,
+                  `Hope to serve you soon!`
+                ];
+              // Add refund note only if it was a successfully paid order now being cancelled.
+              if (order.paymentMethod === 'Razorpay' && order.paymentVerified && order.status !== 'Pending') { // status becomes Cancelled here, check original verify state
+                 text += ' A refund for this pre-paid order will be processed by site administrators if applicable.';
+                 emailBodyLines.splice(1,0, 'If this was a pre-paid order, any applicable refund will be processed by site administrators.');
+                 console.warn(`USER CANCELLATION NOTE: Order ${orderId} was Razorpay-paid and verified. Manual refund potentially needed if cancellation occurred after payment but before fulfillment via admin processing.`);
+              }
+              const html = generateEmailHtml({ recipientName: order.userId?.name || req.session.user.name, subject: subject, greeting: 'Order Cancellation Confirmation', bodyLines: emailBodyLines, buttonUrl: `${req.protocol}://${req.get('host')}/`, buttonText: 'Continue Shopping', companyName: 'miniapp' });
              await sendEmail(order.userEmail, subject, text, html);
           } catch (emailError){ console.error(`Failed sending cancel confirm email O.ID ${order._id}:`, emailError); }
          req.flash('success_msg', 'Order cancelled successfully.'); res.redirect('/orders/my-orders');
@@ -719,24 +1027,41 @@ exports.order_getMyOrders = async (req, res, next) => {
          const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
          const now = Date.now();
          orders.forEach(order => {
-             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
+             order.isCancellable = (order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime()) ||
+                                   (order.paymentMethod === 'Razorpay' && ['PaymentPending', 'PaymentFailed'].includes(order.status));
              order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
          });
          res.render('user/my-orders', { title: 'My Orders', orders: orders });
      } catch (error) { console.error("Error fetching user orders:", error); next(error); }
  };
 
-exports.order_generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => { // Internal function for Admin Controller
-    try {
-        const order = await Order.findById(orderId); if (!order) throw new Error('Order not found.'); if (order.status !== 'Pending') throw new Error(`OTP only for 'Pending' status (is ${order.status}).`);
-        const otp = generateOTP(); const otpExpires = setOTPExpiration(5); order.orderOTP = otp; order.orderOTPExpires = otpExpires; await order.save();
-        const user = await User.findById(order.userId).select('email');
-        console.log(`ADMIN generated OTP for O.ID ${orderId}: ${otp} (User: ${user?.email || '[NA]'}).`);
-        return { success: true, message: `OTP generated for order ${orderId}.` };
-    } catch (error) { console.error(`Admin OTP Gen Error O.ID ${orderId}:`, error); throw error; }
-};
+// ... (order_generateAndSendDirectDeliveryOTPByAdmin and other admin/seller order helpers - NO CHANGES to these internal logic functions)
+exports.order_getMyOrders = async (req, res, next) => {
+     try {
+         const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
+         const now = Date.now();
+         orders.forEach(order => {
+             order.isCancellable = (order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime()) ||
+                                   (order.paymentMethod === 'Razorpay' && ['PaymentPending', 'PaymentFailed'].includes(order.status));
+             order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
+         });
 
-exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => { // Internal function for Seller Controller
+         // --- MODIFIED: Pass query parameters to the template ---
+         const paymentStatus = req.query.payment; // e.g., "success"
+         const processedOrderId = req.query.order_id; // The ID of the order processed
+
+         res.render('user/my-orders', { 
+             title: 'My Orders', 
+             orders: orders,
+             paymentStatus: paymentStatus,     // Pass paymentStatus
+             processedOrderId: processedOrderId  // Pass processedOrderId
+         });
+         // --- END MODIFICATION ---
+
+     } catch (error) { console.error("Error fetching user orders:", error); next(error); }
+ };
+
+exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => {
     try {
         const order = await Order.findById(orderId).populate('products.productId', 'sellerId');
         if (!order) throw new Error('Order not found.'); if (order.status !== 'Pending') throw new Error(`OTP only for 'Pending' status (is ${order.status}).`);
@@ -747,14 +1072,13 @@ exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerI
         return { success: true, message: `OTP generated for order ${orderId}.` };
     } catch (error) { console.error(`Seller OTP Gen Error O.ID ${orderId} by Seller ${sellerId}:`, error); throw error; }
 };
-
-exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper = null) => { // Internal for Admin Controller
+exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper = null) => { 
      try {
          const order = await Order.findOne({ _id: orderId, status: 'Pending', orderOTP: providedOtp, orderOTPExpires: { $gt: Date.now() } });
          if (!order) { const check = await Order.findById(orderId).select('status orderOTP orderOTPExpires'); if (!check) throw new Error('Order not found.'); if (check.status !== 'Pending') throw new Error(`Order is ${check.status}.`); if (check.orderOTP !== providedOtp) throw new Error('Invalid OTP.'); if (!check.orderOTPExpires || check.orderOTPExpires <= Date.now()) throw new Error('Expired OTP.'); throw new Error('OTP verify failed.'); }
          order.status = 'Delivered'; order.receivedByDate = new Date(); order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined; await order.save();
          console.log(`O.ID ${orderId} confirmed delivered by ADMIN ${adminUserId}`);
-         try { // Send confirm email
+         try { 
             const subject = `Order Delivered - miniapp!`; const deliveredDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Order ${order._id} delivered on ${deliveredDate}. Confirmed by Admin.`;
             const html = generateEmailHtml({ recipientName: order.shippingAddress.name, subject: subject, greeting: `Order Delivered!`, bodyLines: [`Order #${order._id} delivered.`, `<strong>Delivered On:</strong> ${deliveredDate}. Confirmed by admin.`], buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`, buttonText: 'View Order Details', companyName: 'miniapp' });
@@ -763,15 +1087,14 @@ exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, provid
          return { success: true, order: order };
      } catch (error) { console.error(`Admin Confirm OTP Error O.ID ${orderId} by Admin ${adminUserId}:`, error); throw error; }
   };
-
-exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, resForHelper = null) => { // Internal for Seller Controller
+exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, resForHelper = null) => {
      try {
          const order = await Order.findOne({ _id: orderId, status: 'Pending', orderOTP: providedOtp, orderOTPExpires: { $gt: Date.now() } }).populate('products.productId', 'sellerId');
          if (!order) { const check = await Order.findById(orderId).select('status orderOTP orderOTPExpires'); if (!check) throw new Error('Order not found.'); if (check.status !== 'Pending') throw new Error(`Order is ${check.status}.`); if (check.orderOTP !== providedOtp) throw new Error('Invalid OTP.'); if (!check.orderOTPExpires || check.orderOTPExpires <= Date.now()) throw new Error('Expired OTP.'); throw new Error('OTP verify failed.'); }
          if (!order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString())) { console.warn(`Seller ${sellerId} attempt confirm unrelated O.ID ${orderId}.`); throw new Error('Permission Denied: Irrelevant order.'); }
          order.status = 'Delivered'; order.receivedByDate = new Date(); order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined; await order.save();
          console.log(`O.ID ${orderId} confirmed delivered by SELLER ${sellerId}`);
-         try { // Send confirm email
+         try { 
             const subject = `Order Delivered - miniapp`; const deliveredDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Order ${order._id} delivered on ${deliveredDate}. Confirmed by Seller.`;
             const html = generateEmailHtml({ recipientName: order.shippingAddress.name, subject: subject, greeting: `Order Delivered!`, bodyLines: [`Order #${order._id} delivered.`, `<strong>Delivered On:</strong> ${deliveredDate}. Confirmed by seller.`], buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`, buttonText: 'View Order Details', companyName: 'miniapp' });
@@ -781,12 +1104,14 @@ exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, provided
      } catch (error) { console.error(`Seller Confirm OTP Error O.ID ${orderId} by Seller ${sellerId}:`, error); throw error; }
  };
 
+
 // ============================
 // Product Controller Functions
 // ============================
+// ... (product_getProducts, product_getProductDetails, etc. - NO CHANGES to these) ...
 const escapeRegex = (string) => string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-exports.product_getProducts = async (req, res, next) => { // Also used by home page, indirectly via search/filter
+exports.product_getProducts = async (req, res, next) => { 
   try {
     const searchTerm = req.query.search || ''; const categoryFilter = req.query.category || '';
     let query = { reviewStatus: 'approved', stock: { $gt: 0 } }; let sort = { createdAt: -1 }; const projection = {};
@@ -838,9 +1163,11 @@ exports.product_getProductSuggestions = async (req, res, next) => {
      } catch (error) { console.error("Error fetching suggestions:", error); res.status(500).json({ error: 'Failed to fetch' }); }
  };
 
+
 // ============================
 // User Controller Functions
 // ============================
+// ... (user_getUserProfilePage, user_updateUserName, etc. - NO CHANGES to these) ...
 exports.user_getUserProfilePage = async (req, res, next) => {
     try {
         const user = await User.findById(req.session.user._id).select('name email role address createdAt').lean();
@@ -848,7 +1175,6 @@ exports.user_getUserProfilePage = async (req, res, next) => {
         res.render('user/profile', { title: 'My Profile', user: user });
     } catch (error) { next(error); }
 };
-
 exports.user_updateUserName = async (req, res, next) => {
      const { name } = req.body; const userId = req.session.user._id;
      if (!name || typeof name !== 'string' || name.trim().length < 2) { req.flash('error_msg', 'Valid name >= 2 chars required.'); return res.redirect('/user/profile'); }
@@ -861,7 +1187,6 @@ exports.user_updateUserName = async (req, res, next) => {
          console.error("Error updating name:", error); next(error);
      }
  };
-
 exports.user_saveAddress = async (req, res, next) => {
      const { name, phone, pincode, locality, cityVillage, landmarkNearby, source, state, district, mandal } = req.body; const userId = req.session.user._id;
      const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
@@ -883,7 +1208,6 @@ exports.user_saveAddress = async (req, res, next) => {
          next(error);
      }
  };
-
 exports.user_getCart = async (req, res, next) => {
      try {
          const user = await User.findById(req.session.user._id).populate('cart.productId', 'name price imageUrl stock _id reviewStatus').lean();
@@ -904,8 +1228,7 @@ exports.user_getCart = async (req, res, next) => {
          res.render('user/cart', { title: 'Your Shopping Cart', cart: populatedCart, cartTotal: cartTotal });
        } catch (error) { next(error); }
  };
-
-exports.user_addToCart = async (req, res, next) => { // Form submission (Product Detail)
+exports.user_addToCart = async (req, res, next) => { 
      const { productId, quantity = 1 } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
      if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 1) { req.flash('error_msg', 'Invalid product/quantity.'); return res.redirect(req.headers.referer || '/'); }
      try {
@@ -925,12 +1248,11 @@ exports.user_addToCart = async (req, res, next) => { // Form submission (Product
          }
          await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity })); await req.session.save();
          req.flash('success_msg', `${product.name} added to cart!`);
-         if(req.query.redirectTo === 'checkout') { return res.redirect('/user/checkout'); } // Buy Now logic
-         else { return res.redirect('/user/cart'); } // Standard Add to Cart redirects to Cart page
+         if(req.query.redirectTo === 'checkout') { return res.redirect('/user/checkout'); } 
+         else { return res.redirect('/user/cart'); } 
      } catch (error) { if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.redirect('/'); } console.error("Add Cart Error:", error); next(error); }
  };
-
-exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
+exports.user_addToCartAjax = async (req, res, next) => { 
      const { productId, quantity = 1 } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
      if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Invalid product ID.' });
      if (isNaN(numQuantity) || numQuantity < 1) return res.status(400).json({ success: false, message: 'Invalid quantity.' });
@@ -955,58 +1277,49 @@ exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
          return res.status(200).json({ success: true, message: `${product.name} added!`, cartItemCount: updatedCartItemCount });
      } catch (error) { console.error("AJAX Add Cart Error:", error); let status = 500; let msg = 'Error adding item.'; if (error.name === 'CastError') { status = 400; msg = 'Invalid product ID.'; } return res.status(status).json({ success: false, message: msg }); }
  };
-
 exports.user_updateCartQuantity = async (req, res, next) => {
     const { productId, quantity } = req.body;
     const userId = req.session.user._id;
     const numQuantity = parseInt(quantity, 10);
-
     if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) {
         return res.status(400).json({ success: false, message: 'Invalid product/quantity.' });
     }
-
     try {
         const [user, product] = await Promise.all([
             User.findById(userId),
             Product.findById(productId).select('stock price reviewStatus name')
         ]);
-
         if (!user || !product) {
             return res.status(404).json({ success: false, message: 'User/Product not found.' });
         }
-
         if (product.reviewStatus !== 'approved') {
             const index = user.cart.findIndex(i => i.productId.toString() === productId);
             if (index > -1) {
                 user.cart.splice(index, 1);
                 await user.save();
                 req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-                await req.session.save(); // Save session after cart update
+                await req.session.save(); 
             }
-            // After removal, calculate the new cart item count for the response
             const updatedCartItemCountAfterRemoval = user.cart.reduce((sum, item) => sum + item.quantity, 0);
             return res.status(400).json({
                 success: false,
                 message: `Product "${product.name}" unavailable, removed.`,
                 removal: true,
-                cartItemCount: updatedCartItemCountAfterRemoval // Send updated count
+                cartItemCount: updatedCartItemCountAfterRemoval
             });
         }
-
         const index = user.cart.findIndex(i => i.productId.toString() === productId);
-
         if (numQuantity === 0) {
             if (index > -1) {
                 user.cart.splice(index, 1);
             }
         } else {
             if (product.stock < numQuantity) {
-                // If stock is low, do not change the cart. Respond with current cart count.
                 const currentCartItemCount = user.cart.reduce((sum, item) => sum + item.quantity, 0);
                 return res.status(400).json({
                     success: false,
                     message: `Stock low: ${product.name} (${product.stock} avail).`,
-                    cartItemCount: currentCartItemCount // Send current count
+                    cartItemCount: currentCartItemCount
                 });
             }
             if (index > -1) {
@@ -1015,17 +1328,11 @@ exports.user_updateCartQuantity = async (req, res, next) => {
                 user.cart.push({ productId, quantity: numQuantity });
             }
         }
-
         await user.save();
         req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-
         let cartTotal = 0;
         let itemSubtotal = 0;
-
-        // Re-fetch user to get populated cart for accurate totals based on current prices
-        // This also ensures we have the most up-to-date cart state for item count.
         const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
-
         updatedUser.cart.forEach(i => {
             if (i.productId?.price) {
                 const currentSub = i.productId.price * i.quantity;
@@ -1035,24 +1342,19 @@ exports.user_updateCartQuantity = async (req, res, next) => {
                 }
             }
         });
-
-        // Calculate the final cart item count
         const updatedCartItemCount = updatedUser.cart.reduce((sum, item) => sum + item.quantity, 0);
-
-        await req.session.save(); // Save session after all updates
-
+        await req.session.save(); 
         res.json({
             success: true,
             message: 'Cart updated.',
             newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0,
             itemSubtotal,
             cartTotal,
-            cartItemCount: updatedCartItemCount, // Send updated count
+            cartItemCount: updatedCartItemCount,
             itemId: productId
         });
     } catch (error) {
         console.error("Cart Update Error:", error);
-        // Try to get current cart count even on error for client UI consistency
         let currentCartItemCountOnError = 0;
         if (req.session.user?.cart) {
             currentCartItemCountOnError = req.session.user.cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -1060,12 +1362,10 @@ exports.user_updateCartQuantity = async (req, res, next) => {
         res.status(500).json({
             success: false,
             message: 'Error updating quantity.',
-            cartItemCount: currentCartItemCountOnError // Send best-effort count
+            cartItemCount: currentCartItemCountOnError 
         });
     }
 };
-
-
 exports.user_removeFromCart = async (req, res, next) => {
      const { productId } = req.params; const userId = req.session.user._id;
      if (!productId || !mongoose.Types.ObjectId.isValid(productId)) { req.flash('error_msg', 'Invalid Product ID.'); return res.redirect('/user/cart'); }
@@ -1079,7 +1379,6 @@ exports.user_removeFromCart = async (req, res, next) => {
          res.redirect('/user/cart');
      } catch (error) { console.error("Remove Cart Error:", error); next(error); }
  };
-
 exports.user_getCheckoutPage = async (req, res, next) => {
     try {
        const user = await User.findById(req.session.user._id).populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId _id').lean();
@@ -1098,10 +1397,11 @@ exports.user_getCheckoutPage = async (req, res, next) => {
              if (itemsToRemove.length > 0) { await User.updateOne({ _id: user._id }, { $pull: { cart: { _id: { $in: itemsToRemove } } } }); const updated = await User.findById(user._id).select('cart').lean(); req.session.user.cart = updated?.cart.map(i => ({ productId: i.productId, quantity: i.quantity })) || []; await req.session.save(); issueMessages.push('Removed problematic items.'); }
              req.flash('error_msg', "Resolve cart issues: " + issueMessages.join(' ')); return res.redirect('/user/cart');
         }
-       res.render('user/checkout', { title: 'Checkout', userAddress: user.address, items: items, subTotal: subTotal, totalAmount: subTotal, paymentMethod: 'COD' });
+       res.render('user/checkout', { title: 'Checkout', userAddress: user.address, items: items, subTotal: subTotal, totalAmount: subTotal,
+       RAZORPAY_KEY_ID: Config.RAZORPAY_KEY_ID
+        });
    } catch (error) { next(error); }
  };
-
 exports.user_lookupPincode = async (req, res) => {
     const { pincode } = req.params; const API_URL = `https://api.postalpincode.in/pincode/${pincode}`;
     if (!pincode || !/^\d{6}$/.test(pincode)) return res.status(400).json({ success: false, message: 'Invalid Pincode (6 digits).' });
@@ -1119,17 +1419,17 @@ exports.user_lookupPincode = async (req, res) => {
     } catch (error) { console.error(`Pincode lookup Net/Req Error ${pincode}:`, error.message); let status = 500; let msg = 'Error looking up pincode.'; if (axios.isAxiosError(error)) { if (error.code === 'ECONNABORTED') { msg = 'Lookup timeout.'; status = 504; } else if (error.response) { msg = `API error (${error.response.status}).`; status = 502; } else if (error.request) { msg = 'Net error.'; status = 502; } } res.status(status).json({ success: false, message: msg }); }
 };
 
+
 // ============================
 // Seller Controller Functions
 // ============================
+// ... (Existing Seller controllers - NO CHANGES for these product/dashboard ones)
 exports.seller_getDashboard = (req, res) => {
     res.render('seller/dashboard', { title: 'Seller Dashboard' });
 };
-
 exports.seller_getUploadProductPage = (req, res) => {
     res.render('seller/upload-product', { title: 'Upload New Product', product: {}, categories: categories });
 };
-
 exports.seller_uploadProduct = async (req, res, next) => {
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
      const sellerId = req.session.user._id; const sellerEmail = req.session.user.email;
@@ -1156,14 +1456,12 @@ exports.seller_uploadProduct = async (req, res, next) => {
          console.error("Seller Upload Error:", error); next(error);
      }
  };
-
 exports.seller_getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({ sellerId: req.session.user._id }).sort({ createdAt: -1 }).lean();
         res.render('seller/manage-products', { title: 'Manage Your Products', products: products });
     } catch (error) { next(error); }
 };
-
 exports.seller_getEditProductPage = async (req, res, next) => {
       try {
          const product = await Product.findOne({ _id: req.params.id, sellerId: req.session.user._id }).lean();
@@ -1171,7 +1469,6 @@ exports.seller_getEditProductPage = async (req, res, next) => {
          res.render('seller/edit-product', { title: `Edit Product: ${product.name}`, product: product, categories: categories });
     } catch (error) { if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.redirect('/seller/products'); } next(error); }
  };
-
 exports.seller_updateProduct = async (req, res, next) => {
       const productId = req.params.id; const sellerId = req.session.user._id; const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
       let productData = { _id: productId, ...req.body }; const renderOpts = { title: `Edit Error`, product: productData, categories: categories };
@@ -1198,7 +1495,6 @@ exports.seller_updateProduct = async (req, res, next) => {
            console.error("Seller Update Error:", error); next(error);
       }
   };
-
 exports.seller_removeProduct = async (req, res, next) => {
      const productId = req.params.id; const sellerId = req.session.user._id;
      try {
@@ -1210,7 +1506,6 @@ exports.seller_removeProduct = async (req, res, next) => {
          console.error("Seller Remove Error:", error); req.flash('error_msg', 'Error removing.'); res.redirect('/seller/products');
      }
  };
-
 exports.seller_getManageOrdersPage = async (req, res, next) => {
      try {
          const sellerId = req.session.user._id;
@@ -1219,7 +1514,9 @@ exports.seller_getManageOrdersPage = async (req, res, next) => {
          const orders = await Order.find({ 'products.productId': { $in: sellerProdIds } }).sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price sellerId').populate('userId', 'name email').lean();
          const now = Date.now();
          orders.forEach(order => {
-              order.isRelevantToSeller = true; order.canBeDirectlyDeliveredBySeller = order.status === 'Pending'; order.canBeCancelledBySeller = order.status === 'Pending';
+              order.isRelevantToSeller = true; 
+              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending'; 
+              order.canBeCancelledBySeller = ['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status); 
               order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
               if (order.products?.length > 0) {
                   order.itemsSummary = order.products.map(p => { const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString(); const price = p.priceAtOrder ?? p.productId?.price ?? 0; const name = p.productId?.name || p.name || '[?Name?]'; return `${isSellerItem ? '<strong>' : ''}${name} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Yours)</strong>' : ''}`; }).join('<br>');
@@ -1228,11 +1525,10 @@ exports.seller_getManageOrdersPage = async (req, res, next) => {
          res.render('seller/manage-orders', { title: 'Manage Your Orders', orders: orders, message: null, sellerCancellationReasons: sellerCancellationReasons });
      } catch (error) { next(error); }
  };
-
 exports.seller_sendDirectDeliveryOtpBySeller = async (req, res, next) => {
      const orderId = req.params.orderId; const sellerId = req.session.user._id;
-     try { // Middleware `isOrderRelevantToSeller` should have run
-         const orderCheck = await Order.findById(orderId).select('status').lean(); // Quick check
+     try { 
+         const orderCheck = await Order.findById(orderId).select('status').lean(); 
          if (!orderCheck) throw new Error("Order not found.");
          if (orderCheck.status !== 'Pending') throw new Error(`Cannot send OTP for status ${orderCheck.status}.`);
          const result = await this.order_generateAndSendDirectDeliveryOTPBySeller(orderId, sellerId);
@@ -1240,46 +1536,108 @@ exports.seller_sendDirectDeliveryOtpBySeller = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `OTP Send Failed: ${error.message}`); }
      res.redirect('/seller/orders');
  };
-
 exports.seller_confirmDirectDeliveryBySeller = async (req, res, next) => {
       const orderId = req.params.orderId; const { otp } = req.body; const sellerId = req.session.user._id;
       if (!otp || !/^\d{6}$/.test(otp.trim())) { req.flash('error_msg', 'Enter 6-digit OTP.'); return res.redirect('/seller/orders'); }
-      try { // Middleware `isOrderRelevantToSeller` should have run
+      try { 
           const { order } = await this.order_confirmDirectDeliveryBySeller(orderId, sellerId, otp.trim(), res);
          req.flash('success_msg', `Order ${orderId} confirmed delivered by you.`);
       } catch (error) { req.flash('error_msg', `Confirm Failed: ${error.message}`); }
       res.redirect('/seller/orders');
   };
-
 exports.seller_cancelOrderBySeller = async (req, res, next) => {
-     const { orderId } = req.params; const { reason } = req.body; const sellerId = req.session.user._id; const sellerEmail = req.session.user.email;
+     const { orderId } = req.params; const { reason } = req.body; const sellerId = req.session.user._id;
      if (!reason || !sellerCancellationReasons.includes(reason)) { req.flash('error_msg', 'Select valid seller reason.'); return res.redirect('/seller/orders'); }
      const sessionDB = await mongoose.startSession(); sessionDB.startTransaction();
-     try { // Middleware `isOrderRelevantToSeller` should have run
+     try {
          const order = await Order.findById(orderId).populate('products.productId', 'sellerId name _id').populate('userId', 'email name').session(sessionDB);
          if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found.'); return res.status(404).redirect('/seller/orders'); }
-         if (order.status !== 'Pending') { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/seller/orders'); }
-         console.log(`Seller Cancel: Restore stock seller ${sellerId} O.ID ${orderId}.`);
-         const restorePromises = order.products .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) .map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Seller Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             console.log(`Seller Cancel: Restore ${qty} stock P.ID ${item.productId._id}`);
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Seller Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-          });
-         await Promise.allSettled(restorePromises); console.log(`Seller Cancel: Stock restore done ${sellerId} O.ID ${orderId}.`);
-         order.status = 'Cancelled'; order.cancellationReason = `Cancelled by Seller: ${reason}`; order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined;
+         if (!['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status)) { 
+            await sessionDB.abortTransaction(); sessionDB.endSession(); 
+            req.flash('error_msg', `Order is '${order.status}'. Cannot cancel items.`); return res.redirect('/seller/orders'); 
+         }
+         console.log(`Seller Cancel: Order ${orderId}, Seller ${sellerId}. Current order status: ${order.status}`);
+
+         let sellerItemsCancelled = false;
+         let orderBecomesFullyCancelled = true; // Assume it will be fully cancelled
+
+         if (order.status === 'Pending') {
+             const restorePromises = [];
+             order.products.forEach(item => {
+                 if (item.productId?.sellerId?.toString() === sellerId.toString()) {
+                     sellerItemsCancelled = true;
+                     const qty = Number(item.quantity); 
+                     if (!item.productId?._id || isNaN(qty) || qty <= 0) { 
+                         console.warn(`Seller Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); 
+                         return;
+                     }
+                     console.log(`Seller Cancel: Restore ${qty} stock P.ID ${item.productId._id}`);
+                     restorePromises.push(Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Seller Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`)));
+                 } else {
+                     orderBecomesFullyCancelled = false; // There are items from other sellers or no-seller items
+                 }
+             });
+             if (restorePromises.length > 0) await Promise.allSettled(restorePromises);
+         } else { 
+            order.products.forEach(item => {
+                if(item.productId?.sellerId?.toString() === sellerId.toString()) {
+                    sellerItemsCancelled = true;
+                } else {
+                     orderBecomesFullyCancelled = false;
+                }
+            });
+         }
+
+         if (!sellerItemsCancelled) { 
+             await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('info_msg', 'No items from your store to cancel in this order.'); return res.redirect('/seller/orders');
+         }
+         
+         // Logic for setting order status
+         if (orderBecomesFullyCancelled) {
+             order.status = 'Cancelled'; 
+             order.cancellationReason = (order.cancellationReason ? order.cancellationReason + " | " : "") + `Seller (${req.session.user.email}) cancelled all item(s): ${reason}`;
+         } else {
+             // Order remains 'Pending' or its original pre-cancellation status if other items exist
+             // but we need to record that some items were cancelled by this seller.
+             order.cancellationReason = (order.cancellationReason ? order.cancellationReason + " | " : "") + `Seller (${req.session.user.email}) cancelled some items: ${reason}. Order may still proceed with other items.`;
+             // If it was PaymentPending/Failed, it should probably become Cancelled if this seller had the *only* items, or 'PaymentFailed' if others remain.
+             // This area can be complex. For now: if not fully cancelled, keep original status if it was 'Pending', otherwise use a general "PartiallyCancelled" status if available, or just add to reason.
+             // Sticking to simplicity: if NOT all items cancelled by THIS action, it just updates the reason string, and order status isn't changed by this seller, admin should review complex cases.
+             // For current schema, 'Cancelled' is the only available terminal state besides 'Delivered'.
+             // A better system might have "Partially Cancelled" or similar.
+             // For now: If order is NOT fully cancelled, it doesn't change the status unless admin changes it.
+             // *However*, if the order WAS PaymentPending/Failed, and seller cancels their items, the order effectively becomes 'Cancelled'
+             // if those were the only items.
+             if (['PaymentPending', 'PaymentFailed'].includes(order.status) && orderBecomesFullyCancelled) {
+                 order.status = 'Cancelled';
+             } else if (!orderBecomesFullyCancelled) {
+                console.log(`Order ${orderId} not fully cancelled by seller. Original status ${order.status} may be retained or reviewed by admin.`);
+                // No status change from this seller alone unless they were the only one.
+             }
+         }
+         
+         order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined;
          await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send email
+
+         try {
               const customerEmail = order.userEmail || order.userId?.email; const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
               if(customerEmail) {
-                  const subject = `Order Cancelled - miniapp`; const text = `Order (${order._id}) cancelled by seller. Reason: ${reason}.`;
-                  const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Regarding Order #${order._id}`, bodyLines: [`Items in order (#${order._id}) cancelled by seller.`, `<strong>Reason:</strong> ${reason}`, `Refund processed if applicable.`], buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
+                  const subject = `Items Cancelled in Order #${order._id} - miniapp`;
+                  const text = `Some items in your order (${order._id}) were cancelled by a seller. Reason: ${reason}.`;
+                  let bodyLines = [`One or more items in your order (#${order._id}) have been cancelled by a seller.`, `<strong>Reason:</strong> ${reason}`, `View order details for more information.`];
+
+                  if (order.paymentMethod === 'Razorpay' && order.paymentVerified) {
+                     bodyLines.push(`If your order was pre-paid, an applicable refund for these items will be processed by site administrators.`);
+                     console.warn(`SELLER CANCELLATION NOTE: Items in Order ${orderId} were Razorpay-paid. Manual refund may be needed by admin from Razorpay dashboard if not automatically handled for partial cancellations. Amount related to cancelled items needs review.`);
+                  }
+                  const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Update for Order #${order._id}`, bodyLines: bodyLines, buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
                   await sendEmail(customerEmail, subject, text, html);
               } else console.warn(`Seller Cancel: Cannot find customer email O.ID ${orderId}.`);
          } catch (emailError) { console.error(`Seller Cancel: Fail send email O.ID ${order._id}:`, emailError); }
-         req.flash('success_msg', `Order ${orderId} cancelled. Reason: ${reason}. Customer notified.`); res.redirect('/seller/orders');
+         req.flash('success_msg', `Your items in order ${orderId} have been cancelled. Reason: ${reason}. Customer notified.`); res.redirect('/seller/orders');
      } catch (error) {
          if(sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error(`Error seller cancelling O.ID ${orderId}:`, error); req.flash('error_msg', 'Internal cancel error.'); res.redirect('/seller/orders');
-     } finally { if (sessionDB) sessionDB.endSession(); }
+     } finally { if (sessionDB) await sessionDB.endSession(); }
  };
 
 middleware.js :
@@ -1481,12 +1839,12 @@ const AddressSchema = new mongoose.Schema({
     name: { type: String, trim: true },
     phone: { type: String, trim: true },
     pincode: { type: String, trim: true },
-    locality: { type: String, trim: true }, // From Pincode lookup
-    cityVillage: { type: String, trim: true }, // House No/Building/Area
-    landmarkNearby: { type: String, trim: true }, // Optional
-    mandal: { type: String, trim: true }, // Derived
-    district: { type: String, trim: true }, // Derived
-    state: { type: String, trim: true }, // Derived
+    locality: { type: String, trim: true },
+    cityVillage: { type: String, trim: true },
+    landmarkNearby: { type: String, trim: true },
+    mandal: { type: String, trim: true },
+    district: { type: String, trim: true },
+    state: { type: String, trim: true },
 }, { _id: false });
 
 const CartItemSchema = new mongoose.Schema({
@@ -1559,14 +1917,14 @@ const ProductSchema = new mongoose.Schema({
         trim: true,
         index: true,
         enum: {
-            values: config.categoryNames, // Use from consolidated config
+            values: config.categoryNames,
             message: '{VALUE} is not a supported category.'
         }
     },
     price: { type: Number, required: [true, 'Please provide a product price'], min: 0 },
     stock: { type: Number, required: [true, 'Please provide product stock quantity'], min: 0, default: 0 },
     imageUrl: { type: String, required: [true, 'Please provide a product image URL'], trim: true },
-    imageUrl2: { type: String, trim: true }, // Optional second image
+    imageUrl2: { type: String, trim: true },
     specifications: { type: String, trim: true },
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     sellerEmail: { type: String, required: true, lowercase: true, trim: true },
@@ -1608,12 +1966,12 @@ const OrderAddressSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
     phone: { type: String, trim: true, required: true },
     pincode: { type: String, trim: true, required: true },
-    locality: { type: String, trim: true, required: true }, // Added
-    cityVillage: { type: String, trim: true, required: true }, // House/Area
-    landmarkNearby: { type: String, trim: true }, // Optional
-    mandal: { type: String, trim: true }, // Derived
-    district: { type: String, trim: true }, // Derived
-    state: { type: String, trim: true }, // Derived
+    locality: { type: String, trim: true, required: true },
+    cityVillage: { type: String, trim: true, required: true },
+    landmarkNearby: { type: String, trim: true },
+    mandal: { type: String, trim: true },
+    district: { type: String, trim: true },
+    state: { type: String, trim: true },
 }, { _id: false });
 
 const OrderSchema = new mongoose.Schema({
@@ -1622,31 +1980,60 @@ const OrderSchema = new mongoose.Schema({
     products: [OrderProductSchema],
     totalAmount: { type: Number, required: true, min: 0 },
     shippingAddress: { type: OrderAddressSchema, required: true },
-    paymentMethod: { type: String, enum: ['COD'], required: true, default: 'COD' },
-    status: { type: String, enum: ['Pending', 'Delivered', 'Cancelled'], default: 'Pending' },
+    paymentMethod: {
+        type: String,
+        enum: ['COD', 'Razorpay'], // <<< UPDATED
+        required: true,
+        default: 'COD'
+    },
+    status: {
+        type: String,
+        // <<< UPDATED Enum
+        enum: ['Pending', 'PaymentPending', 'PaymentFailed', 'Delivered', 'Cancelled'],
+        default: 'PaymentPending' // Default for online payments before confirmation
+    },
     orderDate: { type: Date, default: Date.now },
     receivedByDate: { type: Date },
     orderOTP: String,
     orderOTPExpires: Date,
     cancellationAllowedUntil: { type: Date },
-    cancellationReason: { type: String, trim: true }
+    cancellationReason: { type: String, trim: true },
+    // --- Razorpay Specific Fields --- // <<< ADDED
+    razorpayOrderId: { type: String, trim: true },
+    razorpayPaymentId: { type: String, trim: true },
+    razorpaySignature: { type: String, trim: true },
+    paymentVerified: { type: Boolean, default: false } // To confirm Razorpay webhook/callback processed
+
 }, { timestamps: true });
 
 OrderSchema.pre('save', function(next) {
-    if (this.isNew && !this.cancellationAllowedUntil) {
-        const now = this.orderDate || Date.now();
-        this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+    // Original logic for COD related fields
+    if (this.paymentMethod === 'COD') {
+        if (this.isNew && !this.cancellationAllowedUntil && this.status === 'Pending') {
+            const now = this.orderDate || Date.now();
+            this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour for COD
+        }
+    } else { // For Razorpay or other online payments, cancellation window might be different or not applicable pre-payment
+        this.cancellationAllowedUntil = undefined; // Or handle as per your business logic
     }
+
+
     if (this.isModified('status') && (this.status === 'Cancelled' || this.status === 'Delivered')) {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
-        this.cancellationAllowedUntil = undefined;
+        this.cancellationAllowedUntil = undefined; // Clear this on final states
         if (this.status === 'Cancelled') this.receivedByDate = undefined;
     }
-    if (this.isModified('status') && this.status !== 'Pending') {
+    if (this.isModified('status') && this.status !== 'Pending') { // Clear OTP if not pending for COD delivery
          this.orderOTP = undefined;
          this.orderOTPExpires = undefined;
-     }
+    }
+    // If order becomes Pending (COD confirmed or Razorpay verified), then set cancellation window if not COD
+    if (this.isModified('status') && this.status === 'Pending' && this.paymentMethod !== 'COD' && !this.cancellationAllowedUntil) {
+        const now = Date.now();
+        this.cancellationAllowedUntil = new Date(now + 15 * 60 * 1000); // Shorter window for paid orders, e.g., 15 mins
+    }
+
     next();
 });
 
@@ -1692,8 +2079,10 @@ package.json :
     "express-session": "^1.18.0",
     "method-override": "^3.0.0",
     "mongoose": "^8.4.0",
+    "node-cache": "^5.1.2",
     "nodemailer": "^6.9.13",
     "pincode": "^1.0.0",
+    "razorpay": "^2.9.6",
     "slugify": "^1.6.6"
   },
   "devDependencies": {
@@ -1705,7 +2094,7 @@ package.json :
 routes.js :
 // routes.js
 const express = require('express');
-const controllers = require('./controllers'); // Correct import
+const controllers = require('./controllers'); 
 const middleware = require('./middleware');
 
 // Destructure imported modules for convenience
@@ -1713,8 +2102,6 @@ const {
     isAuthenticated, isAdmin, isSeller, isAdminOrSeller, isProductOwner, isOrderRelevantToSeller
 } = middleware;
 
-// ***** CORRECTED DESTRUCTURING FOR controllers *****
-// Ensure ALL exported functions from controllers.js are listed here
 const {
     // Auth Controllers
     auth_getLoginPage, auth_registerUser, auth_getRegisterPage, auth_verifyOtp, auth_getVerifyOtpPage,
@@ -1724,14 +2111,16 @@ const {
     // Product Controllers
     product_getProducts, product_getProductDetails, product_rateProduct, product_getProductSuggestions,
 
-    // User Controllers (Make sure ALL are here)
-    user_getUserProfilePage, // <--- WAS LIKELY MISSED/MISPELLED HERE ORIGINALLY
-    user_updateUserName, user_saveAddress, user_getCart, user_addToCart,
+    // User Controllers 
+    user_getUserProfilePage, user_updateUserName, user_saveAddress, user_getCart, user_addToCart,
     user_addToCartAjax, user_updateCartQuantity, user_removeFromCart, user_getCheckoutPage, user_lookupPincode,
 
-    // Order Controllers (including internal helpers IF they were meant to be route handlers - adjust if not)
-    // Note: Helpers like generateAndSend... and confirm... are likely called internally by admin/seller controllers, not directly routed.
-    order_placeOrder, order_getMyOrders, order_cancelOrder, // User cancellation route handler
+    // Order Controllers
+    order_placeCODOrder, 
+    order_createRazorpayOrderIntent, 
+    order_verifyRazorpayPayment,  
+    order_markPaymentFailed, // <<< NEW
+    order_getMyOrders, order_cancelOrder,
 
     // Admin Controllers
     admin_getDashboard, admin_uploadProduct, admin_getUploadProductPage, admin_getManageProductsPage,
@@ -1744,17 +2133,17 @@ const {
     seller_getDashboard, seller_getUploadProductPage, seller_uploadProduct, seller_getManageProductsPage,
     seller_getEditProductPage, seller_updateProduct, seller_removeProduct, seller_getManageOrdersPage,
     seller_sendDirectDeliveryOtpBySeller, seller_confirmDirectDeliveryBySeller, seller_cancelOrderBySeller
-} = controllers; // <--- Make sure this points to the imported controllers object
-// ***** END CORRECTED DESTRUCTURING *****
+} = controllers; 
 
 const router = express.Router();
 
 // --- Public/Base Routes ---
-router.get('/', auth_getHomePage); // Home page showing approved products etc.
+router.get('/', auth_getHomePage); 
 
 
 // --- Auth Routes ---
 const authRouter = express.Router();
+// ... (Existing Auth Routes - no change)
 authRouter.get('/login', auth_getLoginPage);
 authRouter.get('/register', auth_getRegisterPage);
 authRouter.get('/verify-otp', auth_getVerifyOtpPage);
@@ -1772,24 +2161,25 @@ router.use('/auth', authRouter);
 
 // --- Product Routes (Public Facing) ---
 const productRouter = express.Router();
-productRouter.get('/suggestions', product_getProductSuggestions); // Before /:id
-productRouter.get('/', product_getProducts); // List/Search approved products
-productRouter.get('/:id', product_getProductDetails); // Show details (permission checked in controller)
-productRouter.post('/:id/rate', isAuthenticated, product_rateProduct); // Requires login
+// ... (Existing Product Routes - no change)
+productRouter.get('/suggestions', product_getProductSuggestions);
+productRouter.get('/', product_getProducts); 
+productRouter.get('/:id', product_getProductDetails); 
+productRouter.post('/:id/rate', isAuthenticated, product_rateProduct); 
 router.use('/products', productRouter);
 
 
 // --- User Routes (Authenticated) ---
 const userRouter = express.Router();
-// Pincode is technically public access but placed here for logical grouping
+// ... (Existing User Routes - no change)
 userRouter.get('/pincode-lookup/:pincode', user_lookupPincode);
-userRouter.use(isAuthenticated); // Protect subsequent user routes
-userRouter.get('/profile', user_getUserProfilePage); // <--- Should now work
+userRouter.use(isAuthenticated); 
+userRouter.get('/profile', user_getUserProfilePage); 
 userRouter.post('/profile/update-name', user_updateUserName);
 userRouter.post('/address/save', user_saveAddress);
 userRouter.get('/cart', user_getCart);
-userRouter.post('/cart/add', user_addToCart); // For forms
-userRouter.post('/cart/add-ajax', user_addToCartAjax); // For AJAX buttons
+userRouter.post('/cart/add', user_addToCart); 
+userRouter.post('/cart/add-ajax', user_addToCartAjax); 
 userRouter.post('/cart/update', user_updateCartQuantity);
 userRouter.post('/cart/remove/:productId', user_removeFromCart);
 userRouter.get('/checkout', user_getCheckoutPage);
@@ -1799,14 +2189,18 @@ router.use('/user', userRouter);
 // --- Order Routes (Authenticated) ---
 const orderRouter = express.Router();
 orderRouter.use(isAuthenticated);
-orderRouter.post('/place', order_placeOrder);
+orderRouter.post('/place-cod', order_placeCODOrder);
+orderRouter.post('/create-razorpay-order', order_createRazorpayOrderIntent); 
+orderRouter.post('/verify-razorpay-payment', order_verifyRazorpayPayment);
+orderRouter.post('/payment-failed/:internal_order_id', order_markPaymentFailed); // <<< NEW
 orderRouter.get('/my-orders', order_getMyOrders);
-orderRouter.post('/cancel/:id', order_cancelOrder); // User cancelling their own order
+orderRouter.post('/cancel/:id', order_cancelOrder); 
 router.use('/orders', orderRouter);
 
 
 // --- Admin Routes (Authenticated + Admin Role) ---
 const adminRouter = express.Router();
+// ... (Existing Admin Routes - no change)
 adminRouter.use(isAuthenticated, isAdmin);
 adminRouter.get('/dashboard', admin_getDashboard);
 adminRouter.get('/upload-product', admin_getUploadProductPage);
@@ -1816,9 +2210,9 @@ adminRouter.get('/manage-products/edit/:id', admin_getEditProductPage);
 adminRouter.post('/manage-products/update/:id', admin_updateProduct);
 adminRouter.post('/manage-products/remove/:id', admin_removeProduct);
 adminRouter.get('/manage-orders', admin_getManageOrdersPage);
-adminRouter.post('/orders/:orderId/send-direct-delivery-otp', admin_sendDirectDeliveryOtpByAdmin); // Calls the controller function
-adminRouter.post('/orders/:orderId/confirm-direct-delivery', admin_confirmDirectDeliveryByAdmin); // Calls the controller function
-adminRouter.post('/orders/:orderId/cancel', admin_cancelOrderByAdmin); // Calls the controller function
+adminRouter.post('/orders/:orderId/send-direct-delivery-otp', admin_sendDirectDeliveryOtpByAdmin); 
+adminRouter.post('/orders/:orderId/confirm-direct-delivery', admin_confirmDirectDeliveryByAdmin); 
+adminRouter.post('/orders/:orderId/cancel', admin_cancelOrderByAdmin); 
 adminRouter.get('/manage-users', admin_getManageUsersPage);
 adminRouter.post('/users/:id/update-role', admin_updateUserRole);
 adminRouter.post('/users/:id/remove', admin_removeUser);
@@ -1829,22 +2223,23 @@ router.use('/admin', adminRouter);
 
 // --- Seller Routes (Authenticated + Seller Role) ---
 const sellerRouter = express.Router();
+// ... (Existing Seller Routes - no change for most)
 sellerRouter.use(isAuthenticated, isSeller);
 sellerRouter.get('/dashboard', seller_getDashboard);
 sellerRouter.get('/products/upload', seller_getUploadProductPage);
 sellerRouter.post('/products/upload', seller_uploadProduct);
-sellerRouter.get('/products', seller_getManageProductsPage); // Lists only own products
-sellerRouter.get('/products/edit/:id', isProductOwner, seller_getEditProductPage); // Requires ownership
-sellerRouter.post('/products/update/:id', isProductOwner, seller_updateProduct); // Requires ownership
-sellerRouter.post('/products/remove/:id', isProductOwner, seller_removeProduct); // Requires ownership
-sellerRouter.get('/orders', seller_getManageOrdersPage); // List relevant orders
-sellerRouter.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, seller_sendDirectDeliveryOtpBySeller); // Calls controller func, requires relevance
-sellerRouter.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, seller_confirmDirectDeliveryBySeller); // Calls controller func, requires relevance
-sellerRouter.post('/orders/:orderId/cancel', isOrderRelevantToSeller, seller_cancelOrderBySeller); // Calls controller func, requires relevance
+sellerRouter.get('/products', seller_getManageProductsPage); 
+sellerRouter.get('/products/edit/:id', isProductOwner, seller_getEditProductPage); 
+sellerRouter.post('/products/update/:id', isProductOwner, seller_updateProduct); 
+sellerRouter.post('/products/remove/:id', isProductOwner, seller_removeProduct); 
+sellerRouter.get('/orders', seller_getManageOrdersPage); 
+sellerRouter.post('/orders/:orderId/send-otp', isOrderRelevantToSeller, seller_sendDirectDeliveryOtpBySeller); 
+sellerRouter.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, seller_confirmDirectDeliveryBySeller); 
+sellerRouter.post('/orders/:orderId/cancel', isOrderRelevantToSeller, seller_cancelOrderBySeller); 
 router.use('/seller', sellerRouter);
 
 
-module.exports = router; // Export the single consolidated router
+module.exports = router; 
 
 server.js :
 // server.js
@@ -1967,9 +2362,12 @@ services.js :
 const crypto = require('crypto');
 const axios = require('axios');
 const config = require('./config'); // Import the consolidated config
+const { razorpayInstance } = config; // <<< Destructure razorpayInstance
+
 
 // --- From services/emailTemplateService.js ---
 const generateEmailHtml = (options) => {
+    // ... (existing generateEmailHtml function - no changes needed here for now)
     const {
       recipientName = 'Valued Customer',
       subject = 'Notification',
@@ -1997,23 +2395,19 @@ const generateEmailHtml = (options) => {
       footerLink: `color: #007bff; text-decoration: none;`,
       preheader: `display: none !important; visibility: hidden; mso-hide: all; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;`,
     };
-
-    // Use String() for safety and sanitize inner HTML-like tags properly
      const bodyHtml = bodyLines
         .map(line => `<p style="${styles.paragraph}">${String(line).replace(/</g, "<").replace(/>/g, ">")}</p>`)
-        .map(line => line.replace(/&lt;strong&gt;/g, '<strong>').replace(/&lt;\/strong&gt;/g, '</strong>')
-                       .replace(/&lt;br&gt;/g, '<br>')
-                       .replace(/&lt;h3 style="(.*?)"&gt;/g, '<h3 style="$1">').replace(/&lt;\/h3&gt;/g, '</h3>')
-                       .replace(/&lt;ul style="(.*?)"&gt;/g, '<ul style="$1">').replace(/&lt;\/ul&gt;/g, '</ul>')
-                       .replace(/&lt;li style="(.*?)"&gt;/g, '<li style="$1">').replace(/&lt;\/li&gt;/g, '</li>')
-                       .replace(/&lt;a href="(.*?)"(.*?)&gt;/g, '<a href="$1"$2>').replace(/&lt;\/a&gt;/g, '</a>')
+        .map(line => line.replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>')
+                       .replace(/<br>/g, '<br>')
+                       .replace(/<h3 style="(.*?)">/g, '<h3 style="$1">').replace(/<\/h3>/g, '</h3>')
+                       .replace(/<ul style="(.*?)">/g, '<ul style="$1">').replace(/<\/ul>/g, '</ul>')
+                       .replace(/<li style="(.*?)">/g, '<li style="$1">').replace(/<\/li>/g, '</li>')
+                       .replace(/<a href="(.*?)"(.*?)>/g, '<a href="$1"$2>').replace(/<\/a>/g, '</a>')
          )
          .join('');
-
-
     let buttonHtml = '';
     if (buttonUrl && buttonText) {
-      const safeButtonUrl = String(buttonUrl).replace(/</g, "<").replace(/>/g, ">").startsWith('http') ? buttonUrl : '#'; // Sanitize and validate URL
+      const safeButtonUrl = String(buttonUrl).replace(/</g, "<").replace(/>/g, ">").startsWith('http') ? buttonUrl : '#';
       const safeButtonText = String(buttonText).replace(/</g, "<").replace(/>/g, ">");
       buttonHtml = `
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
@@ -2024,15 +2418,11 @@ const generateEmailHtml = (options) => {
           </tr>
         </table>`;
     }
-
-    // Sanitize simple text placeholders
     const safeSubject = String(subject).replace(/</g, "<");
     const safeCompanyName = String(companyName).replace(/</g, "<");
     const safeFooterText = String(footerText).replace(/</g, "<");
     const safeCompanyAddress = String(companyAddress).replace(/</g, "<");
     const safeGreeting = String(greeting).replace(/</g, "<");
-
-
     const html = `
   <!DOCTYPE html>
   <html lang="en">
@@ -2081,12 +2471,12 @@ const generateEmailHtml = (options) => {
     </center>
   </body>
   </html>`;
-
     return html;
-  };
+};
 
 // --- From services/geminiService.js ---
 const urlToGenerativePart = async (url) => {
+    // ... (existing urlToGenerativePart function)
     console.log(`Fetching image from: ${url}`);
     try {
         const response = await axios.get(url, {
@@ -2112,21 +2502,19 @@ const urlToGenerativePart = async (url) => {
          } else throw error;
     }
 };
-
 const reviewProductWithGemini = async (product) => {
-    const visionModel = config.visionModel; // Use from consolidated config
+    // ... (existing reviewProductWithGemini function)
+    const visionModel = config.visionModel;
     if (!visionModel) {
         console.log("Gemini Vision model not available. Skipping review, defaulting to 'pending'.");
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
     const { name, category, price, specifications, imageUrl, imageUrl2, shortDescription } = product;
     let imagePart, imagePart2 = null;
-
     try {
         imagePart = await urlToGenerativePart(imageUrl);
         if (!imagePart) throw new Error("Primary image processing failed.");
         console.log(`Prepared primary image for ${name} from ${imageUrl}`);
-
         if (imageUrl2) {
             try {
                 imagePart2 = await urlToGenerativePart(imageUrl2);
@@ -2134,36 +2522,30 @@ const reviewProductWithGemini = async (product) => {
                 console.log(`Prepared second image for ${name} from ${imageUrl2}`);
             } catch (image2Error) {
                 console.warn(`Could not process second image for "${name}" (${imageUrl2}): ${image2Error.message}.`);
-                // Rejecting if second image fails IS an option, but currently skipped:
-                // return { status: 'rejected', reason: `Second Image Error: ${image2Error.message}` };
             }
         }
     } catch (imageError) {
         console.error(`Critical image processing error for "${name}": ${imageError.message}`);
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
-
     const textPrompt = `
         Analyze the following product details AND the provided image(s) for an e-commerce store. Act as a strict content moderator.
         Instructions: Examine IMAGE(s) and TEXT. Verify if image(s) VISUALLY MATCH text description (name, category, short desc). Check BOTH image(s) and text for explicit content, weapons (unless category 'Toys' and clearly stated), illegal items, hate symbols/speech, unsafe content. Check if text details are legitimate (sensible name/desc, reasonable price for category, category matches image). SAFETY IS PARAMOUNT: If unsure, lean towards REJECTION. Use ONLY the required response format.
         Product Details: Name: ${name}, Category: ${category}, Short Desc: ${shortDescription || 'N/A'}, Price: ₹${price?.toFixed(2) || 'N/A'}, Specs: ${specifications || 'N/A'}, Image1: ${imageUrl}, Image2: ${imageUrl2 || 'N/A'}.
         Analysis Task: Based on text AND image(s), respond with "APPROVE" if legitimate, safe, matches description. Respond with "REJECT: [BRIEF REASON]" if ANY issues (safety violation, mismatch, misleading text, nonsensical entry/price).
         Your response:`;
-
     const textPart = { text: textPrompt };
     const contentParts = [textPart, imagePart];
     if (imagePart2) {
         contentParts.push(imagePart2);
     }
-
     try {
         console.log(`Sending "${name}" (${imagePart2 ? '2 images' : '1 image'}) for Gemini Vision review...`);
         const result = await visionModel.generateContent(
             contentParts,
-            { safetySettings: config.geminiSafetySettings } // Use from consolidated config
+            { safetySettings: config.geminiSafetySettings }
         );
         const response = result?.response;
-
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            console.warn(`Gemini review blocked for "${name}". Reason: ${blockReason}.`);
@@ -2171,7 +2553,6 @@ const reviewProductWithGemini = async (product) => {
         }
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Raw Response for "${name}": ${reviewText}`);
-
         if (reviewText.startsWith('APPROVE')) {
             console.log(`Gemini Vision approved: ${name}`);
             return { status: 'approved', reason: null };
@@ -2195,8 +2576,10 @@ const reviewProductWithGemini = async (product) => {
     }
 };
 
+
 // --- From services/otpService.js ---
 const generateOTP = (length = 6) => {
+  // ... (existing generateOTP function)
   if (length <= 0) throw new Error('OTP length must be positive');
   const chars = '0123456789';
   let otp = '';
@@ -2211,12 +2594,50 @@ const setOTPExpiration = (minutes = 10) => {
   return new Date(Date.now() + minutes * 60 * 1000);
 };
 
+// --- Razorpay Service Functions --- // <<< ADDED
+const createRazorpayOrder = async (amountInPaise, receiptId, notes = {}) => {
+    if (!razorpayInstance) {
+        throw new Error("Razorpay not initialized. Check API keys.");
+    }
+    const options = {
+        amount: amountInPaise, // amount in the smallest currency unit (e.g., 50000 for ₹500.00)
+        currency: "INR",
+        receipt: receiptId, // Your internal order ID or a unique receipt string
+        notes: notes // Optional notes object
+    };
+    try {
+        const order = await razorpayInstance.orders.create(options);
+        console.log("Razorpay order created:", order.id);
+        return order; // Contains order_id, amount, currency etc.
+    } catch (error) {
+        console.error("Error creating Razorpay order:", error);
+        throw error;
+    }
+};
+
+const verifyRazorpayPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+        console.error("RAZORPAY_KEY_SECRET not found for verification.");
+        return false;
+    }
+    const body = razorpayOrderId + "|" + razorpayPaymentId;
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(body.toString())
+        .digest('hex');
+    
+    return expectedSignature === razorpaySignature;
+};
+
+
 // --- Consolidated Exports ---
 module.exports = {
     generateEmailHtml,
     reviewProductWithGemini,
     generateOTP,
     setOTPExpiration,
+    createRazorpayOrder, // <<< ADDED
+    verifyRazorpayPayment // <<< ADDED
 };
 
 vercel.json :
@@ -6033,25 +6454,23 @@ views/auth/reset-password.ejs :
     <h1>Reset Password</h1>
     <p>Enter your new password below.</p>
 
-    <form action="/auth/reset-password/<%= token %>" method="POST" class="auth-form">
+    <form action="/auth/reset-password/<%= token %>" method="POST" class="auth-form form-submit-spinner"> <%# Added form-submit-spinner %>
         <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">New Password:</label>
              <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder, title, added helper text --- %>
                 <input type="password" id="password" name="password" placeholder="Enter new password" minlength="8" required title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
                  <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
-             <%# --- ADDED: Helper Text --- %>
+            <%# --- ADDED: Helper Text --- %>
             <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
         </div>
         
         <div class="form-group">
             <label for="confirmPassword">Confirm New Password:</label>
              <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder --- %>
                 <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm new password" minlength="8" required>
                  <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
@@ -7270,6 +7689,9 @@ views/user/checkout.ejs :
 <%# views/user/checkout.ejs %>
 <%- include('../partials/header', { title: 'Checkout' }) %>
 
+<%# --- ADD RAZORPAY CHECKOUT SCRIPT --- %>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
 <div class="checkout-container">
     <h1>Checkout</h1>
 
@@ -7282,13 +7704,9 @@ views/user/checkout.ejs :
                     <p class="mb-1"><strong><%= userAddress.name %></strong></p>
                     <p class="mb-1"><%= userAddress.phone %></p>
                     <p class="mb-1">
-                        <%# Display House/Area first %>
                         <%= userAddress.cityVillage ? userAddress.cityVillage + ', ' : '' %>
-                        <%# Landmark Optional %>
                         <%= userAddress.landmarkNearby ? userAddress.landmarkNearby + ', ' : '' %>
-                        <%# Locality %>
                         <%= userAddress.locality ? userAddress.locality + ', ' : '' %>
-                        <%# Derived Fields %>
                         <%= userAddress.mandal ? userAddress.mandal + ', ' : '' %>
                         <%= userAddress.district ? userAddress.district + ', ' : '' %>
                         <%= userAddress.state ? userAddress.state + ' - ' : '' %>
@@ -7296,7 +7714,6 @@ views/user/checkout.ejs :
                     </p>
                     <button type="button" id="edit-address-btn" class="btn btn-secondary btn-sm mt-2">Edit Address</button>
                 <% } else { %>
-                    <%# This part is less likely needed if checkout requires address, but keep for robustness %>
                     <p class="text-muted">No address found. Please add one below.</p>
                 <% } %>
             </div>
@@ -7305,50 +7722,27 @@ views/user/checkout.ejs :
             <form action="/user/address/save" method="POST" id="address-form" class="address-form <%= (userAddress && userAddress.name) ? 'hidden' : '' %> form-submit-spinner">
                  <h3 class="h5"><%= (userAddress && userAddress.name) ? 'Edit Address' : 'Add Shipping Address' %></h3>
                  <input type="hidden" name="source" value="checkout">
-
                  <div class="form-group">
                      <label for="checkout-name-addr" class="form-label small">Full Name:</label>
-                     <%# Added Placeholder %>
                      <input type="text" id="checkout-name-addr" name="name" class="form-control" value="<%= addressFormData?.name || userAddress?.name || '' %>" placeholder="Enter full name" required autocomplete="name">
                  </div>
                  <div class="form-group">
                      <label for="checkout-phone" class="form-label small">Phone Number:</label>
-                     <%# Added Placeholder %>
                      <input type="tel" id="checkout-phone" name="phone" class="form-control" value="<%= addressFormData?.phone || userAddress?.phone || '' %>" placeholder="10-digit mobile number" required pattern="\d{10,15}" minlength="10" maxlength="15" title="Enter 10 to 15 digit phone number" autocomplete="tel">
                  </div>
                  <div class="form-group">
                     <label for="checkout-pincode" class="form-label small">Pincode:</label>
-                    <%# Added Placeholder %>
-                    <input type="text"
-                           id="checkout-pincode"
-                           name="pincode"
-                           class="form-control pincode-input"
-                           data-target-prefix="checkout"
-                           value="<%= addressFormData?.pincode || userAddress?.pincode || '' %>"
-                           placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric"
-                           title="Enter 6-digit Pincode" autocomplete="postal-code">
+                    <input type="text" id="checkout-pincode" name="pincode" class="form-control pincode-input" data-target-prefix="checkout" value="<%= addressFormData?.pincode || userAddress?.pincode || '' %>" placeholder="6-digit Pincode" required pattern="\d{6}" maxlength="6" inputmode="numeric" title="Enter 6-digit Pincode" autocomplete="postal-code">
                     <small class="pincode-status text-muted"></small>
                 </div>
-
-                <%# --- Locality Dropdown --- %>
                 <div class="form-group">
                     <label for="checkout-locality" class="form-label small">Locality / Post Office:</label>
-                    <select id="checkout-locality"
-                            name="locality"
-                            class="form-control"
-                            required
-                            disabled
-                            data-saved-value="<%= addressFormData?.locality || userAddress?.locality || '' %>">
+                    <select id="checkout-locality" name="locality" class="form-control" required disabled data-saved-value="<%= addressFormData?.locality || userAddress?.locality || '' %>">
                         <option value="" selected disabled>Enter Pincode First</option>
-                        <%# Options will be populated by JavaScript %>
                     </select>
                     <small class="locality-status text-muted"></small>
                 </div>
-                <%# --- End: Locality Dropdown --- %>
-
-                <%# Auto-filled Fields Container %>
-                <div class="auto-filled-fields-container mb-2" id="checkout-auto-filled-fields"
-                     style="<%= (addressFormData?.state || userAddress?.state) ? 'display: block;' : 'display: none;' %>">
+                <div class="auto-filled-fields-container mb-2" id="checkout-auto-filled-fields" style="<%= (addressFormData?.state || userAddress?.state) ? 'display: block;' : 'display: none;' %>">
                     <div class="form-group">
                        <label for="checkout-mandal" class="form-label small">Mandal / Taluk:</label>
                        <input type="text" id="checkout-mandal" class="form-control auto-filled-field" value="<%= addressFormData?.mandal || userAddress?.mandal || '' %>" readonly tabindex="-1">
@@ -7362,20 +7756,15 @@ views/user/checkout.ejs :
                        <input type="text" id="checkout-state" class="form-control auto-filled-field" value="<%= addressFormData?.state || userAddress?.state || '' %>" readonly tabindex="-1">
                    </div>
                 </div>
-
-                <%# Hidden Inputs to Submit Derived Data %>
                 <input type="hidden" id="checkout-mandal-hidden" name="mandal" value="<%= addressFormData?.mandal || userAddress?.mandal || '' %>">
                 <input type="hidden" id="checkout-district-hidden" name="district" value="<%= addressFormData?.district || userAddress?.district || '' %>">
                 <input type="hidden" id="checkout-state-hidden" name="state" value="<%= addressFormData?.state || userAddress?.state || '' %>">
-
                 <div class="form-group">
                     <label for="checkout-cityVillage" class="form-label small">House No. / Building / Area:</label>
-                    <%# Added Placeholder %>
                     <input type="text" id="checkout-cityVillage" name="cityVillage" class="form-control" value="<%= addressFormData?.cityVillage || userAddress?.cityVillage || '' %>" required autocomplete="address-line1" placeholder="E.g., #123, Green Apartments">
                 </div>
                  <div class="form-group">
                     <label for="checkout-landmarkNearby" class="form-label small">Landmark (Optional):</label>
-                    <%# Added Placeholder %>
                     <input type="text" id="checkout-landmarkNearby" name="landmarkNearby" class="form-control" value="<%= addressFormData?.landmarkNearby || userAddress?.landmarkNearby || '' %>" autocomplete="address-line2" placeholder="E.g., Near City Hospital">
                  </div>
                 <button type="submit" class="btn btn-primary me-2">Save Address</button>
@@ -7403,30 +7792,241 @@ views/user/checkout.ejs :
                 <p>Subtotal: <span>₹<%= subTotal.toFixed(2) %></span></p>
                  <p>Shipping: <span>FREE</span></p>
                 <hr>
-                 <p><strong>Total: <span>₹<%= totalAmount.toFixed(2) %></span></strong></p>
+                 <p><strong>Total: <span id="checkout-total-amount-display">₹<%= totalAmount.toFixed(2) %></span></strong></p> 
             </div>
 
             <div class="checkout-payment">
                 <h3>Payment Method</h3>
-                 <div class="payment-option selected">
-                     <input type="radio" id="cod" name="paymentMethodValue" value="COD" checked disabled>
-                     <label for="cod"><i class="fas fa-money-bill-wave"></i> Cash on Delivery (COD)</label>
+                 <div class="payment-option"> 
+                     <input type="radio" id="cod_payment" name="paymentMethod" value="COD" checked>
+                     <label for="cod_payment"><i class="fas fa-money-bill-wave"></i> Cash on Delivery (COD)</label>
                  </div>
+                 <% if (RAZORPAY_KEY_ID) { %> 
+                 <div class="payment-option">
+                    <input type="radio" id="razorpay_payment" name="paymentMethod" value="Razorpay">
+                    <label for="razorpay_payment"><i class="fas fa-credit-card"></i> Online Payment (UPI, Cards, etc.)</label>
+                </div>
+                <% } else { %>
+                    <p class="text-muted small mt-2">Online payment is currently unavailable.</p>
+                <% } %>
             </div>
+            
+            <button type="button" id="btn-place-order" class="btn btn-success btn-block btn-place-order mt-3 form-submit-spinner"
+                <%= (!userAddress || !userAddress.name) && !addressFormData ? 'disabled' : '' %>
+                data-loading-text="<i class='fas fa-spinner fa-spin'></i> Processing..."
+            >
+                Place Order
+            </button>
+            <p id="place-order-error" class="text-danger small mt-1 hidden"></p>
 
-            <form action="/orders/place" method="POST" class="place-order-form form-submit-spinner">
-                 <input type="hidden" name="paymentMethod" value="COD">
-                 <%# Check for existing user address OR addressFormData (if redirected after error) %>
-                 <button type="submit" class="btn btn-success btn-block btn-place-order" <%= (!userAddress || !userAddress.name) && !addressFormData ? 'disabled' : '' %>>
-                    Place Order
-                 </button>
-                 <% if ((!userAddress || !userAddress.name) && !addressFormData) { %>
-                    <p class="text-danger small mt-1">Please add/save your shipping address first.</p>
-                 <% } %>
-             </form>
+            <% if ((!userAddress || !userAddress.name) && !addressFormData) { %>
+                <p class="text-danger small mt-1">Please add/save your shipping address first.</p>
+            <% } %>
          </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const placeOrderBtn = document.getElementById('btn-place-order');
+    const placeOrderErrorP = document.getElementById('place-order-error');
+    const originalButtonHtml = placeOrderBtn ? placeOrderBtn.innerHTML : 'Place Order';
+    const loadingButtonHtml = placeOrderBtn ? placeOrderBtn.dataset.loadingText : '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+    if (placeOrderBtn) {
+        placeOrderBtn.addEventListener('click', async () => {
+            const selectedPaymentMethod = document.querySelector('input[name="paymentMethod"]:checked');
+            if (!selectedPaymentMethod) {
+                placeOrderErrorP.textContent = 'Please select a payment method.';
+                placeOrderErrorP.classList.remove('hidden');
+                return;
+            }
+            placeOrderErrorP.classList.add('hidden');
+            placeOrderBtn.disabled = true;
+            placeOrderBtn.innerHTML = loadingButtonHtml;
+
+            if (selectedPaymentMethod.value === 'COD') {
+                const codForm = document.createElement('form');
+                codForm.method = 'POST';
+                codForm.action = '/orders/place-cod'; 
+                document.body.appendChild(codForm);
+                codForm.submit();
+            } else if (selectedPaymentMethod.value === 'Razorpay') {
+                let internalOrderIdForRzp; // To store internal order ID for use in failure/dismissal
+                try {
+                    const response = await fetch('/orders/create-razorpay-order', { method: 'POST' });
+                    const data = await response.json();
+
+                    if (!response.ok || !data.success) {
+                        throw new Error(data.message || `Failed to initiate payment (Status: ${response.status})`);
+                    }
+                    
+                    internalOrderIdForRzp = data.orderId; // Store for later use
+
+                    const options = {
+                        key: data.keyId,
+                        amount: data.amount, 
+                        currency: data.currency,
+                        name: "miniapp", 
+                        description: `Order #${data.orderId}`,
+                        order_id: data.razorpayOrderId,
+                        handler: async function (razorpayResponse) {
+                            placeOrderBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+                            try {
+                                const verifyResponse = await fetch('/orders/verify-razorpay-payment', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                                        razorpay_order_id: razorpayResponse.razorpay_order_id,
+                                        razorpay_signature: razorpayResponse.razorpay_signature,
+                                        internal_order_id: data.orderId 
+                                    })
+                                });
+                                const verifyData = await verifyResponse.json();
+                                if (verifyResponse.ok && verifyData.success) {
+                                    window.location.href = `/orders/my-orders?payment=success&order_id=${verifyData.orderId || data.orderId}`;
+                                } else {
+                                    throw new Error(verifyData.message || "Payment verification failed.");
+                                }
+                            } catch (verifyError) {
+                                console.error("Razorpay verification error:", verifyError);
+                                placeOrderErrorP.textContent = `Payment verification failed: ${verifyError.message}. Please contact support.`;
+                                placeOrderErrorP.classList.remove('hidden');
+                                placeOrderBtn.disabled = false;
+                                placeOrderBtn.innerHTML = originalButtonHtml;
+                            }
+                        },
+                        prefill: {
+                            name: data.userName,
+                            email: data.userEmail,
+                            contact: data.userPhone
+                        },
+                        notes: {
+                            internal_order_id: data.orderId // For easier reference in Razorpay dashboard
+                        },
+                        theme: {
+                            color: "#007bff" 
+                        },
+                        modal: {
+                            ondismiss: function(){
+                                console.log('Checkout form closed by user for order:', internalOrderIdForRzp);
+                                placeOrderErrorP.textContent = 'Payment cancelled. You can try again or select COD.';
+                                placeOrderErrorP.classList.remove('hidden');
+                                placeOrderBtn.disabled = false;
+                                placeOrderBtn.innerHTML = originalButtonHtml;
+                                // No backend call on dismiss here, order remains 'PaymentPending'
+                                // User can attempt to cancel it from "My Orders" or admin can clean it up.
+                            }
+                        }
+                    };
+                    const rzp1 = new Razorpay(options);
+                    rzp1.on('payment.failed', async function (response){ // Made async
+                        console.error("Razorpay payment failed on client:", response.error);
+                        let readableError = `Payment Failed.`;
+                        if (response.error.description) readableError += ` ${response.error.description}`;
+                        if (response.error.reason) readableError += ` (Reason: ${response.error.reason})`;
+
+                        placeOrderErrorP.textContent = readableError;
+                        placeOrderErrorP.classList.remove('hidden');
+                        
+                        // Update internal order to PaymentFailed via backend
+                        if (internalOrderIdForRzp) {
+                            try {
+                                const failResponse = await fetch(`/orders/payment-failed/${internalOrderIdForRzp}`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                        razorpay_payment_id: response.error?.metadata?.payment_id,
+                                        razorpay_order_id: response.error?.metadata?.order_id,
+                                        reason: `Client-side failure: ${response.error.description || response.error.reason || 'Unknown'}`
+                                    })
+                                });
+                                const failData = await failResponse.json();
+                                if (failResponse.ok && failData.success) {
+                                    console.log(`Order ${internalOrderIdForRzp} marked as PaymentFailed via backend.`);
+                                } else {
+                                    console.error("Failed to mark order as PaymentFailed via backend:", failData.message);
+                                }
+                            } catch (backendFailError) {
+                                console.error("Error calling backend to mark PaymentFailed:", backendFailError);
+                            }
+                        }
+
+                        placeOrderBtn.disabled = false;
+                        placeOrderBtn.innerHTML = originalButtonHtml;
+                    });
+                    rzp1.open();
+
+                } catch (error) {
+                    console.error("Razorpay order creation error:", error);
+                    placeOrderErrorP.textContent = `Error: ${error.message}. Please try COD or contact support.`;
+                    placeOrderErrorP.classList.remove('hidden');
+                    placeOrderBtn.disabled = false;
+                    placeOrderBtn.innerHTML = originalButtonHtml;
+                }
+            }
+        });
+    }
+
+    // Handle address form validation enabling/disabling place order button
+    const addressForm = document.getElementById('address-form');
+    if (addressForm) {
+        const inputs = addressForm.querySelectorAll('input[required], select[required]');
+        const checkFormValidityAndToggleButton = () => {
+            if (placeOrderBtn) {
+                const isFormVisible = !addressForm.classList.contains('hidden');
+                const isSavedAddressVisible = document.querySelector('.saved-address:not(.hidden)') !== null;
+                let allValid = true;
+                if (isFormVisible) {
+                     inputs.forEach(input => { if (!input.value.trim()) allValid = false; });
+                }
+                // Enable if saved address is visible OR form is visible and valid.
+                // Disable if form is visible and not valid.
+                if (isSavedAddressVisible) {
+                    placeOrderBtn.disabled = false;
+                } else if (isFormVisible && allValid) {
+                     placeOrderBtn.disabled = false;
+                } else if (isFormVisible && !allValid) {
+                    placeOrderBtn.disabled = true;
+                }
+                // If neither saved address nor form is visible (initial state with no address)
+                // it might be already disabled by EJS - this primarily handles dynamic changes.
+            }
+        };
+
+        inputs.forEach(input => {
+            input.addEventListener('input', checkFormValidityAndToggleButton);
+            input.addEventListener('change', checkFormValidityAndToggleButton); // For select
+        });
+
+        // Check on initial load (after JS fills pincode potentially)
+        // Ensure this check runs *after* any potential auto-population of address from pincode
+        const pincodeInput = document.getElementById('checkout-pincode');
+        const localitySelect = document.getElementById('checkout-locality');
+
+        const observer = new MutationObserver((mutationsList, obs) => {
+            for(const mutation of mutationsList) {
+                if (mutation.type === 'childList' || mutation.type === 'attributes') {
+                    // Specifically check if locality has a value after population or form fields change
+                    if (localitySelect && localitySelect.value !== "") {
+                         checkFormValidityAndToggleButton();
+                    }
+                }
+            }
+        });
+        if(pincodeInput) observer.observe(pincodeInput.closest('.checkout-address'), { childList: true, subtree: true, attributes: true });
+
+
+        // Trigger initial check if address form is initially visible & filled by server
+        if (!addressForm.classList.contains('hidden') && document.getElementById('checkout-name-addr').value) {
+            checkFormValidityAndToggleButton();
+        } else if (document.querySelector('.saved-address:not(.hidden)')) { // If saved address visible
+             if(placeOrderBtn) placeOrderBtn.disabled = false;
+        }
+    }
+});
+</script>
 
 <%- include('../partials/footer') %>
 
@@ -7437,10 +8037,19 @@ views/user/my-orders.ejs :
 <div class="my-orders-container">
     <h1>My Orders</h1>
 
+    <%# --- MODIFIED: Use local variables 'paymentStatus' and 'processedOrderId' --- %>
+    <% if (typeof paymentStatus !== 'undefined' && paymentStatus === 'success' && typeof processedOrderId !== 'undefined' && processedOrderId) { %>
+      <div class="alert alert-success" role="alert">
+        Payment successful! Your order #<%= processedOrderId %> has been placed.
+      </div>
+    <% } %>
+    <%# --- END MODIFICATION --- %>
+
+
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
-                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %> mb-3"> <%# Add mb-3 for spacing %>
+                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %> mb-3">
                      <div class="order-header">
                          <div><strong>Order ID:</strong><br><%= order._id %></div>
                          <div><strong>Placed on:</strong><br><%= formatDateIST(order.orderDate) %></div>
@@ -7448,51 +8057,38 @@ views/user/my-orders.ejs :
                          <div><strong>Status:</strong><br><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
-                         <%# Simplified item display (text) %>
                          <p class="mb-1"><strong>Items:</strong></p>
                          <div class="order-items-list mb-2">
                             <% order.products.forEach((item, index) => { %>
                                 <small><%= item.name || '[Product Name Missing]' %> (Qty: <%= item.quantity %>) <% if(index < order.products.length - 1) { %> | <% } %></small>
                             <% }) %>
                          </div>
-
-                         <%# --- NEW: Display Product Images --- %>
                          <div class="order-items-images mt-2">
                             <% order.products.forEach(item => { %>
-                                <%# Check if product was populated and has necessary info %>
                                 <% if (item.productId && item.productId._id && item.imageUrl) { %>
                                     <a href="/products/<%= item.productId._id %>" title="View <%= item.name || 'Product' %>">
-                                        <img src="<%= item.imageUrl %>"
-                                             alt="<%= item.name || 'Product Image' %>"
-                                             class="order-item-thumbnail">
+                                        <img src="<%= item.imageUrl %>" alt="<%= item.name || 'Product Image' %>" class="order-item-thumbnail">
                                     </a>
                                 <% } else if (item.productId && item.productId._id) { %>
-                                    <%# Fallback if image URL is missing but product exists %>
                                     <a href="/products/<%= item.productId._id %>" class="order-item-thumbnail-placeholder" title="View <%= item.name || 'Product' %>">[No Img]</a>
                                 <% } else { %>
-                                    <%# Very basic fallback if productId is missing entirely %>
                                     <span class="order-item-thumbnail-placeholder">[Item NA]</span>
                                 <% } %>
                             <% }) %>
                          </div>
-                         <%# --- End: Display Product Images --- %>
-
-                        <div class="order-details mt-3"> <%# Add margin-top for spacing %>
+                        <div class="order-details mt-3">
                              <p class="mb-1"><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
                              <% if (order.status === 'Delivered' && order.receivedByDate) { %>
                                 <p class="text-success mb-1"><small><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></small></p>
                               <% } %>
-                              <%# Display cancellation reason if present %>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger mb-1"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
-
-                              <%# Display Delivery OTP for Customer %>
                               <% if (order.showDeliveryOtp) { %>
                                 <div class="delivery-otp-display mt-2 p-2 border rounded bg-light">
                                     <p class="mb-1">
                                         <strong>Delivery OTP:</strong>
-                                        <strong class="delivery-otp-code ms-1"><%= order.orderOTP %></strong> <%# Display full OTP %>
+                                        <strong class="delivery-otp-code ms-1"><%= order.orderOTP %></strong>
                                     </p>
                                     <small class="text-muted d-block">Provide this code to the delivery person (Seller/Admin).</small>
                                     <% if (order.orderOTPExpires) { %>
@@ -7500,10 +8096,15 @@ views/user/my-orders.ejs :
                                     <% } %>
                                 </div>
                               <% } %>
-                              <%# End: Display Delivery OTP %>
+                              <% if (order.status === 'PaymentFailed') { %>
+                                 <p class="text-danger mb-1"><small><strong>Payment failed. Please try again or contact support.</strong></small></p>
+                              <% } %>
+                              <% if (order.status === 'PaymentPending') { %>
+                                 <p class="text-warning mb-1"><small><strong>Awaiting payment confirmation. If you have already paid, please wait a few minutes. You can also <a href="/user/checkout" class="alert-link">try placing the order again.</a></strong></small></p>
+                              <% } %>
                          </div>
                     </div>
-                     <div class="order-actions text-end p-2 border-top"> <%# Adjusted padding/border %>
+                     <div class="order-actions text-end p-2 border-top">
                         <% if (order.isCancellable) { %>
                             <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner d-inline-block">
                                 <button type="submit" class="btn btn-danger btn-sm">Cancel Order</button>
@@ -7518,6 +8119,8 @@ views/user/my-orders.ejs :
                               <small class="text-success">Order Completed.</small>
                          <% } else if (order.status === 'Cancelled') { %>
                               <small class="text-danger">Order Cancelled.</small>
+                         <% } else if (order.status === 'PaymentFailed' || order.status === 'PaymentPending') { %>
+                            <%# No specific action text here as cancel is handled by isCancellable %>
                          <% } %>
                      </div>
                 </div>

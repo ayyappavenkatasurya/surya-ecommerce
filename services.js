@@ -2,9 +2,12 @@
 const crypto = require('crypto');
 const axios = require('axios');
 const config = require('./config'); // Import the consolidated config
+const { razorpayInstance } = config; // <<< Destructure razorpayInstance
+
 
 // --- From services/emailTemplateService.js ---
 const generateEmailHtml = (options) => {
+    // ... (existing generateEmailHtml function - no changes needed here for now)
     const {
       recipientName = 'Valued Customer',
       subject = 'Notification',
@@ -32,23 +35,19 @@ const generateEmailHtml = (options) => {
       footerLink: `color: #007bff; text-decoration: none;`,
       preheader: `display: none !important; visibility: hidden; mso-hide: all; font-size: 1px; color: #ffffff; line-height: 1px; max-height: 0px; max-width: 0px; opacity: 0; overflow: hidden;`,
     };
-
-    // Use String() for safety and sanitize inner HTML-like tags properly
      const bodyHtml = bodyLines
         .map(line => `<p style="${styles.paragraph}">${String(line).replace(/</g, "<").replace(/>/g, ">")}</p>`)
-        .map(line => line.replace(/&lt;strong&gt;/g, '<strong>').replace(/&lt;\/strong&gt;/g, '</strong>')
-                       .replace(/&lt;br&gt;/g, '<br>')
-                       .replace(/&lt;h3 style="(.*?)"&gt;/g, '<h3 style="$1">').replace(/&lt;\/h3&gt;/g, '</h3>')
-                       .replace(/&lt;ul style="(.*?)"&gt;/g, '<ul style="$1">').replace(/&lt;\/ul&gt;/g, '</ul>')
-                       .replace(/&lt;li style="(.*?)"&gt;/g, '<li style="$1">').replace(/&lt;\/li&gt;/g, '</li>')
-                       .replace(/&lt;a href="(.*?)"(.*?)&gt;/g, '<a href="$1"$2>').replace(/&lt;\/a&gt;/g, '</a>')
+        .map(line => line.replace(/<strong>/g, '<strong>').replace(/<\/strong>/g, '</strong>')
+                       .replace(/<br>/g, '<br>')
+                       .replace(/<h3 style="(.*?)">/g, '<h3 style="$1">').replace(/<\/h3>/g, '</h3>')
+                       .replace(/<ul style="(.*?)">/g, '<ul style="$1">').replace(/<\/ul>/g, '</ul>')
+                       .replace(/<li style="(.*?)">/g, '<li style="$1">').replace(/<\/li>/g, '</li>')
+                       .replace(/<a href="(.*?)"(.*?)>/g, '<a href="$1"$2>').replace(/<\/a>/g, '</a>')
          )
          .join('');
-
-
     let buttonHtml = '';
     if (buttonUrl && buttonText) {
-      const safeButtonUrl = String(buttonUrl).replace(/</g, "<").replace(/>/g, ">").startsWith('http') ? buttonUrl : '#'; // Sanitize and validate URL
+      const safeButtonUrl = String(buttonUrl).replace(/</g, "<").replace(/>/g, ">").startsWith('http') ? buttonUrl : '#';
       const safeButtonText = String(buttonText).replace(/</g, "<").replace(/>/g, ">");
       buttonHtml = `
         <table border="0" cellpadding="0" cellspacing="0" width="100%">
@@ -59,15 +58,11 @@ const generateEmailHtml = (options) => {
           </tr>
         </table>`;
     }
-
-    // Sanitize simple text placeholders
     const safeSubject = String(subject).replace(/</g, "<");
     const safeCompanyName = String(companyName).replace(/</g, "<");
     const safeFooterText = String(footerText).replace(/</g, "<");
     const safeCompanyAddress = String(companyAddress).replace(/</g, "<");
     const safeGreeting = String(greeting).replace(/</g, "<");
-
-
     const html = `
   <!DOCTYPE html>
   <html lang="en">
@@ -116,12 +111,12 @@ const generateEmailHtml = (options) => {
     </center>
   </body>
   </html>`;
-
     return html;
-  };
+};
 
 // --- From services/geminiService.js ---
 const urlToGenerativePart = async (url) => {
+    // ... (existing urlToGenerativePart function)
     console.log(`Fetching image from: ${url}`);
     try {
         const response = await axios.get(url, {
@@ -147,21 +142,19 @@ const urlToGenerativePart = async (url) => {
          } else throw error;
     }
 };
-
 const reviewProductWithGemini = async (product) => {
-    const visionModel = config.visionModel; // Use from consolidated config
+    // ... (existing reviewProductWithGemini function)
+    const visionModel = config.visionModel;
     if (!visionModel) {
         console.log("Gemini Vision model not available. Skipping review, defaulting to 'pending'.");
         return { status: 'pending', reason: 'Gemini Vision service unavailable' };
     }
     const { name, category, price, specifications, imageUrl, imageUrl2, shortDescription } = product;
     let imagePart, imagePart2 = null;
-
     try {
         imagePart = await urlToGenerativePart(imageUrl);
         if (!imagePart) throw new Error("Primary image processing failed.");
         console.log(`Prepared primary image for ${name} from ${imageUrl}`);
-
         if (imageUrl2) {
             try {
                 imagePart2 = await urlToGenerativePart(imageUrl2);
@@ -169,36 +162,30 @@ const reviewProductWithGemini = async (product) => {
                 console.log(`Prepared second image for ${name} from ${imageUrl2}`);
             } catch (image2Error) {
                 console.warn(`Could not process second image for "${name}" (${imageUrl2}): ${image2Error.message}.`);
-                // Rejecting if second image fails IS an option, but currently skipped:
-                // return { status: 'rejected', reason: `Second Image Error: ${image2Error.message}` };
             }
         }
     } catch (imageError) {
         console.error(`Critical image processing error for "${name}": ${imageError.message}`);
         return { status: 'rejected', reason: `Image Error: ${imageError.message}` };
     }
-
     const textPrompt = `
         Analyze the following product details AND the provided image(s) for an e-commerce store. Act as a strict content moderator.
         Instructions: Examine IMAGE(s) and TEXT. Verify if image(s) VISUALLY MATCH text description (name, category, short desc). Check BOTH image(s) and text for explicit content, weapons (unless category 'Toys' and clearly stated), illegal items, hate symbols/speech, unsafe content. Check if text details are legitimate (sensible name/desc, reasonable price for category, category matches image). SAFETY IS PARAMOUNT: If unsure, lean towards REJECTION. Use ONLY the required response format.
         Product Details: Name: ${name}, Category: ${category}, Short Desc: ${shortDescription || 'N/A'}, Price: ₹${price?.toFixed(2) || 'N/A'}, Specs: ${specifications || 'N/A'}, Image1: ${imageUrl}, Image2: ${imageUrl2 || 'N/A'}.
         Analysis Task: Based on text AND image(s), respond with "APPROVE" if legitimate, safe, matches description. Respond with "REJECT: [BRIEF REASON]" if ANY issues (safety violation, mismatch, misleading text, nonsensical entry/price).
         Your response:`;
-
     const textPart = { text: textPrompt };
     const contentParts = [textPart, imagePart];
     if (imagePart2) {
         contentParts.push(imagePart2);
     }
-
     try {
         console.log(`Sending "${name}" (${imagePart2 ? '2 images' : '1 image'}) for Gemini Vision review...`);
         const result = await visionModel.generateContent(
             contentParts,
-            { safetySettings: config.geminiSafetySettings } // Use from consolidated config
+            { safetySettings: config.geminiSafetySettings }
         );
         const response = result?.response;
-
         if (!response || response.promptFeedback?.blockReason) {
            const blockReason = response?.promptFeedback?.blockReason || 'Unknown safety reason';
            console.warn(`Gemini review blocked for "${name}". Reason: ${blockReason}.`);
@@ -206,7 +193,6 @@ const reviewProductWithGemini = async (product) => {
         }
         const reviewText = response?.text()?.trim().toUpperCase() || '';
         console.log(`Gemini Vision Raw Response for "${name}": ${reviewText}`);
-
         if (reviewText.startsWith('APPROVE')) {
             console.log(`Gemini Vision approved: ${name}`);
             return { status: 'approved', reason: null };
@@ -230,8 +216,10 @@ const reviewProductWithGemini = async (product) => {
     }
 };
 
+
 // --- From services/otpService.js ---
 const generateOTP = (length = 6) => {
+  // ... (existing generateOTP function)
   if (length <= 0) throw new Error('OTP length must be positive');
   const chars = '0123456789';
   let otp = '';
@@ -246,10 +234,48 @@ const setOTPExpiration = (minutes = 10) => {
   return new Date(Date.now() + minutes * 60 * 1000);
 };
 
+// --- Razorpay Service Functions --- // <<< ADDED
+const createRazorpayOrder = async (amountInPaise, receiptId, notes = {}) => {
+    if (!razorpayInstance) {
+        throw new Error("Razorpay not initialized. Check API keys.");
+    }
+    const options = {
+        amount: amountInPaise, // amount in the smallest currency unit (e.g., 50000 for ₹500.00)
+        currency: "INR",
+        receipt: receiptId, // Your internal order ID or a unique receipt string
+        notes: notes // Optional notes object
+    };
+    try {
+        const order = await razorpayInstance.orders.create(options);
+        console.log("Razorpay order created:", order.id);
+        return order; // Contains order_id, amount, currency etc.
+    } catch (error) {
+        console.error("Error creating Razorpay order:", error);
+        throw error;
+    }
+};
+
+const verifyRazorpayPayment = (razorpayOrderId, razorpayPaymentId, razorpaySignature) => {
+    if (!process.env.RAZORPAY_KEY_SECRET) {
+        console.error("RAZORPAY_KEY_SECRET not found for verification.");
+        return false;
+    }
+    const body = razorpayOrderId + "|" + razorpayPaymentId;
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(body.toString())
+        .digest('hex');
+    
+    return expectedSignature === razorpaySignature;
+};
+
+
 // --- Consolidated Exports ---
 module.exports = {
     generateEmailHtml,
     reviewProductWithGemini,
     generateOTP,
     setOTPExpiration,
+    createRazorpayOrder, // <<< ADDED
+    verifyRazorpayPayment // <<< ADDED
 };

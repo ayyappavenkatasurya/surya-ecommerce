@@ -4,10 +4,19 @@
 <div class="my-orders-container">
     <h1>My Orders</h1>
 
+    <%# --- MODIFIED: Use local variables 'paymentStatus' and 'processedOrderId' --- %>
+    <% if (typeof paymentStatus !== 'undefined' && paymentStatus === 'success' && typeof processedOrderId !== 'undefined' && processedOrderId) { %>
+      <div class="alert alert-success" role="alert">
+        Payment successful! Your order #<%= processedOrderId %> has been placed.
+      </div>
+    <% } %>
+    <%# --- END MODIFICATION --- %>
+
+
     <% if (orders.length > 0) { %>
         <div class="order-list">
             <% orders.forEach(order => { %>
-                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %> mb-3"> <%# Add mb-3 for spacing %>
+                <div class="order-card status-<%= order.status.toLowerCase().replace(/ /g, '-') %> mb-3">
                      <div class="order-header">
                          <div><strong>Order ID:</strong><br><%= order._id %></div>
                          <div><strong>Placed on:</strong><br><%= formatDateIST(order.orderDate) %></div>
@@ -15,51 +24,38 @@
                          <div><strong>Status:</strong><br><span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span></div>
                      </div>
                     <div class="order-body">
-                         <%# Simplified item display (text) %>
                          <p class="mb-1"><strong>Items:</strong></p>
                          <div class="order-items-list mb-2">
                             <% order.products.forEach((item, index) => { %>
                                 <small><%= item.name || '[Product Name Missing]' %> (Qty: <%= item.quantity %>) <% if(index < order.products.length - 1) { %> | <% } %></small>
                             <% }) %>
                          </div>
-
-                         <%# --- NEW: Display Product Images --- %>
                          <div class="order-items-images mt-2">
                             <% order.products.forEach(item => { %>
-                                <%# Check if product was populated and has necessary info %>
                                 <% if (item.productId && item.productId._id && item.imageUrl) { %>
                                     <a href="/products/<%= item.productId._id %>" title="View <%= item.name || 'Product' %>">
-                                        <img src="<%= item.imageUrl %>"
-                                             alt="<%= item.name || 'Product Image' %>"
-                                             class="order-item-thumbnail">
+                                        <img src="<%= item.imageUrl %>" alt="<%= item.name || 'Product Image' %>" class="order-item-thumbnail">
                                     </a>
                                 <% } else if (item.productId && item.productId._id) { %>
-                                    <%# Fallback if image URL is missing but product exists %>
                                     <a href="/products/<%= item.productId._id %>" class="order-item-thumbnail-placeholder" title="View <%= item.name || 'Product' %>">[No Img]</a>
                                 <% } else { %>
-                                    <%# Very basic fallback if productId is missing entirely %>
                                     <span class="order-item-thumbnail-placeholder">[Item NA]</span>
                                 <% } %>
                             <% }) %>
                          </div>
-                         <%# --- End: Display Product Images --- %>
-
-                        <div class="order-details mt-3"> <%# Add margin-top for spacing %>
+                        <div class="order-details mt-3">
                              <p class="mb-1"><strong>Shipping To:</strong> <%= order.shippingAddress.name %>, <%= order.shippingAddress.cityVillage %>, Pin: <%= order.shippingAddress.pincode %></p>
                              <% if (order.status === 'Delivered' && order.receivedByDate) { %>
                                 <p class="text-success mb-1"><small><strong>Delivered On:</strong> <%= formatDateIST(order.receivedByDate) %></small></p>
                               <% } %>
-                              <%# Display cancellation reason if present %>
                               <% if (order.status === 'Cancelled' && order.cancellationReason) { %>
                                 <p class="text-danger mb-1"><small><strong>Reason:</strong> <%= order.cancellationReason %></small></p>
                               <% } %>
-
-                              <%# Display Delivery OTP for Customer %>
                               <% if (order.showDeliveryOtp) { %>
                                 <div class="delivery-otp-display mt-2 p-2 border rounded bg-light">
                                     <p class="mb-1">
                                         <strong>Delivery OTP:</strong>
-                                        <strong class="delivery-otp-code ms-1"><%= order.orderOTP %></strong> <%# Display full OTP %>
+                                        <strong class="delivery-otp-code ms-1"><%= order.orderOTP %></strong>
                                     </p>
                                     <small class="text-muted d-block">Provide this code to the delivery person (Seller/Admin).</small>
                                     <% if (order.orderOTPExpires) { %>
@@ -67,10 +63,15 @@
                                     <% } %>
                                 </div>
                               <% } %>
-                              <%# End: Display Delivery OTP %>
+                              <% if (order.status === 'PaymentFailed') { %>
+                                 <p class="text-danger mb-1"><small><strong>Payment failed. Please try again or contact support.</strong></small></p>
+                              <% } %>
+                              <% if (order.status === 'PaymentPending') { %>
+                                 <p class="text-warning mb-1"><small><strong>Awaiting payment confirmation. If you have already paid, please wait a few minutes. You can also <a href="/user/checkout" class="alert-link">try placing the order again.</a></strong></small></p>
+                              <% } %>
                          </div>
                     </div>
-                     <div class="order-actions text-end p-2 border-top"> <%# Adjusted padding/border %>
+                     <div class="order-actions text-end p-2 border-top">
                         <% if (order.isCancellable) { %>
                             <form action="/orders/cancel/<%= order._id %>" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');" class="form-submit-spinner d-inline-block">
                                 <button type="submit" class="btn btn-danger btn-sm">Cancel Order</button>
@@ -85,6 +86,8 @@
                               <small class="text-success">Order Completed.</small>
                          <% } else if (order.status === 'Cancelled') { %>
                               <small class="text-danger">Order Cancelled.</small>
+                         <% } else if (order.status === 'PaymentFailed' || order.status === 'PaymentPending') { %>
+                            <%# No specific action text here as cancel is handled by isCancellable %>
                          <% } %>
                      </div>
                 </div>

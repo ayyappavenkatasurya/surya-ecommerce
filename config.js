@@ -2,6 +2,7 @@
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
+const Razorpay = require('razorpay'); // <<< ADDED
 
 // --- From config/categories.js ---
 const categoriesData = [
@@ -32,9 +33,7 @@ if (!process.env.GEMINI_API_KEY) {
     console.warn("GEMINI_API_KEY is not set in .env file. Gemini features will be disabled.");
 }
 const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-// Text-only model (if still needed elsewhere)
-const textModel = genAI ? genAI.getGenerativeModel({ model: "gemini-pro"}) : null; // Use appropriate model
-// Vision model (used in geminiService)
+const textModel = genAI ? genAI.getGenerativeModel({ model: "gemini-pro"}) : null;
 const visionModel = genAI ? genAI.getGenerativeModel({ model: "gemini-1.5-flash" }) : null;
 const geminiSafetySettings = [
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -43,7 +42,7 @@ const geminiSafetySettings = [
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-if (genAI && visionModel) { // Primarily check the vision model used in services
+if (genAI && visionModel) {
     console.log("Gemini AI SDK Initialized successfully (Vision capable).");
 } else {
      console.log("Gemini AI SDK could not be initialized (API Key missing or Vision model error?).");
@@ -86,6 +85,19 @@ const sendEmail = async (to, subject, text, html) => {
   }
 };
 
+// --- Razorpay Configuration --- // <<< ADDED
+let razorpayInstance = null;
+if (process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET) {
+    razorpayInstance = new Razorpay({
+        key_id: process.env.RAZORPAY_KEY_ID,
+        key_secret: process.env.RAZORPAY_KEY_SECRET,
+    });
+    console.log("Razorpay SDK Initialized successfully.");
+} else {
+    console.warn("RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set in .env file. Razorpay features will be disabled.");
+}
+
+
 // --- Consolidated Exports ---
 module.exports = {
     // From categories.js
@@ -94,9 +106,12 @@ module.exports = {
     // From database.js
     connectDB,
     // From gemini.js
-    textModel, // Exporting text model in case it's used, primarily visionModel is used in services
-    visionModel, // Exporting the vision model directly for geminiService
-    geminiSafetySettings, // Exporting safety settings
+    textModel,
+    visionModel,
+    geminiSafetySettings,
     // From mailer.js
-    sendEmail
+    sendEmail,
+    // Razorpay
+    razorpayInstance, // <<< ADDED
+    RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID // <<< ADDED (to pass to frontend)
 };

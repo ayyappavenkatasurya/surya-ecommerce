@@ -39,12 +39,12 @@ const AddressSchema = new mongoose.Schema({
     name: { type: String, trim: true },
     phone: { type: String, trim: true },
     pincode: { type: String, trim: true },
-    locality: { type: String, trim: true }, // From Pincode lookup
-    cityVillage: { type: String, trim: true }, // House No/Building/Area
-    landmarkNearby: { type: String, trim: true }, // Optional
-    mandal: { type: String, trim: true }, // Derived
-    district: { type: String, trim: true }, // Derived
-    state: { type: String, trim: true }, // Derived
+    locality: { type: String, trim: true },
+    cityVillage: { type: String, trim: true },
+    landmarkNearby: { type: String, trim: true },
+    mandal: { type: String, trim: true },
+    district: { type: String, trim: true },
+    state: { type: String, trim: true },
 }, { _id: false });
 
 const CartItemSchema = new mongoose.Schema({
@@ -117,14 +117,14 @@ const ProductSchema = new mongoose.Schema({
         trim: true,
         index: true,
         enum: {
-            values: config.categoryNames, // Use from consolidated config
+            values: config.categoryNames,
             message: '{VALUE} is not a supported category.'
         }
     },
     price: { type: Number, required: [true, 'Please provide a product price'], min: 0 },
     stock: { type: Number, required: [true, 'Please provide product stock quantity'], min: 0, default: 0 },
     imageUrl: { type: String, required: [true, 'Please provide a product image URL'], trim: true },
-    imageUrl2: { type: String, trim: true }, // Optional second image
+    imageUrl2: { type: String, trim: true },
     specifications: { type: String, trim: true },
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     sellerEmail: { type: String, required: true, lowercase: true, trim: true },
@@ -166,12 +166,12 @@ const OrderAddressSchema = new mongoose.Schema({
     name: { type: String, trim: true, required: true },
     phone: { type: String, trim: true, required: true },
     pincode: { type: String, trim: true, required: true },
-    locality: { type: String, trim: true, required: true }, // Added
-    cityVillage: { type: String, trim: true, required: true }, // House/Area
-    landmarkNearby: { type: String, trim: true }, // Optional
-    mandal: { type: String, trim: true }, // Derived
-    district: { type: String, trim: true }, // Derived
-    state: { type: String, trim: true }, // Derived
+    locality: { type: String, trim: true, required: true },
+    cityVillage: { type: String, trim: true, required: true },
+    landmarkNearby: { type: String, trim: true },
+    mandal: { type: String, trim: true },
+    district: { type: String, trim: true },
+    state: { type: String, trim: true },
 }, { _id: false });
 
 const OrderSchema = new mongoose.Schema({
@@ -180,31 +180,60 @@ const OrderSchema = new mongoose.Schema({
     products: [OrderProductSchema],
     totalAmount: { type: Number, required: true, min: 0 },
     shippingAddress: { type: OrderAddressSchema, required: true },
-    paymentMethod: { type: String, enum: ['COD'], required: true, default: 'COD' },
-    status: { type: String, enum: ['Pending', 'Delivered', 'Cancelled'], default: 'Pending' },
+    paymentMethod: {
+        type: String,
+        enum: ['COD', 'Razorpay'], // <<< UPDATED
+        required: true,
+        default: 'COD'
+    },
+    status: {
+        type: String,
+        // <<< UPDATED Enum
+        enum: ['Pending', 'PaymentPending', 'PaymentFailed', 'Delivered', 'Cancelled'],
+        default: 'PaymentPending' // Default for online payments before confirmation
+    },
     orderDate: { type: Date, default: Date.now },
     receivedByDate: { type: Date },
     orderOTP: String,
     orderOTPExpires: Date,
     cancellationAllowedUntil: { type: Date },
-    cancellationReason: { type: String, trim: true }
+    cancellationReason: { type: String, trim: true },
+    // --- Razorpay Specific Fields --- // <<< ADDED
+    razorpayOrderId: { type: String, trim: true },
+    razorpayPaymentId: { type: String, trim: true },
+    razorpaySignature: { type: String, trim: true },
+    paymentVerified: { type: Boolean, default: false } // To confirm Razorpay webhook/callback processed
+
 }, { timestamps: true });
 
 OrderSchema.pre('save', function(next) {
-    if (this.isNew && !this.cancellationAllowedUntil) {
-        const now = this.orderDate || Date.now();
-        this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+    // Original logic for COD related fields
+    if (this.paymentMethod === 'COD') {
+        if (this.isNew && !this.cancellationAllowedUntil && this.status === 'Pending') {
+            const now = this.orderDate || Date.now();
+            this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour for COD
+        }
+    } else { // For Razorpay or other online payments, cancellation window might be different or not applicable pre-payment
+        this.cancellationAllowedUntil = undefined; // Or handle as per your business logic
     }
+
+
     if (this.isModified('status') && (this.status === 'Cancelled' || this.status === 'Delivered')) {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
-        this.cancellationAllowedUntil = undefined;
+        this.cancellationAllowedUntil = undefined; // Clear this on final states
         if (this.status === 'Cancelled') this.receivedByDate = undefined;
     }
-    if (this.isModified('status') && this.status !== 'Pending') {
+    if (this.isModified('status') && this.status !== 'Pending') { // Clear OTP if not pending for COD delivery
          this.orderOTP = undefined;
          this.orderOTPExpires = undefined;
-     }
+    }
+    // If order becomes Pending (COD confirmed or Razorpay verified), then set cancellation window if not COD
+    if (this.isModified('status') && this.status === 'Pending' && this.paymentMethod !== 'COD' && !this.cancellationAllowedUntil) {
+        const now = Date.now();
+        this.cancellationAllowedUntil = new Date(now + 15 * 60 * 1000); // Shorter window for paid orders, e.g., 15 mins
+    }
+
     next();
 });
 

@@ -6,12 +6,12 @@ const axios = require('axios');
 
 // Import consolidated modules
 const Models = require('./models');
-const Config = require('./config');
+const Config = require('./config'); // Existing config require
 const Services = require('./services');
 
 const { User, Product, Order, BannerConfig } = Models;
-const { sendEmail, categories, categoryNames } = Config;
-const { generateOTP, setOTPExpiration, reviewProductWithGemini, generateEmailHtml } = Services;
+const { sendEmail, categories, categoryNames, RAZORPAY_KEY_ID } = Config; // Added RAZORPAY_KEY_ID
+const { generateOTP, setOTPExpiration, reviewProductWithGemini, generateEmailHtml, createRazorpayOrder, verifyRazorpayPayment } = Services; // Added Razorpay services
 
 // Shared Constants (moved here from individual controllers for consolidation)
 const passwordFormatErrorMsg = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
@@ -33,6 +33,7 @@ const sellerCancellationReasons = [
 // ============================
 // Auth Controller Functions
 // ============================
+// ... (auth_getLoginPage, auth_getRegisterPage, etc. - NO CHANGES to these) ...
 exports.auth_getLoginPage = (req, res) => {
     if (req.session.user) { return res.redirect('/'); }
     res.render('auth/login', { title: 'Login' });
@@ -66,7 +67,7 @@ exports.auth_getResetPasswordPage = async (req, res, next) => {
     } catch (error) { next(error); }
 };
 
-exports.auth_getHomePage = async (req, res, next) => { // Keep name generic for potential reuse
+exports.auth_getHomePage = async (req, res, next) => { 
   try {
     const searchTerm = req.query.search || '';
     const categoryFilter = req.query.category || '';
@@ -129,7 +130,7 @@ exports.auth_registerUser = async (req, res, next) => {
              req.flash('success_msg', `OTP sent to ${user.email}. Please verify.`);
              res.redirect(`/auth/verify-otp?email=${encodeURIComponent(user.email)}`);
          } else {
-             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { // Cleanup recent failures
+             if(!user.createdAt || (Date.now() - user.createdAt.getTime()) < 5000) { 
                 try { await User.deleteOne({ _id: user._id, isVerified: false }); console.log(`Cleaned up ${user.email} due to failed email.`); }
                 catch (deleteError) { console.error(`Error cleaning up unverified user ${user.email}:`, deleteError); }
              }
@@ -274,7 +275,7 @@ exports.auth_resetPassword = async (req, res, next) => {
          if (!user) { req.flash('error_msg', 'Token invalid/expired. Request new link.'); return res.redirect('/auth/forgot-password'); }
          user.password = password; user.resetPasswordToken = undefined; user.resetPasswordExpires = undefined; user.otp = undefined; user.otpExpires = undefined; user.isVerified = true;
          await user.save();
-         try { // Send confirmation email (optional)
+         try { 
               const subject = 'Password Reset Success - miniapp'; const text = `Your account password for ${user.email} changed. Contact support if not you.`;
               const html = generateEmailHtml({ recipientName: user.name, subject: subject, greeting: 'Password Reset Successful', bodyLines: [`Password changed for miniapp account.`, `Contact support if not you.`], companyName: 'miniapp', buttonUrl: `${req.protocol}://${req.get('host')}/auth/login`, buttonText: 'Login' });
               await sendEmail(user.email, subject, text, html);
@@ -299,15 +300,13 @@ exports.auth_resetPassword = async (req, res, next) => {
 // ============================
 // Admin Controller Functions
 // ============================
-
+// ... (Existing Admin controllers - NO CHANGES to these specific functions) ...
 exports.admin_getDashboard = (req, res) => {
     res.render('admin/dashboard', { title: 'Admin Dashboard' });
 };
-
 exports.admin_getUploadProductPage = (req, res) => {
     res.render('admin/upload-product', { title: 'Admin: Upload New Product', product: {}, categories: categories });
 };
-
 exports.admin_uploadProduct = async (req, res, next) => {
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
      const adminUserId = req.session.user._id, adminUserEmail = req.session.user.email;
@@ -334,14 +333,12 @@ exports.admin_uploadProduct = async (req, res, next) => {
         console.error("Error uploading product by Admin:", error); next(error);
      }
  };
-
 exports.admin_getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({}).populate('sellerId', 'name email').sort({ createdAt: -1 }).lean();
         res.render('admin/manage-products', { title: 'Manage All Products', products: products });
     } catch (error) { next(error); }
 };
-
 exports.admin_getEditProductPage = async (req, res, next) => {
     try {
         const product = await Product.findById(req.params.id).populate('sellerId', 'name email').lean();
@@ -352,11 +349,10 @@ exports.admin_getEditProductPage = async (req, res, next) => {
         next(error);
     }
 };
-
 exports.admin_updateProduct = async (req, res, next) => {
      const productId = req.params.id;
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription, reviewStatus, rejectionReason } = req.body;
-     let productDataForRender = { _id: productId, ...req.body }; // Default if product fetch fails
+     let productDataForRender = { _id: productId, ...req.body };
      const renderOptions = { title: 'Admin Edit Error', product: productDataForRender, isAdminView: true, categories: categories };
      if (!name || !category || price === undefined || stock === undefined || !imageUrl) { req.flash('error_msg', 'Required: Name, Cat, Price, Stock, Image1.'); return res.render('admin/edit-product', renderOptions); }
      if (isNaN(Number(price)) || Number(price) < 0 || isNaN(Number(stock)) || Number(stock) < 0) { req.flash('error_msg', 'Price/Stock must be >= 0.'); return res.render('admin/edit-product', renderOptions); }
@@ -371,14 +367,13 @@ exports.admin_updateProduct = async (req, res, next) => {
          if (reviewStatus) { product.reviewStatus = reviewStatus; product.rejectionReason = (reviewStatus === 'rejected') ? rejectionReason.trim() : undefined; }
          await product.save(); req.flash('success_msg', `Product "${product.name}" updated by admin.`); res.redirect('/admin/manage-products');
      } catch (error) {
-          productDataForRender = await Product.findById(productId).lean() || productDataForRender; // Try refetching on error
-          renderOptions.product = { ...productDataForRender, ...req.body }; // Merge old + new attempts
+          productDataForRender = await Product.findById(productId).lean() || productDataForRender;
+          renderOptions.product = { ...productDataForRender, ...req.body }; 
           if (error.name === 'ValidationError') { req.flash('error_msg', `Validation Error: ${Object.values(error.errors).map(el => el.message).join(' ')}`); return res.render('admin/edit-product', renderOptions); }
           if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.status(400).redirect('/admin/manage-products'); }
           console.error("Error updating product by Admin:", error); next(error);
      }
  };
-
 exports.admin_removeProduct = async (req, res, next) => {
      const productId = req.params.id;
      try {
@@ -390,13 +385,13 @@ exports.admin_removeProduct = async (req, res, next) => {
          console.error("Error removing product by Admin:", error); next(error);
      }
  };
-
 exports.admin_getManageOrdersPage = async (req, res, next) => {
      try {
          const orders = await Order.find({}) .sort({ orderDate: -1 }).select('-__v -products.__v -shippingAddress._id').populate('products.productId', 'name imageUrl _id price sellerId').populate('userId', 'name email').lean();
          const now = Date.now();
          orders.forEach(order => {
-             order.canBeCancelledByAdmin = order.status === 'Pending'; order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
+             order.canBeCancelledByAdmin = order.status === 'Pending' || order.status === 'PaymentPending' || order.status === 'PaymentFailed'; // UPDATED
+             order.canBeDirectlyDeliveredByAdmin = order.status === 'Pending';
              order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
              if (order.products?.length > 0) {
                  order.itemsSummary = order.products.map(p => `${p.productId?.name || p.name || '[?Name?]'} (Qty: ${p.quantity}) @ ₹${p.priceAtOrder?.toFixed(2) || '?.??'}`).join('<br>');
@@ -405,7 +400,6 @@ exports.admin_getManageOrdersPage = async (req, res, next) => {
          res.render('admin/manage-orders', { title: 'Manage All Orders', orders: orders, cancellationReasons: adminCancellationReasons });
      } catch (error) { next(error); }
  };
-
 exports.admin_sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
      try {
          const result = await this.order_generateAndSendDirectDeliveryOTPByAdmin(req.params.orderId);
@@ -413,7 +407,6 @@ exports.admin_sendDirectDeliveryOtpByAdmin = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `Admin OTP Send Failed: ${error.message}`); }
      res.redirect('/admin/manage-orders');
  };
-
 exports.admin_confirmDirectDeliveryByAdmin = async (req, res, next) => {
      const { otp } = req.body;
      if (!otp || !/^\d{6}$/.test(otp.trim())) { req.flash('error_msg', 'Enter 6-digit OTP.'); return res.redirect('/admin/manage-orders'); }
@@ -423,7 +416,6 @@ exports.admin_confirmDirectDeliveryByAdmin = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `Admin Delivery Confirm Failed: ${error.message}`); }
      res.redirect('/admin/manage-orders');
  };
-
 exports.admin_cancelOrderByAdmin = async (req, res, next) => {
      const { orderId } = req.params; const { reason } = req.body; const adminUserId = req.session.user._id;
      if (!reason || !adminCancellationReasons.includes(reason)) { req.flash('error_msg', 'Select valid admin reason.'); return res.redirect('/admin/manage-orders'); }
@@ -431,19 +423,37 @@ exports.admin_cancelOrderByAdmin = async (req, res, next) => {
      try {
          const order = await Order.findById(orderId).populate('products.productId', 'name _id').populate('userId', 'email name').session(sessionDB);
          if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found.'); return res.status(404).redirect('/admin/manage-orders'); }
-         if (order.status !== 'Pending') { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/admin/manage-orders'); }
-         const restorePromises = order.products.map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Admin Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Admin Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-         });
-         await Promise.allSettled(restorePromises);
-         order.status = 'Cancelled'; order.cancellationReason = reason; await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send email
+         
+         if (!['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status)) { 
+            await sessionDB.abortTransaction(); sessionDB.endSession(); 
+            req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/admin/manage-orders'); 
+         }
+
+         if (order.status === 'Pending') { 
+            const restorePromises = order.products.map(item => {
+                const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Admin Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
+                return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Admin Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
+            });
+            await Promise.allSettled(restorePromises);
+         } 
+         
+         order.status = 'Cancelled'; order.cancellationReason = reason; 
+         order.cancellationAllowedUntil = undefined; // Clear this if cancelling
+         await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
+         
+         try { 
               const customerEmail = order.userEmail || order.userId?.email; const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
               if(customerEmail) {
                   const subject = `Order Cancelled - miniapp`; const text = `Your order (${order._id}) cancelled by admin. Reason: ${reason}.`;
+                  let bodyLines = [`Order (#${order._id}) cancelled by admin.`, `<strong>Reason:</strong> ${reason}`, `Contact support if needed.`];
+                  if (order.paymentMethod === 'Razorpay' && order.paymentVerified) {
+                     bodyLines.push(`For this pre-paid order, a refund will be processed to your original payment method shortly.`);
+                     console.warn(`ADMIN NOTE: Order ${orderId} was Razorpay-paid. Manual refund needed from Razorpay dashboard. Amount: ${order.totalAmount}`);
+                  } else if (order.paymentMethod === 'Razorpay' && !order.paymentVerified) {
+                     bodyLines.push('No payment was processed for this online order attempt.');
+                  }
                   const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Regarding Order #${order._id}`,
-                      bodyLines: [`Order (#${order._id}) cancelled by admin.`, `<strong>Reason:</strong> ${reason}`, `Refund processed if applicable.`, `Contact support if needed.`],
+                      bodyLines: bodyLines,
                       buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
                   await sendEmail(customerEmail, subject, text, html);
               }
@@ -453,14 +463,12 @@ exports.admin_cancelOrderByAdmin = async (req, res, next) => {
          await sessionDB.abortTransaction(); console.error(`Error admin cancelling O.ID ${orderId}:`, error); req.flash('error_msg', 'Internal cancel error.'); res.redirect('/admin/manage-orders');
      } finally { if (sessionDB) sessionDB.endSession(); }
  };
-
 exports.admin_getManageUsersPage = async (req, res, next) => {
      try {
          const users = await User.find({ _id: { $ne: req.session.user._id } }).select('name email role createdAt isVerified address.phone').sort({ createdAt: -1 }).lean();
          res.render('admin/manage-users', { title: 'Manage Registered Users', users: users });
      } catch (error) { next(error); }
  };
-
 exports.admin_updateUserRole = async (req, res, next) => {
       const userId = req.params.id; const { role } = req.body; const allowedRoles = ['user', 'admin', 'seller'];
       if (!role || !allowedRoles.includes(role)) { req.flash('error_msg', 'Invalid role.'); return res.status(400).redirect('/admin/manage-users'); }
@@ -473,7 +481,6 @@ exports.admin_updateUserRole = async (req, res, next) => {
           console.error(`Error updating role user ${userId}:`, error); req.flash('error_msg', 'Error updating role.'); res.redirect('/admin/manage-users');
       }
   };
-
 exports.admin_removeUser = async (req, res, next) => {
       const userId = req.params.id;
       if (userId === req.session.user._id.toString()) { req.flash('error_msg', 'Cannot remove self.'); return res.redirect('/admin/manage-users'); }
@@ -486,7 +493,6 @@ exports.admin_removeUser = async (req, res, next) => {
           console.error(`Error removing user ${userId}:`, error); req.flash('error_msg', 'Error removing user.'); res.redirect('/admin/manage-users');
       }
   };
-
 exports.admin_getManageBannersPage = async (req, res, next) => {
     try {
         let bannerConfig = await BannerConfig.findOne({ configKey: 'mainBanners' }).lean() || { configKey: 'mainBanners', banners: [] };
@@ -494,7 +500,6 @@ exports.admin_getManageBannersPage = async (req, res, next) => {
         res.render('admin/manage-banners', { title: 'Manage Homepage Banners', bannerConfig: { ...bannerConfig, banners: displayBanners } });
     } catch (error) { console.error("Error fetching banner config:", error); next(error); }
 };
-
 exports.admin_updateBanners = async (req, res, next) => {
     const { imageUrl1, linkUrl1, title1, imageUrl2, linkUrl2, title2, imageUrl3, linkUrl3, title3, imageUrl4, linkUrl4, title4 } = req.body;
     const bannerInputs = [ { imageUrl: imageUrl1, linkUrl: linkUrl1, title: title1 }, { imageUrl: imageUrl2, linkUrl: linkUrl2, title: title2 }, { imageUrl: imageUrl3, linkUrl: linkUrl3, title: title3 }, { imageUrl: imageUrl4, linkUrl: linkUrl4, title: title4 } ];
@@ -520,11 +525,16 @@ exports.admin_updateBanners = async (req, res, next) => {
     }
 };
 
+
 // ============================
 // Order Controller Functions (called internally or by other controllers)
 // ============================
-exports.order_placeOrder = async (req, res, next) => {
-     const userId = req.session.user._id; const sessionDB = await mongoose.startSession(); sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+
+// Place COD Order
+exports.order_placeCODOrder = async (req, res, next) => {
+     const userId = req.session.user._id;
+     const sessionDB = await mongoose.startSession();
+     sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
      try {
          const user = await User.findById(userId).populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId').session(sessionDB);
          if (!user) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'User session lost. Login.'); return res.redirect('/auth/login'); }
@@ -553,37 +563,316 @@ exports.order_placeOrder = async (req, res, next) => {
          }
          const order = new Order({ userId: userId, userEmail: user.email, products: orderProducts, totalAmount: totalAmount, shippingAddress: user.address, paymentMethod: 'COD', status: 'Pending' });
          await order.save({ session: sessionDB }); user.cart = []; await user.save({ session: sessionDB }); await sessionDB.commitTransaction(); req.session.user.cart = []; await req.session.save();
-         try { // Send confirmation email
-              const subject = `Order Placed - miniapp`; const text = `Thank you for your order!`;
+         try {
+              const subject = `Order Placed (COD) - miniapp`; const text = `Thank you for your order!`;
               const prodListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
               const html = generateEmailHtml({ recipientName: user.name, subject: subject, greeting: `Order Confirmation #${order._id}`,
-                   bodyLines: [`Order placed successfully.`, `<strong>ID:</strong> ${order._id}`, `<strong>Total:</strong> ₹${order.totalAmount.toFixed(2)}`, `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, `<h3 style="margin-top:15px;">Summary:</h3><ul>${prodListHTML}</ul>` ],
+                   bodyLines: [`COD Order placed successfully.`, `<strong>ID:</strong> ${order._id}`, `<strong>Total:</strong> ₹${order.totalAmount.toFixed(2)}`, `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`, `<h3 style="margin-top:15px;">Summary:</h3><ul>${prodListHTML}</ul>`, `You will be contacted for delivery confirmation.`],
                    buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'View Order Status', companyName: 'miniapp' });
               await sendEmail(user.email, subject, text, html);
-         } catch (emailError) { console.error(`Failed sending order confirm email O.ID ${order._id}:`, emailError); }
-         req.flash('success_msg', 'Order placed successfully!'); res.redirect('/orders/my-orders');
+         } catch (emailError) { console.error(`Failed sending COD order confirm email O.ID ${order._id}:`, emailError); }
+         req.flash('success_msg', 'COD Order placed successfully!'); res.redirect('/orders/my-orders');
      } catch (error) {
-         if (sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error("Order Placement Error:", error);
-         let userErrorMessage = 'Order failed: server error. Try again.'; if (error.message?.includes('Stock changed')) userErrorMessage = error.message;
+         if (sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error("COD Order Placement Error:", error);
+         let userErrorMessage = 'COD Order failed: server error. Try again.'; if (error.message?.includes('Stock changed')) userErrorMessage = error.message;
          req.flash('error_msg', userErrorMessage); res.redirect('/user/cart');
      } finally { if (sessionDB) await sessionDB.endSession(); }
- };
+};
 
-exports.order_cancelOrder = async (req, res, next) => { // User cancellation
+// Create Razorpay Order Intent
+exports.order_createRazorpayOrderIntent = async (req, res, next) => {
+    const userId = req.session.user._id;
+    try {
+        const user = await User.findById(userId).populate('cart.productId', 'name price imageUrl stock reviewStatus');
+        if (!user) return res.status(401).json({ success: false, message: 'User session lost. Please login.' });
+        if (!user.cart || user.cart.length === 0) return res.status(400).json({ success: false, message: 'Your cart is empty.' });
+        if (!user.address?.name || !user.address.phone || !user.address.pincode) return res.status(400).json({ success: false, message: 'Shipping address is incomplete.' });
+
+        let orderProducts = []; let totalAmount = 0;
+        for (const item of user.cart) {
+            const product = item.productId;
+            if (!product || product.reviewStatus !== 'approved' || product.stock < item.quantity) {
+                return res.status(400).json({ success: false, message: `Problem with item "${product?.name || 'Unknown'}": It might be out of stock or unavailable. Please review your cart.` });
+            }
+            orderProducts.push({ productId: product._id, name: product.name, priceAtOrder: product.price, quantity: item.quantity, imageUrl: product.imageUrl, sellerId: product.sellerId });
+            totalAmount += product.price * item.quantity;
+        }
+
+        if (totalAmount <= 0) return res.status(400).json({ success: false, message: 'Total amount must be greater than zero.' });
+
+        const internalOrder = new Order({
+            userId: userId,
+            userEmail: user.email,
+            products: orderProducts,
+            totalAmount: totalAmount,
+            shippingAddress: user.address,
+            paymentMethod: 'Razorpay',
+            status: 'PaymentPending',
+        });
+        await internalOrder.save();
+
+        const razorpayAmount = Math.round(totalAmount * 100);
+        const razorpayOrderOptions = {
+            amount: razorpayAmount,
+            currency: 'INR',
+            receipt: internalOrder._id.toString(),
+            notes: {
+                internal_order_id: internalOrder._id.toString(),
+                customer_email: user.email
+            }
+        };
+        const rzpOrder = await createRazorpayOrder(razorpayAmount, internalOrder._id.toString(), razorpayOrderOptions.notes);
+
+        internalOrder.razorpayOrderId = rzpOrder.id;
+        await internalOrder.save();
+        
+        res.status(200).json({
+            success: true,
+            message: 'Razorpay order created',
+            orderId: internalOrder._id, 
+            razorpayOrderId: rzpOrder.id,
+            amount: rzpOrder.amount, 
+            currency: rzpOrder.currency,
+            keyId: RAZORPAY_KEY_ID,
+            userName: user.name,
+            userEmail: user.email,
+            userPhone: user.address.phone
+        });
+
+    } catch (error) {
+        console.error("Create Razorpay Order Intent Error:", error);
+        if (error.message && error.message.includes("Razorpay not initialized")) {
+             return res.status(503).json({ success: false, message: 'Payment service unavailable. Please try again later or select COD.' });
+        }
+        let userMessage = 'Could not initiate payment. Please try again.';
+        if (error.statusCode && error.error && error.error.description) { 
+            userMessage = `Payment Gateway Error: ${error.error.description}`;
+            console.error("Razorpay API Error details:", error.error);
+        } else if (error.response && error.response.data && error.response.data.message) { 
+             userMessage = error.response.data.message;
+        } else if (error.message) {
+             userMessage = error.message;
+        }
+        return res.status(500).json({ success: false, message: userMessage });
+    }
+};
+
+// Verify Razorpay Payment
+exports.order_verifyRazorpayPayment = async (req, res, next) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, internal_order_id } = req.body;
+    const userId = req.session.user._id;
+
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature || !internal_order_id) {
+        return res.status(400).json({ success: false, message: "Missing payment verification details." });
+    }
+
+    const sessionDB = await mongoose.startSession();
+    sessionDB.startTransaction({ readConcern: { level: 'snapshot' }, writeConcern: { w: 'majority' } });
+
+    try {
+        const isSignatureValid = verifyRazorpayPayment(razorpay_order_id, razorpay_payment_id, razorpay_signature);
+
+        if (!isSignatureValid) {
+            await Order.findByIdAndUpdate(internal_order_id, 
+                { 
+                    status: 'PaymentFailed', 
+                    paymentVerified: false, 
+                    razorpayPaymentId: razorpay_payment_id, 
+                    razorpayOrderId: razorpay_order_id, // Store Razorpay Order ID on failure too
+                    razorpaySignature: "VERIFICATION_FAILED",
+                    cancellationReason: "Payment signature verification failed."
+                }, 
+                { session: sessionDB }
+            );
+            await sessionDB.commitTransaction(); 
+            return res.status(400).json({ success: false, message: "Payment verification failed. Invalid signature." });
+        }
+
+        const order = await Order.findOne({ _id: internal_order_id, razorpayOrderId: razorpay_order_id, userId: userId }).session(sessionDB);
+        if (!order) {
+            await sessionDB.abortTransaction();
+            console.error(`Order not found for internal_order_id: ${internal_order_id} and rzp_order_id: ${razorpay_order_id}`);
+            // Attempt to update the failed payment even if the order with user ID match fails
+            await Order.findByIdAndUpdate(internal_order_id, { status: 'PaymentFailed', cancellationReason: 'Order mismatch during verification.'});
+            return res.status(404).json({ success: false, message: "Order not found for verification." });
+        }
+        if (order.status === 'Pending' && order.paymentVerified) {
+             await sessionDB.commitTransaction();
+             console.log(`Razorpay payment for order ${order._id} already verified.`);
+             return res.status(200).json({ success: true, message: "Payment already verified.", orderId: order._id });
+        }
+        if (order.status !== 'PaymentPending') {
+            await sessionDB.abortTransaction();
+            return res.status(400).json({ success: false, message: `Order status is ${order.status}, cannot verify payment.` });
+        }
+        
+        order.status = 'Pending'; 
+        order.razorpayPaymentId = razorpay_payment_id;
+        order.razorpaySignature = razorpay_signature;
+        order.paymentVerified = true;
+        order.cancellationReason = undefined; // Clear any previous failure reasons
+
+        const stockUpdates = order.products.map(item => ({ productId: item.productId, qtyDecr: item.quantity }));
+        for (const update of stockUpdates) {
+            const productResult = await Product.updateOne(
+                { _id: update.productId, stock: { $gte: update.qtyDecr } },
+                { $inc: { stock: -update.qtyDecr, orderCount: 1 } },
+                { session: sessionDB }
+            );
+            if (productResult.modifiedCount === 0) {
+                order.status = 'PaymentFailed'; // Set to PaymentFailed
+                order.cancellationReason = `Stock unavailable for P.ID ${update.productId} after successful payment. REFUND REQUIRED.`;
+                order.paymentVerified = true; // Payment was successful with Razorpay, but order failed due to stock.
+                await order.save({ session: sessionDB });
+                await sessionDB.commitTransaction(); // COMMIT transaction to save PaymentFailed status
+                console.error(`CRITICAL: Stock unavailable for ${update.productId} after successful Razorpay payment for order ${order._id}. Order marked PaymentFailed. Manual refund needed.`);
+                // This is critical and needs admin attention for refund
+                // TODO: Send admin notification
+                return res.status(500).json({ success: false, message: "Order processing failed due to stock issue post-payment. Please contact support immediately for refund."});
+            }
+        }
+        await order.save({ session: sessionDB }); // This sets the cancellationAllowedUntil via pre-save hook
+        
+        const user = await User.findById(userId).session(sessionDB);
+        if (user) {
+            user.cart = [];
+            await user.save({ session: sessionDB });
+            req.session.user.cart = [];
+            await req.session.save();
+        }
+        
+        await sessionDB.commitTransaction();
+
+        try {
+            const subject = `Payment Successful - Order Placed - miniapp`;
+            const prodListHTML = order.products.map(p => `<li>${p.name} (Qty: ${p.quantity}) - ₹${p.priceAtOrder.toFixed(2)}</li>`).join('');
+            const html = generateEmailHtml({
+                recipientName: order.shippingAddress.name, subject: subject,
+                greeting: `Order Confirmed #${order._id}`,
+                bodyLines: [
+                    `Your payment for order #${order._id} was successful.`,
+                    `<strong>Total Amount:</strong> ₹${order.totalAmount.toFixed(2)} (Paid via Razorpay)`,
+                    `<strong>Razorpay Payment ID:</strong> ${razorpay_payment_id}`,
+                    `<strong>Shipping To:</strong> ${order.shippingAddress.name}, ${order.shippingAddress.locality}, ${order.shippingAddress.pincode}`,
+                    `<h3 style="margin-top:15px;">Order Summary:</h3><ul>${prodListHTML}</ul>`,
+                    `Your order is now being processed.`
+                ],
+                buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'View Your Orders',
+                companyName: 'miniapp'
+            });
+            await sendEmail(order.userEmail, subject, `Payment for order ${order._id} successful. Total: Rs.${order.totalAmount.toFixed(2)}`, html);
+        } catch (emailError) {
+            console.error(`Failed sending Razorpay order confirm email O.ID ${order._id}:`, emailError);
+        }
+        res.status(200).json({ success: true, message: "Payment verified successfully. Order placed!", orderId: order._id });
+    } catch (error) {
+        if (sessionDB.inTransaction()) await sessionDB.abortTransaction();
+        console.error("Verify Razorpay Payment Error:", error);
+        try {
+           await Order.findByIdAndUpdate(internal_order_id, { 
+               status: 'PaymentFailed', 
+               paymentVerified: false,
+               cancellationReason: "Payment verification system error." 
+            });
+        } catch (updateError) {
+           console.error("Failed to mark order as PaymentFailed during Razorpay verification error:", updateError);
+        }
+        res.status(500).json({ success: false, message: "Error verifying payment. " + (error.message || "Internal Server Error") });
+    } finally {
+        if(sessionDB) await sessionDB.endSession();
+    }
+};
+
+// --- NEW: Mark Payment as Failed (called by frontend on Razorpay payment.failed event) ---
+exports.order_markPaymentFailed = async (req, res, next) => {
+    const { internal_order_id } = req.params; // ID from route parameter
+    const { razorpay_payment_id, razorpay_order_id, reason = "Payment failed on Razorpay client-side." } = req.body;
+    const userId = req.session.user._id;
+
+    if (!internal_order_id) {
+        return res.status(400).json({ success: false, message: "Internal order ID is required." });
+    }
+
+    try {
+        const order = await Order.findOne({ _id: internal_order_id, userId: userId });
+
+        if (!order) {
+            console.warn(`Payment Failed Hook: Order ${internal_order_id} not found for user ${userId}.`);
+            return res.status(404).json({ success: false, message: "Order not found." });
+        }
+
+        // Only update if it's in PaymentPending, to avoid overwriting other states like already 'Cancelled'
+        if (order.status === 'PaymentPending') {
+            order.status = 'PaymentFailed';
+            order.razorpayPaymentId = razorpay_payment_id || order.razorpayPaymentId; // Keep existing if new not provided
+            order.razorpayOrderId = razorpay_order_id || order.razorpayOrderId;     // Keep existing if new not provided
+            order.paymentVerified = false;
+            order.cancellationReason = reason;
+            await order.save();
+            console.log(`Order ${internal_order_id} marked as PaymentFailed by user ${userId}. Razorpay Order ID: ${order.razorpayOrderId}`);
+            return res.status(200).json({ success: true, message: "Order status updated to PaymentFailed." });
+        } else {
+            console.log(`Payment Failed Hook: Order ${internal_order_id} status is already '${order.status}'. Not updating.`);
+            return res.status(200).json({ success: false, message: `Order is already in '${order.status}' state.` });
+        }
+    } catch (error) {
+        console.error(`Error in order_markPaymentFailed for order ${internal_order_id}:`, error);
+        return res.status(500).json({ success: false, message: "Server error while updating order status." });
+    }
+};
+
+exports.order_cancelOrder = async (req, res, next) => {
      const orderId = req.params.id; const userId = req.session.user._id; const sessionDB = await mongoose.startSession(); sessionDB.startTransaction({ writeConcern: { w: 'majority' }});
      try {
-         const order = await Order.findOne({ _id: orderId, userId: userId, status: 'Pending', cancellationAllowedUntil: { $gt: Date.now() } }).populate('products.productId', '_id name').populate('userId', 'name').session(sessionDB);
-         if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found, processed, or cancel period expired.'); return res.redirect('/orders/my-orders'); }
-         console.log(`User Cancel: Restore stock O.ID ${orderId}.`);
-         const restorePromises = order.products.map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`User Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`User Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-         });
-         await Promise.allSettled(restorePromises); console.log(`User Cancel: Stock restore complete O.ID ${orderId}.`);
-         order.status = 'Cancelled'; order.cancellationReason = "Cancelled by customer"; await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send cancellation email
-              const subject = `Order Cancelled - miniapp`; const text = `Refund processed if applicable.`;
-              const html = generateEmailHtml({ recipientName: order.userId?.name || req.session.user.name, subject: subject, greeting: 'Order Cancellation Confirmation', bodyLines: [`Order (#${order._id}) cancelled per request.`, `Refund processed if applicable.`, `Hope to serve you soon!` ], buttonUrl: `${req.protocol}://${req.get('host')}/`, buttonText: 'Continue Shopping', companyName: 'miniapp' });
+        const order = await Order.findOne({
+             _id: orderId,
+             userId: userId,
+             status: { $in: ['Pending', 'PaymentPending', 'PaymentFailed'] }, // User can cancel PaymentFailed too
+             $or: [ 
+                 { cancellationAllowedUntil: { $exists: false } }, 
+                 { cancellationAllowedUntil: { $gt: Date.now() } }
+             ]
+         }).populate('products.productId', '_id name').populate('userId', 'name').session(sessionDB);
+
+         if (!order) {
+            await sessionDB.abortTransaction(); sessionDB.endSession();
+            const checkOrder = await Order.findById(orderId).select('status cancellationAllowedUntil').lean();
+            let reasonMsg = 'Order not found or cannot be cancelled at this stage.';
+            if (checkOrder && checkOrder.status === 'Pending' && checkOrder.cancellationAllowedUntil && new Date(checkOrder.cancellationAllowedUntil).getTime() <= Date.now()) {
+                reasonMsg = 'Cancellation window has expired for this order.';
+            }
+            req.flash('error_msg', reasonMsg); return res.redirect('/orders/my-orders');
+         }
+
+        if (order.status === 'Pending') { // Only for 'Pending' as stock was debited.
+            console.log(`User Cancel (Order ID ${orderId}): Restoring stock for order in 'Pending' status.`);
+            const restorePromises = order.products.map(item => {
+                const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`User Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
+                return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`User Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
+            });
+            await Promise.allSettled(restorePromises); console.log(`User Cancel: Stock restore complete O.ID ${orderId}.`);
+        } else { // For PaymentPending or PaymentFailed, stock wasn't debited or was already handled if previously failed.
+            console.log(`User Cancel (Order ID ${orderId}): Order was in ${order.status}, no stock restoration needed.`);
+        }
+
+        order.status = 'Cancelled';
+        order.cancellationReason = "Cancelled by customer";
+        order.cancellationAllowedUntil = undefined;
+        await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
+
+         try {
+              const subject = `Order Cancelled - miniapp`; let text = `Your order (#${order._id}) has been cancelled.`;
+              let emailBodyLines = [
+                  `Your order (#${order._id}) has been cancelled as per your request.`,
+                  `Hope to serve you soon!`
+                ];
+              // Add refund note only if it was a successfully paid order now being cancelled.
+              if (order.paymentMethod === 'Razorpay' && order.paymentVerified && order.status !== 'Pending') { // status becomes Cancelled here, check original verify state
+                 text += ' A refund for this pre-paid order will be processed by site administrators if applicable.';
+                 emailBodyLines.splice(1,0, 'If this was a pre-paid order, any applicable refund will be processed by site administrators.');
+                 console.warn(`USER CANCELLATION NOTE: Order ${orderId} was Razorpay-paid and verified. Manual refund potentially needed if cancellation occurred after payment but before fulfillment via admin processing.`);
+              }
+              const html = generateEmailHtml({ recipientName: order.userId?.name || req.session.user.name, subject: subject, greeting: 'Order Cancellation Confirmation', bodyLines: emailBodyLines, buttonUrl: `${req.protocol}://${req.get('host')}/`, buttonText: 'Continue Shopping', companyName: 'miniapp' });
              await sendEmail(order.userEmail, subject, text, html);
           } catch (emailError){ console.error(`Failed sending cancel confirm email O.ID ${order._id}:`, emailError); }
          req.flash('success_msg', 'Order cancelled successfully.'); res.redirect('/orders/my-orders');
@@ -597,24 +886,41 @@ exports.order_getMyOrders = async (req, res, next) => {
          const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
          const now = Date.now();
          orders.forEach(order => {
-             order.isCancellable = order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime();
+             order.isCancellable = (order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime()) ||
+                                   (order.paymentMethod === 'Razorpay' && ['PaymentPending', 'PaymentFailed'].includes(order.status));
              order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
          });
          res.render('user/my-orders', { title: 'My Orders', orders: orders });
      } catch (error) { console.error("Error fetching user orders:", error); next(error); }
  };
 
-exports.order_generateAndSendDirectDeliveryOTPByAdmin = async (orderId) => { // Internal function for Admin Controller
-    try {
-        const order = await Order.findById(orderId); if (!order) throw new Error('Order not found.'); if (order.status !== 'Pending') throw new Error(`OTP only for 'Pending' status (is ${order.status}).`);
-        const otp = generateOTP(); const otpExpires = setOTPExpiration(5); order.orderOTP = otp; order.orderOTPExpires = otpExpires; await order.save();
-        const user = await User.findById(order.userId).select('email');
-        console.log(`ADMIN generated OTP for O.ID ${orderId}: ${otp} (User: ${user?.email || '[NA]'}).`);
-        return { success: true, message: `OTP generated for order ${orderId}.` };
-    } catch (error) { console.error(`Admin OTP Gen Error O.ID ${orderId}:`, error); throw error; }
-};
+// ... (order_generateAndSendDirectDeliveryOTPByAdmin and other admin/seller order helpers - NO CHANGES to these internal logic functions)
+exports.order_getMyOrders = async (req, res, next) => {
+     try {
+         const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
+         const now = Date.now();
+         orders.forEach(order => {
+             order.isCancellable = (order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime()) ||
+                                   (order.paymentMethod === 'Razorpay' && ['PaymentPending', 'PaymentFailed'].includes(order.status));
+             order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
+         });
 
-exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => { // Internal function for Seller Controller
+         // --- MODIFIED: Pass query parameters to the template ---
+         const paymentStatus = req.query.payment; // e.g., "success"
+         const processedOrderId = req.query.order_id; // The ID of the order processed
+
+         res.render('user/my-orders', { 
+             title: 'My Orders', 
+             orders: orders,
+             paymentStatus: paymentStatus,     // Pass paymentStatus
+             processedOrderId: processedOrderId  // Pass processedOrderId
+         });
+         // --- END MODIFICATION ---
+
+     } catch (error) { console.error("Error fetching user orders:", error); next(error); }
+ };
+
+exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerId) => {
     try {
         const order = await Order.findById(orderId).populate('products.productId', 'sellerId');
         if (!order) throw new Error('Order not found.'); if (order.status !== 'Pending') throw new Error(`OTP only for 'Pending' status (is ${order.status}).`);
@@ -625,14 +931,13 @@ exports.order_generateAndSendDirectDeliveryOTPBySeller = async (orderId, sellerI
         return { success: true, message: `OTP generated for order ${orderId}.` };
     } catch (error) { console.error(`Seller OTP Gen Error O.ID ${orderId} by Seller ${sellerId}:`, error); throw error; }
 };
-
-exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper = null) => { // Internal for Admin Controller
+exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, providedOtp, resForHelper = null) => { 
      try {
          const order = await Order.findOne({ _id: orderId, status: 'Pending', orderOTP: providedOtp, orderOTPExpires: { $gt: Date.now() } });
          if (!order) { const check = await Order.findById(orderId).select('status orderOTP orderOTPExpires'); if (!check) throw new Error('Order not found.'); if (check.status !== 'Pending') throw new Error(`Order is ${check.status}.`); if (check.orderOTP !== providedOtp) throw new Error('Invalid OTP.'); if (!check.orderOTPExpires || check.orderOTPExpires <= Date.now()) throw new Error('Expired OTP.'); throw new Error('OTP verify failed.'); }
          order.status = 'Delivered'; order.receivedByDate = new Date(); order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined; await order.save();
          console.log(`O.ID ${orderId} confirmed delivered by ADMIN ${adminUserId}`);
-         try { // Send confirm email
+         try { 
             const subject = `Order Delivered - miniapp!`; const deliveredDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Order ${order._id} delivered on ${deliveredDate}. Confirmed by Admin.`;
             const html = generateEmailHtml({ recipientName: order.shippingAddress.name, subject: subject, greeting: `Order Delivered!`, bodyLines: [`Order #${order._id} delivered.`, `<strong>Delivered On:</strong> ${deliveredDate}. Confirmed by admin.`], buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`, buttonText: 'View Order Details', companyName: 'miniapp' });
@@ -641,15 +946,14 @@ exports.order_confirmDirectDeliveryByAdmin = async (orderId, adminUserId, provid
          return { success: true, order: order };
      } catch (error) { console.error(`Admin Confirm OTP Error O.ID ${orderId} by Admin ${adminUserId}:`, error); throw error; }
   };
-
-exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, resForHelper = null) => { // Internal for Seller Controller
+exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, providedOtp, resForHelper = null) => {
      try {
          const order = await Order.findOne({ _id: orderId, status: 'Pending', orderOTP: providedOtp, orderOTPExpires: { $gt: Date.now() } }).populate('products.productId', 'sellerId');
          if (!order) { const check = await Order.findById(orderId).select('status orderOTP orderOTPExpires'); if (!check) throw new Error('Order not found.'); if (check.status !== 'Pending') throw new Error(`Order is ${check.status}.`); if (check.orderOTP !== providedOtp) throw new Error('Invalid OTP.'); if (!check.orderOTPExpires || check.orderOTPExpires <= Date.now()) throw new Error('Expired OTP.'); throw new Error('OTP verify failed.'); }
          if (!order.products.some(p => p.productId?.sellerId?.toString() === sellerId.toString())) { console.warn(`Seller ${sellerId} attempt confirm unrelated O.ID ${orderId}.`); throw new Error('Permission Denied: Irrelevant order.'); }
          order.status = 'Delivered'; order.receivedByDate = new Date(); order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined; await order.save();
          console.log(`O.ID ${orderId} confirmed delivered by SELLER ${sellerId}`);
-         try { // Send confirm email
+         try { 
             const subject = `Order Delivered - miniapp`; const deliveredDate = resForHelper?.locals?.formatDateIST(order.receivedByDate) || new Date(order.receivedByDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
             const text = `Order ${order._id} delivered on ${deliveredDate}. Confirmed by Seller.`;
             const html = generateEmailHtml({ recipientName: order.shippingAddress.name, subject: subject, greeting: `Order Delivered!`, bodyLines: [`Order #${order._id} delivered.`, `<strong>Delivered On:</strong> ${deliveredDate}. Confirmed by seller.`], buttonUrl: `${resForHelper?.req?.protocol || 'http'}://${resForHelper?.req?.get('host') || 'localhost'}/orders/my-orders`, buttonText: 'View Order Details', companyName: 'miniapp' });
@@ -659,12 +963,14 @@ exports.order_confirmDirectDeliveryBySeller = async (orderId, sellerId, provided
      } catch (error) { console.error(`Seller Confirm OTP Error O.ID ${orderId} by Seller ${sellerId}:`, error); throw error; }
  };
 
+
 // ============================
 // Product Controller Functions
 // ============================
+// ... (product_getProducts, product_getProductDetails, etc. - NO CHANGES to these) ...
 const escapeRegex = (string) => string.replace(/[-\[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-exports.product_getProducts = async (req, res, next) => { // Also used by home page, indirectly via search/filter
+exports.product_getProducts = async (req, res, next) => { 
   try {
     const searchTerm = req.query.search || ''; const categoryFilter = req.query.category || '';
     let query = { reviewStatus: 'approved', stock: { $gt: 0 } }; let sort = { createdAt: -1 }; const projection = {};
@@ -716,9 +1022,11 @@ exports.product_getProductSuggestions = async (req, res, next) => {
      } catch (error) { console.error("Error fetching suggestions:", error); res.status(500).json({ error: 'Failed to fetch' }); }
  };
 
+
 // ============================
 // User Controller Functions
 // ============================
+// ... (user_getUserProfilePage, user_updateUserName, etc. - NO CHANGES to these) ...
 exports.user_getUserProfilePage = async (req, res, next) => {
     try {
         const user = await User.findById(req.session.user._id).select('name email role address createdAt').lean();
@@ -726,7 +1034,6 @@ exports.user_getUserProfilePage = async (req, res, next) => {
         res.render('user/profile', { title: 'My Profile', user: user });
     } catch (error) { next(error); }
 };
-
 exports.user_updateUserName = async (req, res, next) => {
      const { name } = req.body; const userId = req.session.user._id;
      if (!name || typeof name !== 'string' || name.trim().length < 2) { req.flash('error_msg', 'Valid name >= 2 chars required.'); return res.redirect('/user/profile'); }
@@ -739,7 +1046,6 @@ exports.user_updateUserName = async (req, res, next) => {
          console.error("Error updating name:", error); next(error);
      }
  };
-
 exports.user_saveAddress = async (req, res, next) => {
      const { name, phone, pincode, locality, cityVillage, landmarkNearby, source, state, district, mandal } = req.body; const userId = req.session.user._id;
      const redirectPath = (source === 'profile') ? '/user/profile' : '/user/checkout';
@@ -761,7 +1067,6 @@ exports.user_saveAddress = async (req, res, next) => {
          next(error);
      }
  };
-
 exports.user_getCart = async (req, res, next) => {
      try {
          const user = await User.findById(req.session.user._id).populate('cart.productId', 'name price imageUrl stock _id reviewStatus').lean();
@@ -782,8 +1087,7 @@ exports.user_getCart = async (req, res, next) => {
          res.render('user/cart', { title: 'Your Shopping Cart', cart: populatedCart, cartTotal: cartTotal });
        } catch (error) { next(error); }
  };
-
-exports.user_addToCart = async (req, res, next) => { // Form submission (Product Detail)
+exports.user_addToCart = async (req, res, next) => { 
      const { productId, quantity = 1 } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
      if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 1) { req.flash('error_msg', 'Invalid product/quantity.'); return res.redirect(req.headers.referer || '/'); }
      try {
@@ -803,12 +1107,11 @@ exports.user_addToCart = async (req, res, next) => { // Form submission (Product
          }
          await user.save(); req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity })); await req.session.save();
          req.flash('success_msg', `${product.name} added to cart!`);
-         if(req.query.redirectTo === 'checkout') { return res.redirect('/user/checkout'); } // Buy Now logic
-         else { return res.redirect('/user/cart'); } // Standard Add to Cart redirects to Cart page
+         if(req.query.redirectTo === 'checkout') { return res.redirect('/user/checkout'); } 
+         else { return res.redirect('/user/cart'); } 
      } catch (error) { if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.redirect('/'); } console.error("Add Cart Error:", error); next(error); }
  };
-
-exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
+exports.user_addToCartAjax = async (req, res, next) => { 
      const { productId, quantity = 1 } = req.body; const userId = req.session.user._id; const numQuantity = parseInt(quantity, 10);
      if (!productId || !mongoose.Types.ObjectId.isValid(productId)) return res.status(400).json({ success: false, message: 'Invalid product ID.' });
      if (isNaN(numQuantity) || numQuantity < 1) return res.status(400).json({ success: false, message: 'Invalid quantity.' });
@@ -833,58 +1136,49 @@ exports.user_addToCartAjax = async (req, res, next) => { // AJAX (Product Index)
          return res.status(200).json({ success: true, message: `${product.name} added!`, cartItemCount: updatedCartItemCount });
      } catch (error) { console.error("AJAX Add Cart Error:", error); let status = 500; let msg = 'Error adding item.'; if (error.name === 'CastError') { status = 400; msg = 'Invalid product ID.'; } return res.status(status).json({ success: false, message: msg }); }
  };
-
 exports.user_updateCartQuantity = async (req, res, next) => {
     const { productId, quantity } = req.body;
     const userId = req.session.user._id;
     const numQuantity = parseInt(quantity, 10);
-
     if (!productId || !mongoose.Types.ObjectId.isValid(productId) || isNaN(numQuantity) || numQuantity < 0) {
         return res.status(400).json({ success: false, message: 'Invalid product/quantity.' });
     }
-
     try {
         const [user, product] = await Promise.all([
             User.findById(userId),
             Product.findById(productId).select('stock price reviewStatus name')
         ]);
-
         if (!user || !product) {
             return res.status(404).json({ success: false, message: 'User/Product not found.' });
         }
-
         if (product.reviewStatus !== 'approved') {
             const index = user.cart.findIndex(i => i.productId.toString() === productId);
             if (index > -1) {
                 user.cart.splice(index, 1);
                 await user.save();
                 req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-                await req.session.save(); // Save session after cart update
+                await req.session.save(); 
             }
-            // After removal, calculate the new cart item count for the response
             const updatedCartItemCountAfterRemoval = user.cart.reduce((sum, item) => sum + item.quantity, 0);
             return res.status(400).json({
                 success: false,
                 message: `Product "${product.name}" unavailable, removed.`,
                 removal: true,
-                cartItemCount: updatedCartItemCountAfterRemoval // Send updated count
+                cartItemCount: updatedCartItemCountAfterRemoval
             });
         }
-
         const index = user.cart.findIndex(i => i.productId.toString() === productId);
-
         if (numQuantity === 0) {
             if (index > -1) {
                 user.cart.splice(index, 1);
             }
         } else {
             if (product.stock < numQuantity) {
-                // If stock is low, do not change the cart. Respond with current cart count.
                 const currentCartItemCount = user.cart.reduce((sum, item) => sum + item.quantity, 0);
                 return res.status(400).json({
                     success: false,
                     message: `Stock low: ${product.name} (${product.stock} avail).`,
-                    cartItemCount: currentCartItemCount // Send current count
+                    cartItemCount: currentCartItemCount
                 });
             }
             if (index > -1) {
@@ -893,17 +1187,11 @@ exports.user_updateCartQuantity = async (req, res, next) => {
                 user.cart.push({ productId, quantity: numQuantity });
             }
         }
-
         await user.save();
         req.session.user.cart = user.cart.map(i => ({ productId: i.productId, quantity: i.quantity }));
-
         let cartTotal = 0;
         let itemSubtotal = 0;
-
-        // Re-fetch user to get populated cart for accurate totals based on current prices
-        // This also ensures we have the most up-to-date cart state for item count.
         const updatedUser = await User.findById(userId).populate('cart.productId', 'price').lean();
-
         updatedUser.cart.forEach(i => {
             if (i.productId?.price) {
                 const currentSub = i.productId.price * i.quantity;
@@ -913,24 +1201,19 @@ exports.user_updateCartQuantity = async (req, res, next) => {
                 }
             }
         });
-
-        // Calculate the final cart item count
         const updatedCartItemCount = updatedUser.cart.reduce((sum, item) => sum + item.quantity, 0);
-
-        await req.session.save(); // Save session after all updates
-
+        await req.session.save(); 
         res.json({
             success: true,
             message: 'Cart updated.',
             newQuantity: user.cart.find(i => i.productId.toString() === productId)?.quantity ?? 0,
             itemSubtotal,
             cartTotal,
-            cartItemCount: updatedCartItemCount, // Send updated count
+            cartItemCount: updatedCartItemCount,
             itemId: productId
         });
     } catch (error) {
         console.error("Cart Update Error:", error);
-        // Try to get current cart count even on error for client UI consistency
         let currentCartItemCountOnError = 0;
         if (req.session.user?.cart) {
             currentCartItemCountOnError = req.session.user.cart.reduce((sum, item) => sum + item.quantity, 0);
@@ -938,12 +1221,10 @@ exports.user_updateCartQuantity = async (req, res, next) => {
         res.status(500).json({
             success: false,
             message: 'Error updating quantity.',
-            cartItemCount: currentCartItemCountOnError // Send best-effort count
+            cartItemCount: currentCartItemCountOnError 
         });
     }
 };
-
-
 exports.user_removeFromCart = async (req, res, next) => {
      const { productId } = req.params; const userId = req.session.user._id;
      if (!productId || !mongoose.Types.ObjectId.isValid(productId)) { req.flash('error_msg', 'Invalid Product ID.'); return res.redirect('/user/cart'); }
@@ -957,7 +1238,6 @@ exports.user_removeFromCart = async (req, res, next) => {
          res.redirect('/user/cart');
      } catch (error) { console.error("Remove Cart Error:", error); next(error); }
  };
-
 exports.user_getCheckoutPage = async (req, res, next) => {
     try {
        const user = await User.findById(req.session.user._id).populate('cart.productId', 'name price imageUrl stock reviewStatus sellerId _id').lean();
@@ -976,10 +1256,11 @@ exports.user_getCheckoutPage = async (req, res, next) => {
              if (itemsToRemove.length > 0) { await User.updateOne({ _id: user._id }, { $pull: { cart: { _id: { $in: itemsToRemove } } } }); const updated = await User.findById(user._id).select('cart').lean(); req.session.user.cart = updated?.cart.map(i => ({ productId: i.productId, quantity: i.quantity })) || []; await req.session.save(); issueMessages.push('Removed problematic items.'); }
              req.flash('error_msg', "Resolve cart issues: " + issueMessages.join(' ')); return res.redirect('/user/cart');
         }
-       res.render('user/checkout', { title: 'Checkout', userAddress: user.address, items: items, subTotal: subTotal, totalAmount: subTotal, paymentMethod: 'COD' });
+       res.render('user/checkout', { title: 'Checkout', userAddress: user.address, items: items, subTotal: subTotal, totalAmount: subTotal,
+       RAZORPAY_KEY_ID: Config.RAZORPAY_KEY_ID
+        });
    } catch (error) { next(error); }
  };
-
 exports.user_lookupPincode = async (req, res) => {
     const { pincode } = req.params; const API_URL = `https://api.postalpincode.in/pincode/${pincode}`;
     if (!pincode || !/^\d{6}$/.test(pincode)) return res.status(400).json({ success: false, message: 'Invalid Pincode (6 digits).' });
@@ -997,17 +1278,17 @@ exports.user_lookupPincode = async (req, res) => {
     } catch (error) { console.error(`Pincode lookup Net/Req Error ${pincode}:`, error.message); let status = 500; let msg = 'Error looking up pincode.'; if (axios.isAxiosError(error)) { if (error.code === 'ECONNABORTED') { msg = 'Lookup timeout.'; status = 504; } else if (error.response) { msg = `API error (${error.response.status}).`; status = 502; } else if (error.request) { msg = 'Net error.'; status = 502; } } res.status(status).json({ success: false, message: msg }); }
 };
 
+
 // ============================
 // Seller Controller Functions
 // ============================
+// ... (Existing Seller controllers - NO CHANGES for these product/dashboard ones)
 exports.seller_getDashboard = (req, res) => {
     res.render('seller/dashboard', { title: 'Seller Dashboard' });
 };
-
 exports.seller_getUploadProductPage = (req, res) => {
     res.render('seller/upload-product', { title: 'Upload New Product', product: {}, categories: categories });
 };
-
 exports.seller_uploadProduct = async (req, res, next) => {
      const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
      const sellerId = req.session.user._id; const sellerEmail = req.session.user.email;
@@ -1034,14 +1315,12 @@ exports.seller_uploadProduct = async (req, res, next) => {
          console.error("Seller Upload Error:", error); next(error);
      }
  };
-
 exports.seller_getManageProductsPage = async (req, res, next) => {
     try {
         const products = await Product.find({ sellerId: req.session.user._id }).sort({ createdAt: -1 }).lean();
         res.render('seller/manage-products', { title: 'Manage Your Products', products: products });
     } catch (error) { next(error); }
 };
-
 exports.seller_getEditProductPage = async (req, res, next) => {
       try {
          const product = await Product.findOne({ _id: req.params.id, sellerId: req.session.user._id }).lean();
@@ -1049,7 +1328,6 @@ exports.seller_getEditProductPage = async (req, res, next) => {
          res.render('seller/edit-product', { title: `Edit Product: ${product.name}`, product: product, categories: categories });
     } catch (error) { if (error.name === 'CastError') { req.flash('error_msg', 'Invalid product ID.'); return res.redirect('/seller/products'); } next(error); }
  };
-
 exports.seller_updateProduct = async (req, res, next) => {
       const productId = req.params.id; const sellerId = req.session.user._id; const { name, category, price, stock, imageUrl, imageUrl2, specifications, shortDescription } = req.body;
       let productData = { _id: productId, ...req.body }; const renderOpts = { title: `Edit Error`, product: productData, categories: categories };
@@ -1076,7 +1354,6 @@ exports.seller_updateProduct = async (req, res, next) => {
            console.error("Seller Update Error:", error); next(error);
       }
   };
-
 exports.seller_removeProduct = async (req, res, next) => {
      const productId = req.params.id; const sellerId = req.session.user._id;
      try {
@@ -1088,7 +1365,6 @@ exports.seller_removeProduct = async (req, res, next) => {
          console.error("Seller Remove Error:", error); req.flash('error_msg', 'Error removing.'); res.redirect('/seller/products');
      }
  };
-
 exports.seller_getManageOrdersPage = async (req, res, next) => {
      try {
          const sellerId = req.session.user._id;
@@ -1097,7 +1373,9 @@ exports.seller_getManageOrdersPage = async (req, res, next) => {
          const orders = await Order.find({ 'products.productId': { $in: sellerProdIds } }).sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price sellerId').populate('userId', 'name email').lean();
          const now = Date.now();
          orders.forEach(order => {
-              order.isRelevantToSeller = true; order.canBeDirectlyDeliveredBySeller = order.status === 'Pending'; order.canBeCancelledBySeller = order.status === 'Pending';
+              order.isRelevantToSeller = true; 
+              order.canBeDirectlyDeliveredBySeller = order.status === 'Pending'; 
+              order.canBeCancelledBySeller = ['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status); 
               order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
               if (order.products?.length > 0) {
                   order.itemsSummary = order.products.map(p => { const isSellerItem = p.productId?.sellerId?.toString() === sellerId.toString(); const price = p.priceAtOrder ?? p.productId?.price ?? 0; const name = p.productId?.name || p.name || '[?Name?]'; return `${isSellerItem ? '<strong>' : ''}${name} (Qty: ${p.quantity}) @ ₹${price.toFixed(2)}${isSellerItem ? ' (Yours)</strong>' : ''}`; }).join('<br>');
@@ -1106,11 +1384,10 @@ exports.seller_getManageOrdersPage = async (req, res, next) => {
          res.render('seller/manage-orders', { title: 'Manage Your Orders', orders: orders, message: null, sellerCancellationReasons: sellerCancellationReasons });
      } catch (error) { next(error); }
  };
-
 exports.seller_sendDirectDeliveryOtpBySeller = async (req, res, next) => {
      const orderId = req.params.orderId; const sellerId = req.session.user._id;
-     try { // Middleware `isOrderRelevantToSeller` should have run
-         const orderCheck = await Order.findById(orderId).select('status').lean(); // Quick check
+     try { 
+         const orderCheck = await Order.findById(orderId).select('status').lean(); 
          if (!orderCheck) throw new Error("Order not found.");
          if (orderCheck.status !== 'Pending') throw new Error(`Cannot send OTP for status ${orderCheck.status}.`);
          const result = await this.order_generateAndSendDirectDeliveryOTPBySeller(orderId, sellerId);
@@ -1118,44 +1395,106 @@ exports.seller_sendDirectDeliveryOtpBySeller = async (req, res, next) => {
      } catch (error) { req.flash('error_msg', `OTP Send Failed: ${error.message}`); }
      res.redirect('/seller/orders');
  };
-
 exports.seller_confirmDirectDeliveryBySeller = async (req, res, next) => {
       const orderId = req.params.orderId; const { otp } = req.body; const sellerId = req.session.user._id;
       if (!otp || !/^\d{6}$/.test(otp.trim())) { req.flash('error_msg', 'Enter 6-digit OTP.'); return res.redirect('/seller/orders'); }
-      try { // Middleware `isOrderRelevantToSeller` should have run
+      try { 
           const { order } = await this.order_confirmDirectDeliveryBySeller(orderId, sellerId, otp.trim(), res);
          req.flash('success_msg', `Order ${orderId} confirmed delivered by you.`);
       } catch (error) { req.flash('error_msg', `Confirm Failed: ${error.message}`); }
       res.redirect('/seller/orders');
   };
-
 exports.seller_cancelOrderBySeller = async (req, res, next) => {
-     const { orderId } = req.params; const { reason } = req.body; const sellerId = req.session.user._id; const sellerEmail = req.session.user.email;
+     const { orderId } = req.params; const { reason } = req.body; const sellerId = req.session.user._id;
      if (!reason || !sellerCancellationReasons.includes(reason)) { req.flash('error_msg', 'Select valid seller reason.'); return res.redirect('/seller/orders'); }
      const sessionDB = await mongoose.startSession(); sessionDB.startTransaction();
-     try { // Middleware `isOrderRelevantToSeller` should have run
+     try {
          const order = await Order.findById(orderId).populate('products.productId', 'sellerId name _id').populate('userId', 'email name').session(sessionDB);
          if (!order) { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', 'Order not found.'); return res.status(404).redirect('/seller/orders'); }
-         if (order.status !== 'Pending') { await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('error_msg', `Order is '${order.status}'. Cannot cancel.`); return res.redirect('/seller/orders'); }
-         console.log(`Seller Cancel: Restore stock seller ${sellerId} O.ID ${orderId}.`);
-         const restorePromises = order.products .filter(item => item.productId?.sellerId?.toString() === sellerId.toString()) .map(item => {
-             const qty = Number(item.quantity); if (!item.productId?._id || isNaN(qty) || qty <= 0) { console.warn(`Seller Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); return Promise.resolve(); }
-             console.log(`Seller Cancel: Restore ${qty} stock P.ID ${item.productId._id}`);
-             return Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Seller Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`));
-          });
-         await Promise.allSettled(restorePromises); console.log(`Seller Cancel: Stock restore done ${sellerId} O.ID ${orderId}.`);
-         order.status = 'Cancelled'; order.cancellationReason = `Cancelled by Seller: ${reason}`; order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined;
+         if (!['Pending', 'PaymentPending', 'PaymentFailed'].includes(order.status)) { 
+            await sessionDB.abortTransaction(); sessionDB.endSession(); 
+            req.flash('error_msg', `Order is '${order.status}'. Cannot cancel items.`); return res.redirect('/seller/orders'); 
+         }
+         console.log(`Seller Cancel: Order ${orderId}, Seller ${sellerId}. Current order status: ${order.status}`);
+
+         let sellerItemsCancelled = false;
+         let orderBecomesFullyCancelled = true; // Assume it will be fully cancelled
+
+         if (order.status === 'Pending') {
+             const restorePromises = [];
+             order.products.forEach(item => {
+                 if (item.productId?.sellerId?.toString() === sellerId.toString()) {
+                     sellerItemsCancelled = true;
+                     const qty = Number(item.quantity); 
+                     if (!item.productId?._id || isNaN(qty) || qty <= 0) { 
+                         console.warn(`Seller Cancel: Invalid item ${item.productId?._id}/Qty ${item.quantity} O.ID ${orderId}.`); 
+                         return;
+                     }
+                     console.log(`Seller Cancel: Restore ${qty} stock P.ID ${item.productId._id}`);
+                     restorePromises.push(Product.updateOne({ _id: item.productId._id }, { $inc: { stock: qty, orderCount: -1 } }, { session: sessionDB }).catch(err => console.error(`Seller Cancel: Fail stock P.ID ${item.productId._id} O.ID ${orderId}: ${err.message}`)));
+                 } else {
+                     orderBecomesFullyCancelled = false; // There are items from other sellers or no-seller items
+                 }
+             });
+             if (restorePromises.length > 0) await Promise.allSettled(restorePromises);
+         } else { 
+            order.products.forEach(item => {
+                if(item.productId?.sellerId?.toString() === sellerId.toString()) {
+                    sellerItemsCancelled = true;
+                } else {
+                     orderBecomesFullyCancelled = false;
+                }
+            });
+         }
+
+         if (!sellerItemsCancelled) { 
+             await sessionDB.abortTransaction(); sessionDB.endSession(); req.flash('info_msg', 'No items from your store to cancel in this order.'); return res.redirect('/seller/orders');
+         }
+         
+         // Logic for setting order status
+         if (orderBecomesFullyCancelled) {
+             order.status = 'Cancelled'; 
+             order.cancellationReason = (order.cancellationReason ? order.cancellationReason + " | " : "") + `Seller (${req.session.user.email}) cancelled all item(s): ${reason}`;
+         } else {
+             // Order remains 'Pending' or its original pre-cancellation status if other items exist
+             // but we need to record that some items were cancelled by this seller.
+             order.cancellationReason = (order.cancellationReason ? order.cancellationReason + " | " : "") + `Seller (${req.session.user.email}) cancelled some items: ${reason}. Order may still proceed with other items.`;
+             // If it was PaymentPending/Failed, it should probably become Cancelled if this seller had the *only* items, or 'PaymentFailed' if others remain.
+             // This area can be complex. For now: if not fully cancelled, keep original status if it was 'Pending', otherwise use a general "PartiallyCancelled" status if available, or just add to reason.
+             // Sticking to simplicity: if NOT all items cancelled by THIS action, it just updates the reason string, and order status isn't changed by this seller, admin should review complex cases.
+             // For current schema, 'Cancelled' is the only available terminal state besides 'Delivered'.
+             // A better system might have "Partially Cancelled" or similar.
+             // For now: If order is NOT fully cancelled, it doesn't change the status unless admin changes it.
+             // *However*, if the order WAS PaymentPending/Failed, and seller cancels their items, the order effectively becomes 'Cancelled'
+             // if those were the only items.
+             if (['PaymentPending', 'PaymentFailed'].includes(order.status) && orderBecomesFullyCancelled) {
+                 order.status = 'Cancelled';
+             } else if (!orderBecomesFullyCancelled) {
+                console.log(`Order ${orderId} not fully cancelled by seller. Original status ${order.status} may be retained or reviewed by admin.`);
+                // No status change from this seller alone unless they were the only one.
+             }
+         }
+         
+         order.orderOTP = undefined; order.orderOTPExpires = undefined; order.cancellationAllowedUntil = undefined;
          await order.save({ session: sessionDB }); await sessionDB.commitTransaction();
-         try { // Send email
+
+         try {
               const customerEmail = order.userEmail || order.userId?.email; const customerName = order.shippingAddress.name || order.userId?.name || 'Customer';
               if(customerEmail) {
-                  const subject = `Order Cancelled - miniapp`; const text = `Order (${order._id}) cancelled by seller. Reason: ${reason}.`;
-                  const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Regarding Order #${order._id}`, bodyLines: [`Items in order (#${order._id}) cancelled by seller.`, `<strong>Reason:</strong> ${reason}`, `Refund processed if applicable.`], buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
+                  const subject = `Items Cancelled in Order #${order._id} - miniapp`;
+                  const text = `Some items in your order (${order._id}) were cancelled by a seller. Reason: ${reason}.`;
+                  let bodyLines = [`One or more items in your order (#${order._id}) have been cancelled by a seller.`, `<strong>Reason:</strong> ${reason}`, `View order details for more information.`];
+
+                  if (order.paymentMethod === 'Razorpay' && order.paymentVerified) {
+                     bodyLines.push(`If your order was pre-paid, an applicable refund for these items will be processed by site administrators.`);
+                     console.warn(`SELLER CANCELLATION NOTE: Items in Order ${orderId} were Razorpay-paid. Manual refund may be needed by admin from Razorpay dashboard if not automatically handled for partial cancellations. Amount related to cancelled items needs review.`);
+                  }
+                  const html = generateEmailHtml({ recipientName: customerName, subject: subject, greeting: `Update for Order #${order._id}`, bodyLines: bodyLines, buttonUrl: `${req.protocol}://${req.get('host')}/orders/my-orders`, buttonText: 'My Orders', companyName: 'miniapp' });
                   await sendEmail(customerEmail, subject, text, html);
               } else console.warn(`Seller Cancel: Cannot find customer email O.ID ${orderId}.`);
          } catch (emailError) { console.error(`Seller Cancel: Fail send email O.ID ${order._id}:`, emailError); }
-         req.flash('success_msg', `Order ${orderId} cancelled. Reason: ${reason}. Customer notified.`); res.redirect('/seller/orders');
+         req.flash('success_msg', `Your items in order ${orderId} have been cancelled. Reason: ${reason}. Customer notified.`); res.redirect('/seller/orders');
      } catch (error) {
          if(sessionDB.inTransaction()) await sessionDB.abortTransaction(); console.error(`Error seller cancelling O.ID ${orderId}:`, error); req.flash('error_msg', 'Internal cancel error.'); res.redirect('/seller/orders');
-     } finally { if (sessionDB) sessionDB.endSession(); }
+     } finally { if (sessionDB) await sessionDB.endSession(); }
  };
