@@ -27,6 +27,7 @@
                         <th>Customer / Address</th>
                         <th>Items (Your items highlighted)</th>
                         <th>Total</th>
+                        <th>Payment Method</th> <%# <<< ADDED PAYMENT METHOD HEADER %>
                         <th>Status</th>
                         <th class="actions-cell">Actions</th>
                     </tr>
@@ -68,6 +69,15 @@
                                 <% } %>
                             </td>
                             <td data-label="Total" class="order-total"><strong>₹<%= order.totalAmount.toFixed(2) %></strong></td>
+                            <%# <<< ADDED PAYMENT METHOD DATA CELL %>
+                            <td data-label="Payment Method">
+                                <%= order.paymentMethod %>
+                                <% if (order.paymentMethod === 'Razorpay' && order.razorpayPaymentId) { %>
+                                    <br><small class="text-muted" title="Razorpay Payment ID: <%= order.razorpayPaymentId %>">Online Verified</small>
+                                <% } else if (order.paymentMethod === 'Razorpay' && !order.razorpayPaymentId && (order.status === 'PaymentPending' || order.status === 'PaymentFailed')) { %>
+                                    <br><small class="text-muted">Online Attempt</small>
+                                <% } %>
+                            </td>
                             <td data-label="Status" class="order-status-cell">
                                 <span class="status-badge status-<%= order.status.toLowerCase().replace(/ /g, '-') %>"><%= order.status %></span>
                                 <% if(order.status === 'Cancelled' && order.cancellationReason) { %>
@@ -134,7 +144,7 @@
                     <% }) %>
                     <%# --- ADD NO RESULTS ROW --- %>
                     <tr id="no-seller-orders-found" class="hidden">
-                        <td colspan="6" class="text-center text-muted p-3">No orders match your filter.</td>
+                        <td colspan="7" class="text-center text-muted p-3">No orders match your filter.</td> <%# <<< UPDATED COLSPAN %>
                     </tr>
                     <%# --- END NO RESULTS ROW --- %>
                 </tbody>
