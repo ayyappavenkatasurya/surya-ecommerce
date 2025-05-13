@@ -1,23 +1,31 @@
 .env :
+// .env
 NODE_ENV=development
-PORT=3000
+PORT=5000
 MONGO_URI=mongodb+srv://ecommerce:ecommerce@cluster0.jcfuk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
-SESSION_SECRET=e6142a6d230d0445c9b050af41bfd1e53ece6270797e546fbdaa97af20f3b77e # Use a strong, random secret
-SESSION_MAX_AGE=86400000 # 1 day in milliseconds
+SESSION_SECRET=e6142a6d230d0445c9b050af41bfd1e53ece6270797e546fbdaa97af20f3b77e
+SESSION_MAX_AGE=86400000
+
+# --- Frontend Origin URL (For CORS) ---
+FRONTEND_URL=http://localhost:5173
 
 # Email Configuration
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USER=ayyappanallamothu4@gmail.com
-MAIL_PASS=yxor nmot lxmq skyc # Use an App Password if using Gmail 2FA
-MAIL_FROM='"miniapp" <ayyappanallamothu4@gmail.com>' # Ensure format is correct
+MAIL_PASS=yxor nmot lxmq skyc
+MAIL_FROM='"miniapp" <ayyappanallamothu4@gmail.com>'
 
-# --- NEW: Add your Gemini API Key ---
+# --- Gemini API Key ---
 GEMINI_API_KEY=AIzaSyCX31vkQ9Qf7t-ytSeDZUGR8hK4XZUHQT0
 
-# --- NEW: Razorpay API Keys ---
-RAZORPAY_KEY_ID=rzp_test_pqiinPMS00E9lu # Replace with your actual Key ID
-RAZORPAY_KEY_SECRET=x7MZpBzxmuyH0opjy4RGg5r5 # Replace with your actual Key Secret
+# --- Razorpay API Keys ---
+RAZORPAY_KEY_ID=rzp_test_pqiinPMS00E9lu
+RAZORPAY_KEY_SECRET=x7MZpBzxmuyH0opjy4RGg5r5
+
+# --- Rate Limiting Config ---
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
 
 config.js :
 // config.js
@@ -8301,3 +8309,4 @@ views/user/profile.ejs :
 
 </div>
 <%- include('../partials/footer') %>
+
