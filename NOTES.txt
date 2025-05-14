@@ -8326,4 +8326,3 @@ views/user/profile.ejs :
 
 </div>
 <%- include('../partials/footer') %>
-
