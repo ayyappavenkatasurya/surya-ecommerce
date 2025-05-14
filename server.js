@@ -1,3 +1,4 @@
+
 // server.js
 require('dotenv').config();
 const express = require('express');
@@ -6,6 +7,7 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const flash = require('connect-flash');
 const methodOverride = require('method-override');
+// const rateLimit = require('express-rate-limit'); // Rate limiter will be defined and applied in routes.js
 
 // Import consolidated modules
 const Config = require('./config');

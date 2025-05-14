@@ -881,21 +881,9 @@ exports.order_cancelOrder = async (req, res, next) => {
      } finally { if (sessionDB) await sessionDB.endSession(); }
  };
 
-exports.order_getMyOrders = async (req, res, next) => {
-     try {
-         const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
-         const now = Date.now();
-         orders.forEach(order => {
-             order.isCancellable = (order.status === 'Pending' && order.cancellationAllowedUntil && now < new Date(order.cancellationAllowedUntil).getTime()) ||
-                                   (order.paymentMethod === 'Razorpay' && ['PaymentPending', 'PaymentFailed'].includes(order.status));
-             order.showDeliveryOtp = order.status === 'Pending' && !!order.orderOTP && !!order.orderOTPExpires && new Date(order.orderOTPExpires).getTime() > now;
-         });
-         res.render('user/my-orders', { title: 'My Orders', orders: orders });
-     } catch (error) { console.error("Error fetching user orders:", error); next(error); }
- };
+// REMOVED THE FIRST, SIMPLER DEFINITION OF order_getMyOrders
 
-// ... (order_generateAndSendDirectDeliveryOTPByAdmin and other admin/seller order helpers - NO CHANGES to these internal logic functions)
-exports.order_getMyOrders = async (req, res, next) => {
+exports.order_getMyOrders = async (req, res, next) => { // This is the correct, more detailed version
      try {
          const orders = await Order.find({ userId: req.session.user._id }).select('-__v').sort({ orderDate: -1 }).populate('products.productId', 'name imageUrl _id price').lean();
          const now = Date.now();

@@ -1,3 +1,5 @@
+
+
 // public/js/main.js
 console.log("Main JS loaded.");
 
@@ -264,10 +266,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const maxStock = parseInt(quantityInput.max, 10);
                 if (!isNaN(maxStock) && newQuantity > maxStock) {
                     showToast(`Only ${maxStock} items available in stock.`, 'warning');
-                    quantityInput.value = maxStock;
-                    return;
+                    quantityInput.value = maxStock; // Correct to max stock
+                    // Optionally, still proceed with update to maxStock if that's desired UX
+                    // updateCartItemQuantityAJAX(productId, maxStock, button, quantityInput);
+                    return; // Current logic: stop if user tries to go over max.
                 }
-                // Pass the button and quantityInput for UI updates within the AJAX function
                 updateCartItemQuantityAJAX(productId, newQuantity, button, quantityInput);
             }
         });
@@ -863,15 +866,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- Cart Update AJAX Function ---
 async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, quantityInputElement) {
-    // Note: originalButtonText should be 'Add' or similar from the cart page,
-    // it might be different from the index page's 'Add to Cart'.
-    // This function is specific to cart page updates.
-    const originalButtonText = 'Add'; // Default for the cart page update button
-    const loadingButtonText = '<i class="fas fa-spinner fa-spin"></i>';
     const cartItemDiv = buttonElement.closest('.cart-item');
+    
+    // Store original HTML content if not already stored
+    if (!buttonElement.dataset.originalHtmlContent) {
+        buttonElement.dataset.originalHtmlContent = buttonElement.innerHTML;
+    }
+    const originalButtonHtml = buttonElement.dataset.originalHtmlContent;
+    const loadingButtonHtml = '<i class="fas fa-spinner fa-spin"></i>';
 
     buttonElement.disabled = true;
-    buttonElement.innerHTML = loadingButtonText;
+    buttonElement.innerHTML = loadingButtonHtml;
     if(quantityInputElement) quantityInputElement.readOnly = true;
 
     try {
@@ -892,7 +897,6 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
                     cartItemDiv.style.marginBottom = '0'; cartItemDiv.style.borderWidth = '0';
                      setTimeout(() => {
                          if (cartItemDiv.parentNode) cartItemDiv.remove();
-                         // Use server-provided count if available, otherwise, client calculation is fallback
                          updateCartTotalAndBadge(data.cartTotal, data.cartItemCount);
                          handleEmptyCartDisplay();
                      }, 300);
@@ -940,7 +944,7 @@ async function updateCartItemQuantityAJAX(productId, quantity, buttonElement, qu
     } finally {
          if (cartItemDiv && (!cartItemDiv.style.opacity || parseFloat(cartItemDiv.style.opacity) !== 0)) {
              buttonElement.disabled = false;
-             buttonElement.innerHTML = originalButtonText;
+             buttonElement.innerHTML = originalButtonHtml; // Restore original HTML
              if(quantityInputElement) quantityInputElement.readOnly = false;
          }
      }
