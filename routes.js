@@ -90,7 +90,6 @@ router.use('/auth', authRouter);
 
 
 // --- Product Routes (Public Facing) ---
-// ... (Product router is unchanged) ...
 const productRouter = express.Router();
 productRouter.get('/suggestions', generalLimiter, product_getProductSuggestions);
 productRouter.get('/', generalLimiter, product_getProducts);
@@ -100,7 +99,6 @@ router.use('/products', productRouter);
 
 
 // --- User Routes (Authenticated) ---
-// ... (User router is unchanged) ...
 const userRouter = express.Router();
 userRouter.get('/pincode-lookup/:pincode', generalLimiter, user_lookupPincode);
 userRouter.use(isAuthenticated);
@@ -117,7 +115,6 @@ userRouter.get('/checkout', user_getCheckoutPage);
 router.use('/user', userRouter);
 
 // --- Order Routes (Authenticated) ---
-// ... (Order router is unchanged) ...
 const orderRouter = express.Router();
 orderRouter.use(isAuthenticated);
 orderRouter.post('/place-cod', paymentApiLimiter, order_placeCODOrder);
@@ -129,7 +126,6 @@ orderRouter.post('/cancel/:id', generalLimiter, order_cancelOrder);
 router.use('/orders', orderRouter);
 
 // --- Admin Routes (Authenticated + Admin Role) ---
-// ... (Admin router is unchanged) ...
 const adminRouter = express.Router();
 adminRouter.use(isAuthenticated, isAdmin);
 adminRouter.use(generalLimiter);
@@ -152,7 +148,6 @@ adminRouter.post('/manage-banners', admin_updateBanners);
 router.use('/admin', adminRouter);
 
 // --- Seller Routes (Authenticated + Seller Role) ---
-// ... (Seller router is unchanged) ...
 const sellerRouter = express.Router();
 sellerRouter.use(isAuthenticated, isSeller);
 sellerRouter.use(generalLimiter);
