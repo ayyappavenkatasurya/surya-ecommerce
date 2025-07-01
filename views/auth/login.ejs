@@ -3,24 +3,29 @@
 <div class="auth-container">
     <h1>Login</h1>
 
+    <%# --- MODIFIED: Add Google Button and OR divider --- %>
+    <a href="/auth/google" class="btn btn-google btn-block mb-3">
+        <i class="fab fa-google"></i> Continue with Google
+    </a>
+    <div class="auth-divider">
+        <span>OR</span>
+    </div>
+    <%# --- END MODIFICATION --- %>
+
     <form action="/auth/login" method="POST" class="auth-form form-submit-spinner">
         <div class="form-group">
             <label for="email">Email:</label>
-            <%# Added Placeholder %>
             <input type="email" id="email" name="email" placeholder="Enter your email" required autocomplete="email">
         </div>
-        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
             <div class="password-wrapper">
-                <%# Added Placeholder %>
                 <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
         </div>
-        <%# --- END: Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
     <div class="auth-links">

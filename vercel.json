@@ -1,15 +1,42 @@
+
 {
-    "version": 2,
-    "builds": [
-      {
-        "src": "server.js",
-        "use": "@vercel/node"
-      }
-    ],
-    "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "server.js"
-      }
-    ]
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": { "includeFiles": [".env"] }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/v1/(.*)",
+      "dest": "server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "@node_env",
+    "PORT": "@port",
+    "MONGO_URI": "@mongo_uri",
+    "SESSION_SECRET": "@session_secret",
+    "SESSION_MAX_AGE": "@session_max_age",
+    "MAIL_HOST": "@mail_host",
+    "MAIL_PORT": "@mail_port",
+    "MAIL_USER": "@mail_user",
+    "MAIL_PASS": "@mail_pass",
+    "MAIL_FROM": "@mail_from",
+    "GEMINI_API_KEY": "@gemini_api_key",
+    "RAZORPAY_KEY_ID": "@razorpay_key_id",
+    "RAZORPAY_KEY_SECRET": "@razorpay_key_secret",
+    "RATE_LIMIT_WINDOW_MS": "@rate_limit_window_ms",
+    "RATE_LIMIT_MAX_REQUESTS": "@rate_limit_max_requests",
+    
+    "SERVER_BASE_URL": "@server_base_url",
+    "GOOGLE_CLIENT_ID": "@google_client_id",
+    "GOOGLE_CLIENT_SECRET": "@google_client_secret"
   }
+}

@@ -2017,4 +2017,56 @@ tr.hidden {
   height: 100%;
 }
 
-/* --- End Product Image Slider Styles --- */
+/* public/css/style.css */
+
+/* Add this at the end of the Buttons section */
+.btn-google {
+    background-color: #ffffff;
+    color: #444;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.btn-google:hover,
+.btn-google:focus {
+    background-color: #f7f7f7;
+    border-color: #ccc;
+    color: #222;
+}
+.btn-google .fa-google {
+    color: #db4437; /* Google's red color */
+    margin-right: 10px;
+}
+
+/* Add this in the Auth section or a new dedicated area */
+.auth-divider {
+    text-align: center;
+    margin: 1.2rem 0;
+    overflow: hidden;
+    line-height: 1.2em;
+}
+.auth-divider span {
+    display: inline-block;
+    position: relative;
+    padding: 0 10px;
+    background-color: var(--card-bg);
+    color: var(--secondary-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    position: relative;
+    top: 50%;
+    width: 50%;
+    display: inline-block;
+    border-top: 1px solid var(--border-color);
+}
+.auth-divider::before {
+    margin-left: -50%;
+    right: 10px;
+}
+.auth-divider::after {
+    margin-right: -50%;
+    left: 10px;
+}

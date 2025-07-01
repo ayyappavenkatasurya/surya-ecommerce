@@ -2,44 +2,44 @@
 
 <div class="auth-container">
     <h1>Register</h1>
+    
+    <%# --- MODIFIED: Add Google Button and OR divider --- %>
+    <a href="/auth/google" class="btn btn-google btn-block mb-3">
+        <i class="fab fa-google"></i> Continue with Google
+    </a>
+    <div class="auth-divider">
+        <span>OR</span>
+    </div>
+    <%# --- END MODIFICATION --- %>
 
     <form action="/auth/register" method="POST" class="auth-form form-submit-spinner">
          <div class="form-group">
             <label for="name">Name:</label>
-            <%# Retain value on error, added placeholder %>
             <input type="text" id="name" name="name" placeholder="Enter your full name" required autocomplete="name" value="<%= typeof name !== 'undefined' ? name : '' %>">
         </div>
         <div class="form-group">
             <label for="email">Email:</label>
-             <%# Retain value on error, added placeholder %>
             <input type="email" id="email" name="email" placeholder="Enter your email address" required autocomplete="email" value="<%= typeof email !== 'undefined' ? email : '' %>">
         </div>
-         <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
             <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder, title attr, added helper text --- %>
                 <input type="password" id="password" name="password" placeholder="Create a password" minlength="8" required autocomplete="new-password" title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
-            <%# --- ADDED: Helper Text --- %>
             <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
         </div>
-         <%# --- END: Password Wrapper & Toggle Button --- %>
-         <%# --- ADDED: Confirm Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="confirmPassword">Confirm Password:</label>
              <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder --- %>
                 <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" minlength="8" required autocomplete="new-password">
                  <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
         </div>
-        <%# --- END: Confirm Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Register</button>
     </form>
     <div class="auth-links">
