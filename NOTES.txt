@@ -16,17 +16,20 @@ MAIL_FROM='"miniapp" <ayyappanallamothu4@gmail.com>'
 # --- Gemini API Key ---
 GEMINI_API_KEY=AIzaSyDqsWRBawV0i0TGRx35I4HAXLkwxt8lwG0
 
-
 #RAZORPAY_KEY_ID=rzp_live_wSdgCnz7CENT3Y
 #RAZORPAY_KEY_SECRET=gA4yxvxNJSHgAB4A5yAIxSFw
 
- RAZORPAY_KEY_ID=rzp_test_pqiinPMS00E9lu
- RAZORPAY_KEY_SECRET=x7MZpBzxmuyH0opjy4RGg5r5
-
+RAZORPAY_KEY_ID=rzp_test_pqiinPMS00E9lu
+RAZORPAY_KEY_SECRET=x7MZpBzxmuyH0opjy4RGg5r5
 
 # --- Rate Limiting Config ---
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
+
+# --- MODIFIED: Add Google OAuth and Server Base URL ---
+SERVER_BASE_URL=http://localhost:5000
+GOOGLE_CLIENT_ID=187475501062-1iuqla74rjf4us85r7h5lc0csljsog1s.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
 
 config.js :
 // config.js
@@ -1861,9 +1864,15 @@ const UserSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, 'Please provide a password'],
+        // <<< MODIFIED: Removed required validation to allow for social logins
         minlength: [8, 'Password must be at least 8 characters long'],
         select: false,
+    },
+    // <<< MODIFIED: Add googleId for Google OAuth
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true // Allows multiple documents to have null for this field
     },
     role: { type: String, enum: ['user', 'admin', 'seller'], default: 'user' },
     isVerified: { type: Boolean, default: false },
@@ -1887,12 +1896,15 @@ UserSchema.pre('save', async function(next) {
 });
 
 UserSchema.methods.matchPassword = async function(enteredPassword) {
+    // <<< MODIFIED: Check if a password is set before trying to compare
     if (!this.password) {
-        const userWithPassword = await User.findById(this._id).select('+password').exec();
-        if (!userWithPassword || !userWithPassword.password) return false;
-        return await bcrypt.compare(enteredPassword, userWithPassword.password);
+        return false;
     }
-    return await bcrypt.compare(enteredPassword, this.password);
+
+    const userWithPassword = await User.findById(this._id).select('+password').exec();
+    if (!userWithPassword || !userWithPassword.password) return false;
+    
+    return await bcrypt.compare(enteredPassword, userWithPassword.password);
 };
 
 const User = mongoose.model('User', UserSchema);
@@ -1979,15 +1991,14 @@ const OrderSchema = new mongoose.Schema({
     shippingAddress: { type: OrderAddressSchema, required: true },
     paymentMethod: {
         type: String,
-        enum: ['COD', 'Razorpay'], // <<< UPDATED
+        enum: ['COD', 'Razorpay'],
         required: true,
         default: 'COD'
     },
     status: {
         type: String,
-        // <<< UPDATED Enum
         enum: ['Pending', 'PaymentPending', 'PaymentFailed', 'Delivered', 'Cancelled'],
-        default: 'PaymentPending' // Default for online payments before confirmation
+        default: 'PaymentPending'
     },
     orderDate: { type: Date, default: Date.now },
     receivedByDate: { type: Date },
@@ -1995,40 +2006,37 @@ const OrderSchema = new mongoose.Schema({
     orderOTPExpires: Date,
     cancellationAllowedUntil: { type: Date },
     cancellationReason: { type: String, trim: true },
-    // --- Razorpay Specific Fields --- // <<< ADDED
     razorpayOrderId: { type: String, trim: true },
     razorpayPaymentId: { type: String, trim: true },
     razorpaySignature: { type: String, trim: true },
-    paymentVerified: { type: Boolean, default: false } // To confirm Razorpay webhook/callback processed
+    paymentVerified: { type: Boolean, default: false }
 
 }, { timestamps: true });
 
 OrderSchema.pre('save', function(next) {
-    // Original logic for COD related fields
     if (this.paymentMethod === 'COD') {
         if (this.isNew && !this.cancellationAllowedUntil && this.status === 'Pending') {
             const now = this.orderDate || Date.now();
             this.cancellationAllowedUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour for COD
         }
-    } else { // For Razorpay or other online payments, cancellation window might be different or not applicable pre-payment
-        this.cancellationAllowedUntil = undefined; // Or handle as per your business logic
+    } else {
+        this.cancellationAllowedUntil = undefined;
     }
 
 
     if (this.isModified('status') && (this.status === 'Cancelled' || this.status === 'Delivered')) {
         this.orderOTP = undefined;
         this.orderOTPExpires = undefined;
-        this.cancellationAllowedUntil = undefined; // Clear this on final states
+        this.cancellationAllowedUntil = undefined;
         if (this.status === 'Cancelled') this.receivedByDate = undefined;
     }
-    if (this.isModified('status') && this.status !== 'Pending') { // Clear OTP if not pending for COD delivery
+    if (this.isModified('status') && this.status !== 'Pending') {
          this.orderOTP = undefined;
          this.orderOTPExpires = undefined;
     }
-    // If order becomes Pending (COD confirmed or Razorpay verified), then set cancellation window if not COD
     if (this.isModified('status') && this.status === 'Pending' && this.paymentMethod !== 'COD' && !this.cancellationAllowedUntil) {
         const now = Date.now();
-        this.cancellationAllowedUntil = new Date(now + 15 * 60 * 1000); // Shorter window for paid orders, e.g., 15 mins
+        this.cancellationAllowedUntil = new Date(now + 15 * 60 * 1000); // 15 mins for paid orders
     }
 
     next();
@@ -2046,6 +2054,8 @@ module.exports = {
 };
 
 package.json :
+
+
 {
   "name": "professional-ecommerce",
   "version": "1.0.0",
@@ -2060,7 +2070,8 @@ package.json :
     "nodejs",
     "express",
     "mongodb",
-    "ejs"
+    "ejs",
+    "passport"
   ],
   "author": "AI Assistant",
   "license": "MIT",
@@ -2078,6 +2089,8 @@ package.json :
     "method-override": "^3.0.0",
     "mongoose": "^8.4.0",
     "nodemailer": "^6.9.13",
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0",
     "razorpay": "^2.9.6"
   },
   "devDependencies": {
@@ -2085,48 +2098,37 @@ package.json :
   }
 }
 
-
 routes.js :
-
 // routes.js
 const express = require('express');
-const rateLimit = require('express-rate-limit'); // <<< ADDED
+const rateLimit = require('express-rate-limit');
 const controllers = require('./controllers');
 const middleware = require('./middleware');
+const passport = require('passport'); // <<< MODIFIED: Import passport
 
 // Destructure imported modules for convenience
 const {
     isAuthenticated, isAdmin, isSeller, isAdminOrSeller, isProductOwner, isOrderRelevantToSeller
 } = middleware;
 
+// ... (Controller destructuring is unchanged)
 const {
-    // Auth Controllers
     auth_getLoginPage, auth_registerUser, auth_getRegisterPage, auth_verifyOtp, auth_getVerifyOtpPage,
     auth_resendOtp, auth_forgotPassword, auth_getForgotPasswordPage, auth_resetPassword, auth_getResetPasswordPage,
     auth_loginUser, auth_logoutUser, auth_getHomePage,
-
-    // Product Controllers
     product_getProducts, product_getProductDetails, product_rateProduct, product_getProductSuggestions,
-
-    // User Controllers
     user_getUserProfilePage, user_updateUserName, user_saveAddress, user_getCart, user_addToCart,
     user_addToCartAjax, user_updateCartQuantity, user_removeFromCart, user_getCheckoutPage, user_lookupPincode,
-
-    // Order Controllers
     order_placeCODOrder,
     order_createRazorpayOrderIntent,
     order_verifyRazorpayPayment,
     order_markPaymentFailed,
     order_getMyOrders, order_cancelOrder,
-
-    // Admin Controllers
     admin_getDashboard, admin_uploadProduct, admin_getUploadProductPage, admin_getManageProductsPage,
     admin_getEditProductPage, admin_updateProduct, admin_removeProduct, admin_getManageOrdersPage,
     admin_sendDirectDeliveryOtpByAdmin, admin_confirmDirectDeliveryByAdmin, admin_cancelOrderByAdmin,
     admin_getManageUsersPage, admin_updateUserRole, admin_removeUser,
     admin_getManageBannersPage, admin_updateBanners,
-
-    // Seller Controllers
     seller_getDashboard, seller_getUploadProductPage, seller_uploadProduct, seller_getManageProductsPage,
     seller_getEditProductPage, seller_updateProduct, seller_removeProduct, seller_getManageOrdersPage,
     seller_sendDirectDeliveryOtpBySeller, seller_confirmDirectDeliveryBySeller, seller_cancelOrderBySeller
@@ -2134,50 +2136,11 @@ const {
 
 const router = express.Router();
 
-// --- Rate Limiting Configuration ---  <<< ADDED SECTION
-const generalLimiter = rateLimit({
-    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)), // Default 15 minutes
-    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || 100), // Default 100 requests per windowMs
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-    message: 'Too many requests from this IP, please try again after a while.',
-    handler: (req, res, next, options) => {
-        req.flash('error_msg', options.message);
-        // Attempt to redirect back, or to a common page if referer is not available
-        const backURL = req.header('Referer') || '/';
-        res.status(options.statusCode).redirect(backURL);
-    }
-});
-
-const authActionLimiter = rateLimit({ // Stricter for sensitive auth actions
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 15, // Limit each IP to 15 requests per window
-    message: 'Too many attempts. Please try again later.',
-    handler: (req, res, next, options) => {
-        req.flash('error_msg', options.message);
-        // Redirect to a relevant page, e.g., login for login attempts, register for register attempts
-        let redirectUrl = '/auth/login';
-        if (req.path.includes('register')) redirectUrl = '/auth/register';
-        else if (req.path.includes('forgot-password')) redirectUrl = '/auth/forgot-password';
-        else if (req.path.includes('verify-otp') || req.path.includes('resend-otp')) {
-            const email = req.body.email || req.query.email;
-            redirectUrl = email ? `/auth/verify-otp?email=${encodeURIComponent(email)}` : '/auth/register';
-        }
-        res.status(options.statusCode).redirect(redirectUrl);
-    }
-});
-
-const paymentApiLimiter = rateLimit({ // Limiter for payment APIs
-    windowMs: 5 * 60 * 1000, // 5 minutes
-    max: 10, // Limit to 10 payment-related API calls per window
-    message: 'Too many payment attempts. Please try again after a few minutes.',
-    handler: (req, res, next, options) => {
-        // For API endpoints, respond with JSON
-        res.status(options.statusCode).json({ success: false, message: options.message });
-    }
-});
-// --- END Rate Limiting Configuration ---
-
+// --- Rate Limiting Configuration ---
+// ... (Rate limiter setup is unchanged)
+const generalLimiter = rateLimit({ windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || (15 * 60 * 1000)), max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || 100), standardHeaders: true, legacyHeaders: false, message: 'Too many requests from this IP, please try again after a while.', handler: (req, res, next, options) => { req.flash('error_msg', options.message); const backURL = req.header('Referer') || '/'; res.status(options.statusCode).redirect(backURL); }});
+const authActionLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 15, message: 'Too many attempts. Please try again later.', handler: (req, res, next, options) => { req.flash('error_msg', options.message); let redirectUrl = '/auth/login'; if (req.path.includes('register')) redirectUrl = '/auth/register'; else if (req.path.includes('forgot-password')) redirectUrl = '/auth/forgot-password'; else if (req.path.includes('verify-otp') || req.path.includes('resend-otp')) { const email = req.body.email || req.query.email; redirectUrl = email ? `/auth/verify-otp?email=${encodeURIComponent(email)}` : '/auth/register'; } res.status(options.statusCode).redirect(redirectUrl); }});
+const paymentApiLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, message: 'Too many payment attempts. Please try again after a few minutes.', handler: (req, res, next, options) => { res.status(options.statusCode).json({ success: false, message: options.message }); }});
 
 // --- Public/Base Routes ---
 router.get('/', generalLimiter, auth_getHomePage);
@@ -2185,7 +2148,6 @@ router.get('/', generalLimiter, auth_getHomePage);
 
 // --- Auth Routes ---
 const authRouter = express.Router();
-// Apply generalLimiter to GET pages, stricter authActionLimiter to POST actions
 authRouter.get('/login', generalLimiter, auth_getLoginPage);
 authRouter.get('/register', generalLimiter, auth_getRegisterPage);
 authRouter.get('/verify-otp', generalLimiter, auth_getVerifyOtpPage);
@@ -2194,29 +2156,56 @@ authRouter.get('/reset-password/:token', generalLimiter, auth_getResetPasswordPa
 
 authRouter.post('/register', authActionLimiter, auth_registerUser);
 authRouter.post('/login', authActionLimiter, auth_loginUser);
-authRouter.post('/logout', isAuthenticated, auth_logoutUser); // Logout is less sensitive
+authRouter.post('/logout', isAuthenticated, auth_logoutUser);
 authRouter.post('/verify-otp', authActionLimiter, auth_verifyOtp);
 authRouter.post('/resend-otp', authActionLimiter, auth_resendOtp);
 authRouter.post('/forgot-password', authActionLimiter, auth_forgotPassword);
 authRouter.post('/reset-password/:token', authActionLimiter, auth_resetPassword);
+
+/* --- MODIFIED: Add Google OAuth Routes --- */
+// 1. Route to start Google authentication
+authRouter.get('/google',
+    authActionLimiter, // Apply limiter
+    passport.authenticate('google', {
+        scope: ['profile', 'email'] // Request user's profile and email
+    })
+);
+
+// 2. Google callback route
+authRouter.get('/google/callback',
+    passport.authenticate('google', {
+        failureRedirect: '/auth/login', // Redirect on failure
+        failureFlash: 'Google authentication failed. Please try again or use a different method.', // Optional flash message
+    }),
+    (req, res) => {
+        // Successful authentication
+        req.flash('success_msg', 'You have successfully logged in with Google.');
+        const returnTo = req.session.returnTo || '/';
+        delete req.session.returnTo;
+        res.redirect(returnTo);
+    }
+);
+/* --- END Google OAuth Routes --- */
+
 router.use('/auth', authRouter);
 
 
 // --- Product Routes (Public Facing) ---
+// ... (Product router is unchanged) ...
 const productRouter = express.Router();
-productRouter.get('/suggestions', generalLimiter, product_getProductSuggestions); // Limiter for suggestion API
+productRouter.get('/suggestions', generalLimiter, product_getProductSuggestions);
 productRouter.get('/', generalLimiter, product_getProducts);
 productRouter.get('/:id', generalLimiter, product_getProductDetails);
-productRouter.post('/:id/rate', isAuthenticated, generalLimiter, product_rateProduct); // Limit rating submissions
+productRouter.post('/:id/rate', isAuthenticated, generalLimiter, product_rateProduct);
 router.use('/products', productRouter);
 
 
 // --- User Routes (Authenticated) ---
+// ... (User router is unchanged) ...
 const userRouter = express.Router();
-userRouter.get('/pincode-lookup/:pincode', generalLimiter, user_lookupPincode); // Limit pincode lookups
-userRouter.use(isAuthenticated); // Authenticated routes below
-userRouter.use(generalLimiter); // Apply general limiter to authenticated user actions
-
+userRouter.get('/pincode-lookup/:pincode', generalLimiter, user_lookupPincode);
+userRouter.use(isAuthenticated);
+userRouter.use(generalLimiter);
 userRouter.get('/profile', user_getUserProfilePage);
 userRouter.post('/profile/update-name', user_updateUserName);
 userRouter.post('/address/save', user_saveAddress);
@@ -2228,26 +2217,23 @@ userRouter.post('/cart/remove/:productId', user_removeFromCart);
 userRouter.get('/checkout', user_getCheckoutPage);
 router.use('/user', userRouter);
 
-
 // --- Order Routes (Authenticated) ---
+// ... (Order router is unchanged) ...
 const orderRouter = express.Router();
 orderRouter.use(isAuthenticated);
-// Apply paymentApiLimiter to payment creation and verification
 orderRouter.post('/place-cod', paymentApiLimiter, order_placeCODOrder);
 orderRouter.post('/create-razorpay-order', paymentApiLimiter, order_createRazorpayOrderIntent);
 orderRouter.post('/verify-razorpay-payment', paymentApiLimiter, order_verifyRazorpayPayment);
 orderRouter.post('/payment-failed/:internal_order_id', paymentApiLimiter, order_markPaymentFailed);
-
 orderRouter.get('/my-orders', generalLimiter, order_getMyOrders);
 orderRouter.post('/cancel/:id', generalLimiter, order_cancelOrder);
 router.use('/orders', orderRouter);
 
-
 // --- Admin Routes (Authenticated + Admin Role) ---
+// ... (Admin router is unchanged) ...
 const adminRouter = express.Router();
 adminRouter.use(isAuthenticated, isAdmin);
-adminRouter.use(generalLimiter); // Apply general limiter to admin actions
-
+adminRouter.use(generalLimiter);
 adminRouter.get('/dashboard', admin_getDashboard);
 adminRouter.get('/upload-product', admin_getUploadProductPage);
 adminRouter.post('/upload-product', admin_uploadProduct);
@@ -2266,12 +2252,11 @@ adminRouter.get('/manage-banners', admin_getManageBannersPage);
 adminRouter.post('/manage-banners', admin_updateBanners);
 router.use('/admin', adminRouter);
 
-
 // --- Seller Routes (Authenticated + Seller Role) ---
+// ... (Seller router is unchanged) ...
 const sellerRouter = express.Router();
 sellerRouter.use(isAuthenticated, isSeller);
-sellerRouter.use(generalLimiter); // Apply general limiter to seller actions
-
+sellerRouter.use(generalLimiter);
 sellerRouter.get('/dashboard', seller_getDashboard);
 sellerRouter.get('/products/upload', seller_getUploadProductPage);
 sellerRouter.post('/products/upload', seller_uploadProduct);
@@ -2285,11 +2270,9 @@ sellerRouter.post('/orders/:orderId/confirm-delivery', isOrderRelevantToSeller, 
 sellerRouter.post('/orders/:orderId/cancel', isOrderRelevantToSeller, seller_cancelOrderBySeller);
 router.use('/seller', sellerRouter);
 
-
 module.exports = router;
 
 server.js :
-
 // server.js
 require('dotenv').config();
 const express = require('express');
@@ -2298,12 +2281,17 @@ const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const flash = require('connect-flash');
 const methodOverride = require('method-override');
-// const rateLimit = require('express-rate-limit'); // Rate limiter will be defined and applied in routes.js
+// <<< MODIFIED: Import passport and strategy
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
 
 // Import consolidated modules
 const Config = require('./config');
-const routes = require('./routes'); // Import the single router file
+const routes = require('./routes');
 const middleware = require('./middleware');
+// <<< MODIFIED: Import User model for Passport config
+const { User } = require('./models');
 
 // Destructure for clarity
 const { connectDB, categories: siteCategories } = Config;
@@ -2335,24 +2323,107 @@ app.use(
     }),
     cookie: {
         maxAge: parseInt(process.env.SESSION_MAX_AGE || '86400000', 10),
-        httpOnly: true
-        // secure: process.env.NODE_ENV === 'production', // Enable in production
-        // sameSite: 'lax' // Recommended for security
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production'
     }
   })
 );
+
+/* --- MODIFIED: Passport Middleware & Strategy Configuration --- */
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Configure Google OAuth2.0 strategy
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+    passport.use(new GoogleStrategy({
+        clientID: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        callbackURL: `${process.env.SERVER_BASE_URL}/auth/google/callback`
+    },
+    async (accessToken, refreshToken, profile, done) => {
+        try {
+            // 1. Check if user already exists via Google ID
+            let user = await User.findOne({ googleId: profile.id });
+
+            if (user) {
+                return done(null, user); // User found, log them in
+            }
+
+            // 2. If no user with Google ID, check for email match
+            const userEmail = profile.emails && profile.emails[0] ? profile.emails[0].value : null;
+            if (userEmail) {
+                user = await User.findOne({ email: userEmail });
+
+                // 2a. Email exists, link the Google ID
+                if (user) {
+                    user.googleId = profile.id;
+                    // Google email is inherently verified
+                    user.isVerified = true;
+                    await user.save({ validateBeforeSave: false }); // Bypass password validation
+                    return done(null, user);
+                }
+            }
+
+            // 3. No existing user, create a new one
+            const newUser = new User({
+                googleId: profile.id,
+                name: profile.displayName,
+                email: userEmail,
+                isVerified: true // Google handles email verification
+                // Password is not required for Google users
+            });
+
+            await newUser.save();
+            return done(null, newUser);
+
+        } catch (error) {
+            return done(error, false);
+        }
+    }));
+    console.log("Passport Google strategy configured.");
+} else {
+    console.warn("Google OAuth credentials not set. Google login will be disabled.");
+}
+
+
+// Serialize user to store in session
+passport.serializeUser((user, done) => {
+    done(null, user.id); // Store only the user's ID in the session
+});
+
+// Deserialize user from session
+passport.deserializeUser(async (id, done) => {
+    try {
+        const user = await User.findById(id);
+        done(null, user);
+    } catch (error) {
+        done(error, null);
+    }
+});
+/* --- END Passport Configuration --- */
 
 // --- Flash Middleware ---
 app.use(flash());
 
 // --- Res Locals Middleware (Uses consolidated config) ---
 app.use((req, res, next) => {
-  // Flash messages
   res.locals.success_msg = req.flash('success_msg');
   res.locals.error_msg = req.flash('error_msg');
   res.locals.error = req.flash('error');
 
-  // User info
+  // <<< MODIFIED: Use req.user from passport if req.session.user is not set
+  // Passport populates req.user. We will also maintain our req.session.user
+  if (req.user && !req.session.user) {
+      req.session.user = {
+          _id: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          role: req.user.role,
+          address: req.user.address?.toObject(),
+          cart: req.user.cart ? req.user.cart.map(item => ({ productId: item.productId?._id, quantity: item.quantity })) : []
+      };
+  }
+
   res.locals.currentUser = req.session.user || null;
   res.locals.cartItemCount = req.session.user?.cart?.reduce((count, item) => count + (item.quantity || 0), 0) || 0;
   let userInitials = '??';
@@ -2362,9 +2433,9 @@ app.use((req, res, next) => {
       if (nameParts.length > 1 && nameParts[0] && nameParts[nameParts.length - 1]) userInitials = (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
       else if (nameParts.length === 1 && nameParts[0].length >= 2) userInitials = nameParts[0].substring(0, 2).toUpperCase();
       else if (nameParts.length === 1 && nameParts[0].length === 1) userInitials = (nameParts[0][0] + nameParts[0][0]).toUpperCase();
-    } catch (e) { userInitials = '??'; } // Fallback remains '??'
+    } catch (e) { userInitials = '??'; }
   }
-   else if (req.session.user?.email) { // Fallback to email if name fails/missing
+   else if (req.session.user?.email) {
      const emailPrefix = req.session.user.email.split('@')[0];
      if (emailPrefix.length >= 2) { userInitials = emailPrefix.substring(0, 2).toUpperCase(); }
      else if (emailPrefix.length === 1) { userInitials = emailPrefix.toUpperCase() + emailPrefix.toUpperCase(); }
@@ -2372,7 +2443,6 @@ app.use((req, res, next) => {
   res.locals.userInitials = userInitials;
 
 
-  // URL and Date Formatting
   res.locals.currentUrl = req.originalUrl;
   res.locals.fullUrl = `${req.protocol}://${req.get('host')}${req.originalUrl}`;
   res.locals.formatDateIST = (dateInput) => {
@@ -2380,13 +2450,9 @@ app.use((req, res, next) => {
       try { const date = new Date(dateInput); return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }); }
       catch (error) { console.error("Date Format Error:", error, dateInput); return 'Date Error'; }
   };
-
-  // Site Config from consolidated config
-  res.locals.defaultSiteName = 'miniapp'; // Or read from config if moved there
+  res.locals.defaultSiteName = 'miniapp';
   res.locals.NODE_ENV = process.env.NODE_ENV;
-  res.locals.siteCategories = siteCategories; // Use imported categories
-
-   // Pincode Address Form Data Handling (Retain original logic)
+  res.locals.siteCategories = siteCategories;
    res.locals.addressFormData = req.session?.addressFormData || null;
    if (req.session?.addressFormData) { delete req.session.addressFormData; }
 
@@ -2716,7 +2782,6 @@ vercel.json :
     "MONGO_URI": "@mongo_uri",
     "SESSION_SECRET": "@session_secret",
     "SESSION_MAX_AGE": "@session_max_age",
-    "FRONTEND_URL": "@frontend_url",
     "MAIL_HOST": "@mail_host",
     "MAIL_PORT": "@mail_port",
     "MAIL_USER": "@mail_user",
@@ -2726,7 +2791,11 @@ vercel.json :
     "RAZORPAY_KEY_ID": "@razorpay_key_id",
     "RAZORPAY_KEY_SECRET": "@razorpay_key_secret",
     "RATE_LIMIT_WINDOW_MS": "@rate_limit_window_ms",
-    "RATE_LIMIT_MAX_REQUESTS": "@rate_limit_max_requests"
+    "RATE_LIMIT_MAX_REQUESTS": "@rate_limit_max_requests",
+    
+    "SERVER_BASE_URL": "@server_base_url",
+    "GOOGLE_CLIENT_ID": "@google_client_id",
+    "GOOGLE_CLIENT_SECRET": "@google_client_secret"
   }
 }
 
@@ -4750,7 +4819,59 @@ tr.hidden {
   height: 100%;
 }
 
-/* --- End Product Image Slider Styles --- */
+/* public/css/style.css */
+
+/* Add this at the end of the Buttons section */
+.btn-google {
+    background-color: #ffffff;
+    color: #444;
+    border: 1px solid #ddd;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.btn-google:hover,
+.btn-google:focus {
+    background-color: #f7f7f7;
+    border-color: #ccc;
+    color: #222;
+}
+.btn-google .fa-google {
+    color: #db4437; /* Google's red color */
+    margin-right: 10px;
+}
+
+/* Add this in the Auth section or a new dedicated area */
+.auth-divider {
+    text-align: center;
+    margin: 1.2rem 0;
+    overflow: hidden;
+    line-height: 1.2em;
+}
+.auth-divider span {
+    display: inline-block;
+    position: relative;
+    padding: 0 10px;
+    background-color: var(--card-bg);
+    color: var(--secondary-color);
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.auth-divider::before,
+.auth-divider::after {
+    content: '';
+    position: relative;
+    top: 50%;
+    width: 50%;
+    display: inline-block;
+    border-top: 1px solid var(--border-color);
+}
+.auth-divider::before {
+    margin-left: -50%;
+    right: 10px;
+}
+.auth-divider::after {
+    margin-right: -50%;
+    left: 10px;
+}
 
 public/js/main.js :
 
@@ -6455,24 +6576,29 @@ views/auth/login.ejs :
 <div class="auth-container">
     <h1>Login</h1>
 
+    <%# --- MODIFIED: Add Google Button and OR divider --- %>
+    <a href="/auth/google" class="btn btn-google btn-block mb-3">
+        <i class="fab fa-google"></i> Continue with Google
+    </a>
+    <div class="auth-divider">
+        <span>OR</span>
+    </div>
+    <%# --- END MODIFICATION --- %>
+
     <form action="/auth/login" method="POST" class="auth-form form-submit-spinner">
         <div class="form-group">
             <label for="email">Email:</label>
-            <%# Added Placeholder %>
             <input type="email" id="email" name="email" placeholder="Enter your email" required autocomplete="email">
         </div>
-        <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
             <div class="password-wrapper">
-                <%# Added Placeholder %>
                 <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
         </div>
-        <%# --- END: Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Login</button>
     </form>
     <div class="auth-links">
@@ -6488,44 +6614,44 @@ views/auth/register.ejs :
 
 <div class="auth-container">
     <h1>Register</h1>
+    
+    <%# --- MODIFIED: Add Google Button and OR divider --- %>
+    <a href="/auth/google" class="btn btn-google btn-block mb-3">
+        <i class="fab fa-google"></i> Continue with Google
+    </a>
+    <div class="auth-divider">
+        <span>OR</span>
+    </div>
+    <%# --- END MODIFICATION --- %>
 
     <form action="/auth/register" method="POST" class="auth-form form-submit-spinner">
          <div class="form-group">
             <label for="name">Name:</label>
-            <%# Retain value on error, added placeholder %>
             <input type="text" id="name" name="name" placeholder="Enter your full name" required autocomplete="name" value="<%= typeof name !== 'undefined' ? name : '' %>">
         </div>
         <div class="form-group">
             <label for="email">Email:</label>
-             <%# Retain value on error, added placeholder %>
             <input type="email" id="email" name="email" placeholder="Enter your email address" required autocomplete="email" value="<%= typeof email !== 'undefined' ? email : '' %>">
         </div>
-         <%# --- ADDED: Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="password">Password:</label>
             <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder, title attr, added helper text --- %>
                 <input type="password" id="password" name="password" placeholder="Create a password" minlength="8" required autocomplete="new-password" title="Min 8 chars: Uppercase, Lowercase, Number, Special Char">
                 <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
-            <%# --- ADDED: Helper Text --- %>
             <small class="form-text text-muted">Min 8 characters. Must include uppercase, lowercase, number, and special character (e.g: Example@2004).</small>
         </div>
-         <%# --- END: Password Wrapper & Toggle Button --- %>
-         <%# --- ADDED: Confirm Password Wrapper & Toggle Button --- %>
         <div class="form-group">
             <label for="confirmPassword">Confirm Password:</label>
              <div class="password-wrapper">
-                 <%# UPDATED: minlength="8", placeholder --- %>
                 <input type="password" id="confirmPassword" name="confirmPassword" placeholder="Confirm your password" minlength="8" required autocomplete="new-password">
                  <button type="button" class="password-toggle-btn" aria-label="Toggle password visibility">
                     <i class="fas fa-eye-slash"></i>
                 </button>
             </div>
         </div>
-        <%# --- END: Confirm Password Wrapper & Toggle Button --- %>
         <button type="submit" class="btn btn-primary">Register</button>
     </form>
     <div class="auth-links">
@@ -8399,3 +8525,4 @@ views/user/profile.ejs :
 
 </div>
 <%- include('../partials/footer') %>
+
