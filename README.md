@@ -6,7 +6,7 @@ A full-featured, responsive e-commerce web application built with Node.js, Expre
 
 **Live Demo:** [miniappecom.vercel.app](https://miniappecom.vercel.app/)
 
-**GitHub Repo:** [nallamothusurya/surya-ecommerce](https://github.com/nallamothusurya/surya-ecommerce)
+**GitHub Repo:** [nallamothusurya/surya-ecommerce](https://github.com/ayyappavenkatasurya/surya-ecommerce)
 
 ---
 
